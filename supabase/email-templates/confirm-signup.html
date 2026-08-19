@@ -68,8 +68,18 @@
                   E-posta adresinizi dogrulayin
                 </h1>
                 <p style="margin:0 0 8px 0; font-size:15px; line-height:1.65; color:#475569;">
-                  Merhaba, <strong style="color:#0f172a;">{{ .Email }}</strong> adresiyle bir hesap
-                  olusturuldu. Kaydi tamamlamak icin asagidaki butona tiklayin.
+                  {{/*
+                    full_name, kayit formundan signUp options.data icinde gelir ve
+                    auth.users.raw_user_meta_data alaninda saklanir; sablonda .Data
+                    uzerinden okunur. Panelden (Add user) olusturulan kullanicilarda
+                    bu alan bos oldugu icin e-postaya geri dusuyoruz - aksi halde
+                    Go sablonu "<no value>" basardi.
+                  */}}
+                  Merhaba
+                  <strong style="color:#0f172a;">{{ if .Data.full_name }}{{ .Data.full_name }}{{ else }}{{ .Email }}{{ end }}</strong>,
+                  <br />
+                  <span style="color:#64748b;">{{ .Email }}</span> adresiyle bir hesap olusturuldu.
+                  Kaydi tamamlamak icin asagidaki butona tiklayin.
                 </p>
               </td>
             </tr>
