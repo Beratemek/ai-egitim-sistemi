@@ -18,15 +18,33 @@ baslangic projesi.
 
 ## Hizli baslangic
 
+Gereksinim: **Node.js 18.18+** (onerilen: 20 veya 22). Baska hicbir sey gerekmez.
+
 ```bash
+git clone https://github.com/Beratemek/ai-egitim-sistemi.git
+cd ai-egitim-sistemi
 npm install
-cp .env.example .env.local   # PowerShell: Copy-Item .env.example .env.local
 npm run dev
 ```
 
-`.env.local` doldurulmadan da uygulama **demo modunda** calisir: giris ekrani
-rol secme baglantilari gosterir, paneller `lib/mock-data.ts` icindeki ornek
-veriyle render edilir ve AI cagrilarina sahte yanit doner.
+Tarayicida <http://localhost:3000> adresini acin. **Anahtar girmenize gerek yok** -
+uygulama `.env.local` olmadan **demo modunda** calisir:
+
+- giris ekrani parola sormaz, dogrudan rol secme baglantilari gosterir,
+- paneller `lib/mock-data.ts` icindeki ornek veriyle render edilir,
+- AI uclari gercek bir API cagrisi yapmadan `[MOCK]` etiketli yanit doner.
+
+> Port 3000 doluysa Next.js otomatik olarak bir sonraki bos porta gecer;
+> terminaldeki `Local:` satirinda hangi adreste calistigi yazar.
+> Belirli bir port icin: `npm run dev -- -p 3001`
+
+Gercek Supabase ve OpenAI baglamak istediginizde:
+
+```bash
+cp .env.example .env.local   # PowerShell: Copy-Item .env.example .env.local
+```
+
+ve asagidaki adimlari izleyin.
 
 ### Supabase kurulumu
 
