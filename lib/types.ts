@@ -130,6 +130,34 @@ export type ExamStatistics = {
 };
 
 /* -------------------------------------------------------------------------- */
+/*  Tercih hafizasi (AI'in icerik uzmanindan ogrenmesi)                       */
+/* -------------------------------------------------------------------------- */
+
+export const PREFERENCE_VERDICTS = ["begendi", "begenmedi"] as const;
+export type PreferenceVerdict = (typeof PREFERENCE_VERDICTS)[number];
+
+export type QuestionPreference = {
+  id: string;
+  user_id: string;
+  verdict: PreferenceVerdict;
+  question_text: string;
+  question_type: QuestionType;
+  topic: string;
+  difficulty: string;
+  options_json: QuestionOption[] | null;
+  rubric: string | null;
+  note: string | null;
+  outcome_id: string | null;
+  created_at: string;
+};
+
+/** Modele few-shot olarak verilecek ornek kumesi. */
+export interface StyleGuide {
+  liked: QuestionPreference[];
+  disliked: QuestionPreference[];
+}
+
+/* -------------------------------------------------------------------------- */
 /*  Yapay zeka cikti tipleri                                                  */
 /* -------------------------------------------------------------------------- */
 
@@ -261,6 +289,20 @@ export interface Database {
           | "reviewed_by"
         >
       >;
+      question_preferences: TableDefinition<
+        QuestionPreference,
+        Insertable<
+          QuestionPreference,
+          | "id"
+          | "created_at"
+          | "topic"
+          | "difficulty"
+          | "options_json"
+          | "rubric"
+          | "note"
+          | "outcome_id"
+        >
+      >;
     };
     Views: {
       /** Salt okunur gorunum: Insert/Update tanimlanmaz. */
@@ -284,6 +326,7 @@ export interface Database {
       question_type: QuestionType;
       question_status: QuestionStatus;
       submission_status: SubmissionStatus;
+      preference_verdict: PreferenceVerdict;
     };
   };
 }

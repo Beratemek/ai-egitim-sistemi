@@ -1,0 +1,226 @@
+"use client";
+
+import * as React from "react";
+import { Check, Loader2, ThumbsDown, ThumbsUp } from "lucide-react";
+import { toast } from "sonner";
+
+import { recordPreference } from "@/app/actions/questions";
+import { QuestionTypeBadge } from "@/components/shared/status-badge";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
+import type { GeneratedQuestion, PreferenceVerdict } from "@/lib/types";
+
+const DIFFICULTY_VARIANT: Record<
+  GeneratedQuestion["difficulty"],
+  "success" | "warning" | "danger"
+> = {
+  kolay: "success",
+  orta: "warning",
+  zor: "danger",
+};
+
+export interface GeneratedQuestionCardProps {
+  question: GeneratedQuestion;
+  index: number;
+  /** Havuza gonderilmek uzere secili mi? */
+  selected: boolean;
+  onToggleSelected: (selected: boolean) => void;
+  outcomeId?: string;
+}
+
+/**
+ * Tek bir AI taslagi.
+ *
+ * Begen / begenme dugmeleri taslagi tercih hafizasina yazar; bir sonraki
+ * uretimde model bu ornekleri gorur. Begenmedigi taslaga uzman kisa bir
+ * gerekce de yazabilir - o gerekce de modele gider.
+ */
+export function GeneratedQuestionCard({
+  question,
+  index,
+  selected,
+  onToggleSelected,
+  outcomeId,
+}: GeneratedQuestionCardProps) {
+  const [verdict, setVerdict] = React.useState<PreferenceVerdict | null>(null);
+  const [pending, setPending] = React.useState<PreferenceVerdict | null>(null);
+  const [noteOpen, setNoteOpen] = React.useState(false);
+  const [note, setNote] = React.useState("");
+
+  async function submitVerdict(next: PreferenceVerdict, withNote?: string) {
+    setPending(next);
+
+    const result = await recordPreference({
+      question,
+      verdict: next,
+      ...(withNote ? { note: withNote } : {}),
+      ...(outcomeId ? { outcomeId } : {}),
+    });
+
+    setPending(null);
+
+    if (!result.ok) {
+      toast.error("Geri bildirim kaydedilemedi", { description: result.error });
+      return;
+    }
+
+    setVerdict(next);
+    setNoteOpen(false);
+
+    if (next === "begendi") {
+      // Begenilen soru dogal olarak havuza da aday.
+      onToggleSelected(true);
+      toast.success("Begeni kaydedildi", {
+        description: "AI bir sonraki uretimde bu tarzi daha cok kullanacak.",
+      });
+    } else {
+      onToggleSelected(false);
+      toast.success("Geri bildirim kaydedildi", {
+        description: "AI bu tarzdan uzak duracak.",
+      });
+    }
+  }
+
+  return (
+    <Card
+      className={cn(
+        "transition-colors",
+        verdict === "begendi" && "border-success/40 bg-success/[0.03]",
+        verdict === "begenmedi" && "border-destructive/30 opacity-70",
+      )}
+    >
+      <CardContent className="space-y-3 p-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={selected}
+              onChange={(event) => onToggleSelected(event.target.checked)}
+              className="h-4 w-4 rounded border-input accent-[hsl(var(--primary))]"
+              aria-label={`${index + 1}. soruyu havuza gonder`}
+            />
+            <span className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/10 text-xs font-semibold text-primary">
+              {index + 1}
+            </span>
+          </label>
+
+          <QuestionTypeBadge type={question.type} />
+          <Badge variant={DIFFICULTY_VARIANT[question.difficulty]}>
+            {question.difficulty}
+          </Badge>
+          <span className="text-xs text-muted-foreground">{question.topic}</span>
+
+          {verdict ? (
+            <Badge
+              variant={verdict === "begendi" ? "success" : "danger"}
+              className="ml-auto gap-1.5"
+            >
+              {verdict === "begendi" ? (
+                <ThumbsUp className="h-3 w-3" />
+              ) : (
+                <ThumbsDown className="h-3 w-3" />
+              )}
+              {verdict === "begendi" ? "Begenildi" : "Begenilmedi"}
+            </Badge>
+          ) : null}
+        </div>
+
+        <p className="font-medium leading-relaxed">{question.text}</p>
+
+        {question.type === "test" ? (
+          <ul className="space-y-1">
+            {(question.options ?? []).map((option) => {
+              const isCorrect = option.key === question.correct_answer;
+
+              return (
+                <li
+                  key={option.key}
+                  className={cn(
+                    "flex gap-2 rounded-md px-2 py-1.5 text-sm",
+                    isCorrect
+                      ? "bg-success/10 font-medium text-success"
+                      : "text-muted-foreground",
+                  )}
+                >
+                  <span className="font-mono text-xs opacity-70">{option.key})</span>
+                  {option.text}
+                  {isCorrect ? <Check className="ml-auto h-4 w-4 shrink-0" /> : null}
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <div className="rounded-lg bg-muted/60 p-3">
+            <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Rubrik
+            </p>
+            <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">
+              {question.rubric}
+            </pre>
+          </div>
+        )}
+
+        {/* ---------- Geri bildirim ---------- */}
+        <div className="flex flex-wrap items-center gap-2 border-t pt-3">
+          <Button
+            type="button"
+            size="sm"
+            variant={verdict === "begendi" ? "default" : "outline"}
+            className="gap-1.5"
+            disabled={pending !== null}
+            onClick={() => void submitVerdict("begendi")}
+          >
+            {pending === "begendi" ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <ThumbsUp className="h-3.5 w-3.5" />
+            )}
+            Begendim
+          </Button>
+
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="gap-1.5 text-muted-foreground hover:text-destructive"
+            disabled={pending !== null}
+            onClick={() => setNoteOpen((open) => !open)}
+          >
+            <ThumbsDown className="h-3.5 w-3.5" />
+            Begenmedim
+          </Button>
+
+          <span className="ml-auto text-xs text-muted-foreground">
+            Geri bildirim AI&apos;in bir sonraki uretimini sekillendirir
+          </span>
+        </div>
+
+        {noteOpen ? (
+          <div className="flex flex-col gap-2 rounded-lg bg-muted/50 p-3 sm:flex-row">
+            <Input
+              value={note}
+              onChange={(event) => setNote(event.target.value)}
+              placeholder="Nesi eksik? (ornek: celdiriciler zayif, cok kolay)"
+              className="flex-1"
+            />
+            <Button
+              type="button"
+              size="sm"
+              variant="destructive"
+              disabled={pending !== null}
+              onClick={() => void submitVerdict("begenmedi", note.trim() || undefined)}
+            >
+              {pending === "begenmedi" ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : null}
+              Gonder
+            </Button>
+          </div>
+        ) : null}
+      </CardContent>
+    </Card>
+  );
+}

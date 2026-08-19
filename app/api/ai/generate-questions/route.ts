@@ -1,5 +1,6 @@
 import { generateQuestions } from "@/lib/ai";
 import { errorMessage, jsonError, jsonOk, readJson, requireRole } from "@/lib/api";
+import { getStyleGuide } from "@/lib/queries";
 import type { GenerateQuestionsRequest, GeneratedQuestion } from "@/lib/types";
 
 // AI SDK Node.js ortamini gerektirir.
@@ -31,12 +32,16 @@ export async function POST(request: Request) {
 
     const count = Math.min(Math.max(body.count ?? 5, 1), 20);
 
+    // Icerik uzmaninin gecmis begeni/red kayitlari modele ornek olarak verilir.
+    const styleGuide = await getStyleGuide();
+
     const questions: GeneratedQuestion[] = await generateQuestions(
       body.context,
       body.kazanim,
       {
         count,
         type: body.type ?? "karisik",
+        styleGuide,
         ...(body.topic ? { topic: body.topic } : {}),
       },
     );

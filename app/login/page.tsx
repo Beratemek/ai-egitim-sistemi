@@ -2,9 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft, CheckCircle2 } from "lucide-react";
 
+import { DevQuickLogin } from "@/components/shared/dev-quick-login";
 import { LoginForm } from "@/components/shared/login-form";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { BrandMark } from "@/components/shared/brand-mark";
+import { canQuickLogin } from "@/lib/dev-mode";
 
 export const metadata: Metadata = {
   title: "Giris",
@@ -88,6 +90,8 @@ export default function LoginPage() {
             </div>
 
             <LoginForm />
+
+            {canQuickLogin() ? <DevQuickLogin /> : null}
 
             <p className="text-center text-xs text-muted-foreground">
               Sorun mu yasiyorsunuz?{" "}

@@ -11,6 +11,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { updateQuestionStatus } from "@/app/actions/questions";
+
 import {
   QuestionStatusBadge,
   QuestionTypeBadge,
@@ -50,10 +52,10 @@ export interface QuestionPoolTableProps {
   /** Baslangic verisi. Su an mock; Supabase'e gecerken sunucudan gecirin. */
   questions: readonly Question[];
   /**
-   * Durum degisikligini kalici hale getirir. Verilmezse degisiklik yalnizca
-   * bilesen icindeki state'te tutulur (mock demo davranisi).
+   * true ise onay/red veritabanina yazilir (server action).
+   * false ise degisiklik yalnizca bilesen icindeki state'te kalir - demo modu.
    */
-  onStatusChange?: (questionId: string, status: QuestionStatus) => Promise<void> | void;
+  persist?: boolean;
 }
 
 const TYPE_LABELS: Record<QuestionType, string> = {
@@ -68,7 +70,10 @@ const STATUS_TABS: readonly { value: StatusFilter; label: string }[] = [
   { value: "reddedildi", label: "Reddedildi" },
 ];
 
-export function QuestionPoolTable({ questions, onStatusChange }: QuestionPoolTableProps) {
+export function QuestionPoolTable({
+  questions,
+  persist = false,
+}: QuestionPoolTableProps) {
   const [rows, setRows] = React.useState<readonly Question[]>(questions);
   const [search, setSearch] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState<StatusFilter>("hepsi");
@@ -119,14 +124,19 @@ export function QuestionPoolTable({ questions, onStatusChange }: QuestionPoolTab
     );
 
     try {
-      await onStatusChange?.(question.id, status);
-      toast.success(
-        status === "onayli" ? "Soru havuza eklendi" : "Soru reddedildi",
-        { description: question.text.slice(0, 70) + "..." },
-      );
-    } catch {
+      if (persist) {
+        const result = await updateQuestionStatus(question.id, status);
+        if (!result.ok) throw new Error(result.error);
+      }
+
+      toast.success(status === "onayli" ? "Soru havuza eklendi" : "Soru reddedildi", {
+        description: `${question.text.slice(0, 70)}...`,
+      });
+    } catch (caught) {
       setRows(previous); // basarisiz olursa geri al
-      toast.error("Islem kaydedilemedi", { description: "Lutfen tekrar deneyin." });
+      toast.error("Islem kaydedilemedi", {
+        description: caught instanceof Error ? caught.message : "Lutfen tekrar deneyin.",
+      });
     } finally {
       setPendingId(null);
     }

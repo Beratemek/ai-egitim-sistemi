@@ -4,6 +4,7 @@ import * as React from "react";
 import { LogOut, Menu } from "lucide-react";
 
 import { NavLinks, RoleCard } from "@/components/shared/app-nav";
+import { DevRoleSwitcher } from "@/components/shared/dev-role-switcher";
 import { BrandMark } from "@/components/shared/brand-mark";
 import { ROLE_ICONS } from "@/components/shared/role-icons";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
@@ -35,6 +36,12 @@ export interface DashboardShellProps {
   fullName: string;
   /** Supabase yapilandirilmadiginda demo rozeti gosterilir. */
   demoMode?: boolean;
+  /** Gelistirici rol degistiricisi acik mi? */
+  devSwitch?: boolean;
+  /** Veritabanindaki gercek rol (rol degistirici icin). */
+  actualRole?: UserRole;
+  /** Su an baska bir rol taklit ediliyor mu? */
+  impersonating?: boolean;
   children: React.ReactNode;
 }
 
@@ -42,6 +49,9 @@ export function DashboardShell({
   role,
   fullName,
   demoMode = false,
+  devSwitch = false,
+  actualRole,
+  impersonating = false,
   children,
 }: DashboardShellProps) {
   const [mobileOpen, setMobileOpen] = React.useState(false);
@@ -130,6 +140,14 @@ export function DashboardShell({
               <Badge variant="warning" className="hidden sm:inline-flex">
                 Demo modu
               </Badge>
+            ) : null}
+
+            {devSwitch ? (
+              <DevRoleSwitcher
+                currentRole={role}
+                actualRole={actualRole ?? role}
+                impersonating={impersonating}
+              />
             ) : null}
 
             <ThemeToggle />

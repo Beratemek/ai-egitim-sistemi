@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
+import { DEV_ROLE_COOKIE, isDevRoleSwitchEnabled } from "@/lib/dev-mode";
 import { isSupabaseConfigured, publicEnv } from "@/lib/env";
 import { dashboardPathFor, roleForPath } from "@/lib/roles";
 import { isUserRole } from "@/lib/types";
@@ -69,7 +70,13 @@ export async function middleware(request: NextRequest) {
     .eq("id", user.id)
     .single();
 
-  const role = isUserRole(profile?.role) ? profile.role : "ogrenci";
+  const actualRole = isUserRole(profile?.role) ? profile.role : "ogrenci";
+
+  // Gelistirici rol degistiricisi: yalnizca yonlendirme kurallarini etkiler.
+  // RLS her zaman gercek kullaniciya gore calismaya devam eder.
+  const devRole = request.cookies.get(DEV_ROLE_COOKIE)?.value;
+  const role =
+    isDevRoleSwitchEnabled && isUserRole(devRole) ? devRole : actualRole;
 
   if (pathname === "/login") {
     return NextResponse.redirect(new URL(dashboardPathFor(role), request.url));

@@ -26,30 +26,38 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  MOCK_QUESTIONS,
-  MOCK_SCORE_TREND,
-  MOCK_STATISTICS,
-  MOCK_USERS,
-} from "@/lib/mock-data";
+  getExamStatistics,
+  getQuestions,
+  getScoreTrend,
+  getUsers,
+} from "@/lib/queries";
 import { formatScore } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Egitim Yoneticisi" };
 
-export default function YoneticiPage() {
-  const totalStudents = MOCK_STATISTICS.reduce(
+export default async function YoneticiPage() {
+  const [statistics, questions, users, scoreTrend] =
+    await Promise.all([
+      getExamStatistics(),
+      getQuestions(),
+      getUsers(),
+      getScoreTrend(),
+    ]);
+
+  const totalStudents = statistics.reduce(
     (total, row) => total + row.student_count,
     0,
   );
-  const totalSubmissions = MOCK_STATISTICS.reduce(
+  const totalSubmissions = statistics.reduce(
     (total, row) => total + row.submission_count,
     0,
   );
-  const totalApproved = MOCK_STATISTICS.reduce(
+  const totalApproved = statistics.reduce(
     (total, row) => total + row.approved_count,
     0,
   );
 
-  const scored = MOCK_STATISTICS.filter((row) => row.average_score !== null);
+  const scored = statistics.filter((row) => row.average_score !== null);
   const overallAverage =
     scored.length > 0
       ? scored.reduce(
@@ -92,11 +100,11 @@ export default function YoneticiPage() {
         />
       </div>
 
-      <ScoreTrendChart data={MOCK_SCORE_TREND} />
+      <ScoreTrendChart data={scoreTrend} />
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <ExamAverageChart data={MOCK_STATISTICS} />
-        <QuestionStatusChart questions={MOCK_QUESTIONS} />
+        <ExamAverageChart data={statistics} />
+        <QuestionStatusChart questions={questions} />
       </div>
 
       {/* Grafiklerin tablo karsiligi - ekran okuyucu ve yazdirma icin */}
@@ -120,7 +128,7 @@ export default function YoneticiPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {MOCK_STATISTICS.map((row) => (
+              {statistics.map((row) => (
                 <TableRow key={row.exam_id}>
                   <TableCell className="font-medium">{row.exam_title}</TableCell>
                   <TableCell className="text-right tabular">{row.student_count}</TableCell>
@@ -146,7 +154,7 @@ export default function YoneticiPage() {
           <CardDescription>Sistemdeki roller ve sahipleri.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-2 sm:grid-cols-2">
-          {MOCK_USERS.map((user) => {
+          {users.map((user) => {
             const initials = user.full_name
               .split(" ")
               .slice(0, 2)

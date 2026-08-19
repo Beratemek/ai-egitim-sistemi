@@ -17,20 +17,26 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { MOCK_EXAMS, MOCK_QUESTIONS, MOCK_SUBMISSIONS } from "@/lib/mock-data";
+import { getExams, getQuestions, getSubmissions } from "@/lib/queries";
 import { formatDateTime } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Ogrenci" };
 
-export default function OgrenciPage() {
-  const publishedExams = MOCK_EXAMS.filter((exam) => exam.is_published);
+export default async function OgrenciPage() {
+  const [exams, questions, submissions] = await Promise.all([
+    getExams(),
+    getQuestions(),
+    getSubmissions(),
+  ]);
+
+  const publishedExams = exams.filter((exam) => exam.is_published);
 
   // Demo: onaylanmis ilk acik uclu soru uzerinden cevap akisini gosteriyoruz.
-  const openQuestion = MOCK_QUESTIONS.find(
+  const openQuestion = questions.find(
     (question) => question.type === "acik_uclu" && question.status === "onayli",
   );
 
-  const finalScores = MOCK_SUBMISSIONS.map(
+  const finalScores = submissions.map(
     (submission) => submission.instructor_approved_score ?? submission.ai_score,
   ).filter((score): score is number => score !== null);
 
@@ -55,7 +61,7 @@ export default function OgrenciPage() {
         />
         <StatCard
           label="Gonderilen cevap"
-          value={MOCK_SUBMISSIONS.length}
+          value={submissions.length}
           icon={FileText}
         />
         <StatCard
@@ -105,7 +111,7 @@ export default function OgrenciPage() {
             Gecmis cevaplarim
           </h2>
 
-          {MOCK_SUBMISSIONS.map((submission) => {
+          {submissions.map((submission) => {
             const finalScore =
               submission.instructor_approved_score ?? submission.ai_score;
 

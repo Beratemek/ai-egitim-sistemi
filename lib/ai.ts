@@ -23,6 +23,7 @@ import type {
   GeneratedQuestion,
   GradingResult,
   QuestionType,
+  StyleGuide,
 } from "@/lib/types";
 
 /* -------------------------------------------------------------------------- */
@@ -100,6 +101,59 @@ export interface GenerateQuestionsOptions {
   type?: QuestionType | "karisik";
   /** Konu basligi. Verilmezse model kazanimdan cikarir. */
   topic?: string;
+  /**
+   * Icerik uzmaninin gecmis begeni/red kayitlari. Modele few-shot ornek olarak
+   * verilir: begenilenler taklit edilecek tarz, reddedilenler kacinilacak tarz.
+   */
+  styleGuide?: StyleGuide;
+}
+
+/**
+ * Tercih kayitlarini modele verilecek metne cevirir.
+ *
+ * Ornekler kisaltilir (soru koku + varsa uzmanin notu) - tam rubrik/sik listesi
+ * baglami sisirir ve tarz bilgisi zaten soru kokunde ve notta.
+ */
+function buildStyleGuidePrompt(styleGuide: StyleGuide | undefined): string {
+  if (!styleGuide) return "";
+
+  const format = (preference: StyleGuide["liked"][number]): string => {
+    const parts = [
+      `- [${preference.question_type === "test" ? "test" : "acik uclu"} / ${preference.difficulty}] ${preference.question_text}`,
+    ];
+    if (preference.note) parts.push(`  (uzman notu: ${preference.note})`);
+    return parts.join("\n");
+  };
+
+  const sections: string[] = [];
+
+  if (styleGuide.liked.length > 0) {
+    sections.push(
+      [
+        "ICERIK UZMANININ BEGENDIGI SORULAR - bu tarzi ornek al:",
+        styleGuide.liked.map(format).join("\n"),
+      ].join("\n"),
+    );
+  }
+
+  if (styleGuide.disliked.length > 0) {
+    sections.push(
+      [
+        "ICERIK UZMANININ REDDETTIGI SORULAR - bu tarzdan kacin:",
+        styleGuide.disliked.map(format).join("\n"),
+      ].join("\n"),
+    );
+  }
+
+  if (sections.length === 0) return "";
+
+  return [
+    "",
+    "== TARZ REHBERI ==",
+    ...sections,
+    "Bu ornekleri KOPYALAMA; yalnizca soru kurgusu, zorluk dengesi, celdirici",
+    "mantigi ve dil tonu bakimindan ornek al. Yeni sorular ozgun olmali.",
+  ].join("\n");
 }
 
 /**
@@ -113,14 +167,14 @@ export async function generateQuestions(
   kazanim: string,
   options: GenerateQuestionsOptions = {},
 ): Promise<GeneratedQuestion[]> {
-  const { count = 5, type = "karisik", topic } = options;
+  const { count = 5, type = "karisik", topic, styleGuide } = options;
 
   if (!context.trim() || !kazanim.trim()) {
     throw new Error("[ai] generateQuestions: context ve kazanim bos olamaz.");
   }
 
   if (serverEnv.aiMockMode) {
-    return mockGenerateQuestions(kazanim, { count, type, topic });
+    return mockGenerateQuestions(kazanim, { count, type, topic, styleGuide });
   }
 
   const typeInstruction =
@@ -141,12 +195,14 @@ export async function generateQuestions(
       "Sorular yalnizca kaynak metinden dogrulanabilecek bilgileri olcmelidir; bilgi uydurma.",
       "Coktan secmeli sorularda celdiriciler makul olmali, tek bir dogru cevap bulunmalidir.",
       "Acik uclu sorularda rubrik madde madde yazilmali ve maddelerin puan toplami 100 olmalidir.",
+      "Istekte TARZ REHBERI varsa, uzmanin begendigi kurguya yaklas ve reddettigi kaliplardan uzak dur.",
     ].join(" "),
     prompt: [
       `KAZANIM:\n${kazanim}`,
       topic ? `KONU:\n${topic}` : "",
       `KAYNAK METIN:\n${context}`,
       `GOREV: Yukaridaki kazanimi olcen ${count} adet soru uret. ${typeInstruction}`,
+      buildStyleGuidePrompt(styleGuide),
     ]
       .filter(Boolean)
       .join("\n\n"),
@@ -305,11 +361,21 @@ function normalizeGradingResult(
 function mockGenerateQuestions(
   kazanim: string,
   options: Required<Pick<GenerateQuestionsOptions, "count" | "type">> &
-    Pick<GenerateQuestionsOptions, "topic">,
+    Pick<GenerateQuestionsOptions, "topic" | "styleGuide">,
 ): GeneratedQuestion[] {
-  const { count, type, topic } = options;
+  const { count, type, topic, styleGuide } = options;
   const resolvedTopic = topic ?? kazanim.split(" ").slice(0, 3).join(" ");
-  const difficulties = ["kolay", "orta", "zor"] as const;
+  const likedCount = styleGuide?.liked.length ?? 0;
+  const dislikedCount = styleGuide?.disliked.length ?? 0;
+
+  /**
+   * Mock modda tarz rehberinin gercekten uygulandigini gorunur kilar:
+   * begenilen ornek varsa zorluk dagilimi onlara gore kayar, etiket de bunu yazar.
+   */
+  const learned = likedCount > 0 || dislikedCount > 0;
+  const difficulties = learned
+    ? (likedMockDifficulties(styleGuide) ?? (["kolay", "orta", "zor"] as const))
+    : (["kolay", "orta", "zor"] as const);
 
   return Array.from({ length: count }, (_, index): GeneratedQuestion => {
     const isTest = type === "test" || (type === "karisik" && index % 2 === 0);
@@ -318,7 +384,7 @@ function mockGenerateQuestions(
     if (isTest) {
       return {
         topic: resolvedTopic,
-        text: `[MOCK] "${kazanim}" kazanimini olcen ${index + 1}. coktan secmeli soru.`,
+        text: `[MOCK${learned ? " · ogrenilmis tarz" : ""}] "${kazanim}" kazanimini olcen ${index + 1}. coktan secmeli soru.`,
         type: "test",
         options: [
           { key: "A", text: "Birinci secenek" },
@@ -334,7 +400,7 @@ function mockGenerateQuestions(
 
     return {
       topic: resolvedTopic,
-      text: `[MOCK] "${kazanim}" kazanimini olcen ${index + 1}. acik uclu soru.`,
+      text: `[MOCK${learned ? " · ogrenilmis tarz" : ""}] "${kazanim}" kazanimini olcen ${index + 1}. acik uclu soru.`,
       type: "acik_uclu",
       options: null,
       correct_answer: null,
@@ -374,4 +440,24 @@ function mockGradeAnswer(
       comment: "[MOCK] Ornek gerekce.",
     })),
   };
+}
+
+/**
+ * Mock modda "ogrenme" etkisini gorunur kilar: uzmanin begendigi orneklerdeki
+ * zorluk dagilimini one cikarir. Gercek modda bu isi modelin kendisi yapar.
+ */
+function likedMockDifficulties(
+  styleGuide: StyleGuide | undefined,
+): readonly GeneratedQuestion["difficulty"][] | null {
+  const liked = styleGuide?.liked ?? [];
+  if (liked.length === 0) return null;
+
+  const valid: GeneratedQuestion["difficulty"][] = liked
+    .map((preference) => preference.difficulty)
+    .filter(
+      (value): value is GeneratedQuestion["difficulty"] =>
+        value === "kolay" || value === "orta" || value === "zor",
+    );
+
+  return valid.length > 0 ? valid : null;
 }

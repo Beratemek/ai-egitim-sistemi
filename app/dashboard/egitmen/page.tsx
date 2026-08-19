@@ -25,19 +25,27 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import {
-  MOCK_EXAMS,
-  MOCK_QUESTIONS,
-  MOCK_SUBMISSIONS,
-  MOCK_USER_NAMES,
-} from "@/lib/mock-data";
+  getExams,
+  getQuestions,
+  getSubmissions,
+  getUserNameMap,
+} from "@/lib/queries";
 import { cn, formatDateTime } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Egitmen" };
 
-export default function EgitmenPage() {
-  const pendingQuestions = MOCK_QUESTIONS.filter((q) => q.status === "taslak").length;
-  const approvedQuestions = MOCK_QUESTIONS.filter((q) => q.status === "onayli").length;
-  const pendingSubmissions = MOCK_SUBMISSIONS.filter(
+export default async function EgitmenPage() {
+  const [questions, exams, submissions, userNames] =
+    await Promise.all([
+      getQuestions(),
+      getExams(),
+      getSubmissions(),
+      getUserNameMap(),
+    ]);
+
+  const pendingQuestions = questions.filter((q) => q.status === "taslak").length;
+  const approvedQuestions = questions.filter((q) => q.status === "onayli").length;
+  const pendingSubmissions = submissions.filter(
     (submission) => submission.status === "ai_degerlendirildi",
   );
 
@@ -72,7 +80,7 @@ export default function EgitmenPage() {
           icon={Library}
           accent="success"
         />
-        <StatCard label="Sinav" value={MOCK_EXAMS.length} icon={CalendarClock} />
+        <StatCard label="Sinav" value={exams.length} icon={CalendarClock} />
         <StatCard
           label="Puan onayi bekleyen"
           value={pendingSubmissions.length}
@@ -95,8 +103,8 @@ export default function EgitmenPage() {
         </CardHeader>
 
         <CardContent className="space-y-3">
-          {MOCK_SUBMISSIONS.map((submission) => {
-            const studentName = MOCK_USER_NAMES[submission.student_id] ?? "Bilinmiyor";
+          {submissions.map((submission) => {
+            const studentName = userNames[submission.student_id] ?? "Bilinmiyor";
             const initials = studentName
               .split(" ")
               .slice(0, 2)
@@ -175,7 +183,7 @@ export default function EgitmenPage() {
           <CardDescription>Olusturdugunuz sinavlar ve yayin durumlari.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 sm:grid-cols-2">
-          {MOCK_EXAMS.map((exam) => (
+          {exams.map((exam) => (
             <div
               key={exam.id}
               className="flex flex-col gap-2 rounded-xl border p-4 transition-colors hover:border-primary/40"

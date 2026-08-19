@@ -2,31 +2,31 @@ import type { Metadata } from "next";
 
 import { PageHeader } from "@/components/shared/page-header";
 import { QuestionPoolTable } from "@/components/shared/question-pool-table";
-import { MOCK_QUESTIONS } from "@/lib/mock-data";
+import { Badge } from "@/components/ui/badge";
+import { isSupabaseConfigured } from "@/lib/env";
+import { getQuestions } from "@/lib/queries";
 
 export const metadata: Metadata = { title: "Soru Havuzu" };
 
 /**
- * Soru havuzu.
- *
- * Su an mock veriyle calisiyor. Supabase'e gecerken bu sayfayi soyle degistirin:
- *
- *   const supabase = await createServerSupabaseClient();
- *   const { data: questions } = await supabase
- *     .from("questions")
- *     .select("*")
- *     .order("created_at", { ascending: false });
- *
- * ve `questions ?? []` degerini tabloya gecirin.
+ * Soru havuzu. Veriler `lib/queries.ts` uzerinden gelir; Supabase
+ * yapilandirilmamissa demo verisine duser ve onay/red kalici olmaz.
  */
-export default function SoruHavuzuPage() {
+export default async function SoruHavuzuPage() {
+  const questions = await getQuestions();
+
   return (
     <>
       <PageHeader
         title="Soru Havuzu"
         description="AI tarafindan uretilen taslaklari inceleyin; onaylayarak havuza ekleyin."
+        actions={
+          isSupabaseConfigured ? null : (
+            <Badge variant="warning">Demo — degisiklikler kaydedilmez</Badge>
+          )
+        }
       />
-      <QuestionPoolTable questions={MOCK_QUESTIONS} />
+      <QuestionPoolTable questions={questions} persist={isSupabaseConfigured} />
     </>
   );
 }

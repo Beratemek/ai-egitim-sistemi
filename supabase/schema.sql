@@ -419,3 +419,71 @@ select
   'Ogrenci fotosentezin isik ve karanlik evrelerini aciklar.',
   'Fotosentez, bitkilerin isik enerjisini kimyasal enerjiye donusturdugu surectir. Isik evresi tilakoit zarda, karanlik evre (Calvin dongusu) stromada gerceklesir.'
 where not exists (select 1 from public.learning_outcomes where topic = 'Fotosentez');
+
+-- ===========================================================================
+-- 8. SORU TERCIH HAFIZASI  (AI'in icerik uzmanindan ogrenmesi)
+--
+--    Icerik uzmani AI'in urettigi her taslagi begenebilir (like) veya
+--    reddedebilir (dislike). Bu kayitlar bir sonraki uretimde modele
+--    ornek olarak geri verilir: begenilenler "bu tarzda uret", reddedilenler
+--    "bu tarzdan kacin" olarak. Ince ayar (fine-tuning) degil, baglam ici
+--    ogrenme (few-shot) - hemen etki eder ve geri alinabilir.
+-- ===========================================================================
+
+do $$
+begin
+  if not exists (select 1 from pg_type where typname = 'preference_verdict') then
+    create type public.preference_verdict as enum ('begendi', 'begenmedi');
+  end if;
+end
+$$;
+
+create table if not exists public.question_preferences (
+  id           uuid primary key default gen_random_uuid(),
+  user_id      uuid not null references public.users (id) on delete cascade,
+  verdict      public.preference_verdict not null,
+
+  -- Ornegin kendisi: modele few-shot olarak geri verilir.
+  question_text  text not null,
+  question_type  public.question_type not null,
+  topic          text not null default '',
+  difficulty     text not null default 'orta',
+  options_json   jsonb,
+  rubric         text,
+
+  -- Uzmanin serbest yorumu ("celdiriciler zayif", "cok kolay" gibi).
+  note         text,
+  outcome_id   uuid references public.learning_outcomes (id) on delete set null,
+  created_at   timestamptz not null default now()
+);
+
+comment on table public.question_preferences is
+  'Icerik uzmaninin AI taslaklarina verdigi begeni/red geri bildirimi; sonraki uretimlere ornek olarak beslenir.';
+
+create index if not exists question_preferences_user_idx
+  on public.question_preferences (user_id, created_at desc);
+create index if not exists question_preferences_verdict_idx
+  on public.question_preferences (verdict);
+
+alter table public.question_preferences enable row level security;
+
+-- Herkes kendi tercihlerini yonetir; egitmen ve yonetici okuyabilir.
+drop policy if exists "preferences_select" on public.question_preferences;
+create policy "preferences_select" on public.question_preferences
+  for select using (
+    user_id = auth.uid()
+    or public.has_role('egitmen')
+    or public.has_role('egitim_yoneticisi')
+  );
+
+drop policy if exists "preferences_insert_own" on public.question_preferences;
+create policy "preferences_insert_own" on public.question_preferences
+  for insert with check (user_id = auth.uid());
+
+drop policy if exists "preferences_update_own" on public.question_preferences;
+create policy "preferences_update_own" on public.question_preferences
+  for update using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+drop policy if exists "preferences_delete_own" on public.question_preferences;
+create policy "preferences_delete_own" on public.question_preferences
+  for delete using (user_id = auth.uid());

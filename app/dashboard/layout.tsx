@@ -2,6 +2,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { DashboardShell } from "@/components/shared/dashboard-shell";
+import { isDevRoleSwitchEnabled } from "@/lib/dev-mode";
 import { isSupabaseConfigured } from "@/lib/env";
 import { roleForPath } from "@/lib/roles";
 import { getCurrentUser } from "@/lib/supabase-server";
@@ -32,6 +33,9 @@ export default async function DashboardLayout({
     <DashboardShell
       role={current.profile.role}
       fullName={current.profile.full_name || current.user.email || "Kullanici"}
+      devSwitch={isDevRoleSwitchEnabled}
+      actualRole={current.actualRole}
+      impersonating={current.impersonatedRole !== null}
     >
       {children}
     </DashboardShell>
