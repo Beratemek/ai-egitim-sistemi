@@ -17,7 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { isSupabaseConfigured } from "@/lib/env";
+import { isSupabaseConfigured, publicEnv } from "@/lib/env";
 import { ROLE_LIST, dashboardPathFor } from "@/lib/roles";
 import { createClient } from "@/lib/supabase";
 import { isUserRole, type UserRole } from "@/lib/types";
@@ -53,6 +53,10 @@ export function LoginForm() {
             // `handle_new_user` trigger'i bu meta veriden rolu okuyup
             // public.users profilini olusturur.
             data: { full_name: fullName, role },
+            // Dogrulama e-postasindaki baglanti buraya doner. Belirtilmezse
+            // Supabase "Site URL" koküne doner, oradaki ?code=... hicbir yerde
+            // islenmez ve kullanici dogrulamaya ragmen oturum acmamis olur.
+            emailRedirectTo: `${publicEnv.siteUrl}/auth/callback`,
           },
         });
 

@@ -1,0 +1,150 @@
+<!--
+  Supabase > Authentication > Emails > "Confirm signup" sablonu.
+
+  Supabase panelindeki sablon kutusuna bu dosyanin TAMAMINI yapistirin.
+
+  Kullanilabilir degiskenler (Go template):
+    {{ .ConfirmationURL }}  dogrulama baglantisi
+    {{ .Email }}            alicinin e-postasi
+    {{ .Token }}            6 haneli kod
+    {{ .SiteURL }}          proje Site URL'i
+
+  E-posta istemcileri modern CSS'i desteklemez; bu yuzden duzen <table> ile
+  kurulur ve tum stiller satir ici (inline) yazilir. Harici gorsel/font yok -
+  cogu istemci varsayilan olarak engelliyor.
+-->
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <meta name="supported-color-schemes" content="light" />
+    <title>E-posta adresinizi dogrulayin</title>
+  </head>
+  <body style="margin:0; padding:0; background-color:#f1f5f9; -webkit-font-smoothing:antialiased;">
+    <!-- Gelen kutusu onizleme metni (mailde gorunmez) -->
+    <div style="display:none; max-height:0; overflow:hidden; opacity:0;">
+      Hesabinizi etkinlestirmek icin e-posta adresinizi dogrulayin.
+    </div>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+           style="background-color:#f1f5f9;">
+      <tr>
+        <td align="center" style="padding:40px 16px;">
+
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+                 style="max-width:560px; background-color:#ffffff; border-radius:14px;
+                        border:1px solid #e2e8f0; overflow:hidden;
+                        font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+
+            <!-- ===== Ust seride marka ===== -->
+            <tr>
+              <td style="background-color:#4f46e5; padding:28px 32px;">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td style="padding-right:12px;">
+                      <div style="width:40px; height:40px; background-color:rgba(255,255,255,0.18);
+                                  border-radius:10px; text-align:center; line-height:40px;
+                                  color:#ffffff; font-size:20px; font-weight:700;">A</div>
+                    </td>
+                    <td>
+                      <div style="color:#ffffff; font-size:16px; font-weight:600; line-height:1.3;">
+                        AI Destekli Egitim Sistemi
+                      </div>
+                      <div style="color:rgba(255,255,255,0.75); font-size:12px; line-height:1.4; padding-top:2px;">
+                        Olcme &amp; Degerlendirme Platformu
+                      </div>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <!-- ===== Govde ===== -->
+            <tr>
+              <td style="padding:36px 32px 8px 32px;">
+                <h1 style="margin:0 0 12px 0; font-size:22px; line-height:1.35; font-weight:600; color:#0f172a;">
+                  E-posta adresinizi dogrulayin
+                </h1>
+                <p style="margin:0 0 8px 0; font-size:15px; line-height:1.65; color:#475569;">
+                  Merhaba, <strong style="color:#0f172a;">{{ .Email }}</strong> adresiyle bir hesap
+                  olusturuldu. Kaydi tamamlamak icin asagidaki butona tiklayin.
+                </p>
+              </td>
+            </tr>
+
+            <!-- ===== Buton ===== -->
+            <tr>
+              <td align="center" style="padding:20px 32px 8px 32px;">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td style="background-color:#4f46e5; border-radius:10px;">
+                      <a href="{{ .ConfirmationURL }}"
+                         style="display:inline-block; padding:14px 34px; font-size:15px; font-weight:600;
+                                color:#ffffff; text-decoration:none; border-radius:10px;">
+                        Hesabimi dogrula
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <!-- ===== Yedek baglanti ===== -->
+            <tr>
+              <td style="padding:16px 32px 0 32px;">
+                <p style="margin:0 0 6px 0; font-size:13px; line-height:1.6; color:#64748b;">
+                  Buton calismiyorsa bu adresi tarayicinizin adres cubuguna yapistirin:
+                </p>
+                <p style="margin:0; font-size:12px; line-height:1.6; word-break:break-all;">
+                  <a href="{{ .ConfirmationURL }}" style="color:#4f46e5; text-decoration:underline;">
+                    {{ .ConfirmationURL }}
+                  </a>
+                </p>
+              </td>
+            </tr>
+
+            <!-- ===== Bilgi kutusu ===== -->
+            <tr>
+              <td style="padding:24px 32px 0 32px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+                       style="background-color:#f8fafc; border:1px solid #e2e8f0; border-radius:10px;">
+                  <tr>
+                    <td style="padding:14px 16px;">
+                      <p style="margin:0; font-size:13px; line-height:1.6; color:#475569;">
+                        Bu baglanti <strong style="color:#0f172a;">24 saat</strong> gecerlidir ve yalnizca
+                        bir kez kullanilabilir.
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <!-- ===== Ayirici ===== -->
+            <tr>
+              <td style="padding:28px 32px 0 32px;">
+                <div style="height:1px; background-color:#e2e8f0; line-height:1px; font-size:0;">&nbsp;</div>
+              </td>
+            </tr>
+
+            <!-- ===== Alt bilgi ===== -->
+            <tr>
+              <td style="padding:20px 32px 32px 32px;">
+                <p style="margin:0 0 6px 0; font-size:12px; line-height:1.6; color:#94a3b8;">
+                  Bu hesabi siz olusturmadiysaniz bu e-postayi yok sayabilirsiniz; hicbir islem yapilmaz.
+                </p>
+                <p style="margin:0; font-size:12px; line-height:1.6; color:#94a3b8;">
+                  AI Destekli Egitim Sistemi
+                </p>
+              </td>
+            </tr>
+
+          </table>
+
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
