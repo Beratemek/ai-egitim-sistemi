@@ -3,11 +3,20 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { ArrowRight, Loader2, TriangleAlert } from "lucide-react";
 
+import { ROLE_ICONS } from "@/components/shared/role-icons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { isSupabaseConfigured } from "@/lib/env";
 import { ROLE_LIST, dashboardPathFor } from "@/lib/roles";
 import { createClient } from "@/lib/supabase";
@@ -95,31 +104,24 @@ export function LoginForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1">
-        {(["giris", "kayit"] as const).map((value) => (
-          <button
-            key={value}
-            type="button"
-            onClick={() => {
-              setMode(value);
-              setError(null);
-              setInfo(null);
-            }}
-            className={
-              mode === value
-                ? "rounded-md bg-background px-3 py-1.5 text-sm font-medium shadow-sm"
-                : "rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground"
-            }
-          >
-            {value === "giris" ? "Giris yap" : "Kayit ol"}
-          </button>
-        ))}
-      </div>
+    <form onSubmit={handleSubmit} className="space-y-5">
+      <Tabs
+        value={mode}
+        onValueChange={(value) => {
+          setMode(value as Mode);
+          setError(null);
+          setInfo(null);
+        }}
+      >
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="giris">Giris yap</TabsTrigger>
+          <TabsTrigger value="kayit">Kayit ol</TabsTrigger>
+        </TabsList>
+      </Tabs>
 
       {mode === "kayit" ? (
         <>
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             <Label htmlFor="fullName">Ad Soyad</Label>
             <Input
               id="fullName"
@@ -132,22 +134,30 @@ export function LoginForm() {
             />
           </div>
 
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             <Label htmlFor="role">Rol</Label>
             <Select
-              id="role"
-              name="role"
               value={role}
-              onChange={(event) => {
-                const next = event.target.value;
-                if (isUserRole(next)) setRole(next);
+              onValueChange={(value) => {
+                if (isUserRole(value)) setRole(value);
               }}
             >
-              {ROLE_LIST.map((definition) => (
-                <option key={definition.role} value={definition.role}>
-                  {definition.label}
-                </option>
-              ))}
+              <SelectTrigger id="role">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {ROLE_LIST.map((definition) => {
+                  const Icon = ROLE_ICONS[definition.role];
+                  return (
+                    <SelectItem key={definition.role} value={definition.role}>
+                      <span className="flex items-center gap-2">
+                        <Icon className="h-4 w-4 text-muted-foreground" />
+                        {definition.label}
+                      </span>
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
               Demo amaclidir. Gercek kurulumda rol atamasi yonetici tarafindan yapilmalidir.
@@ -156,7 +166,7 @@ export function LoginForm() {
         </>
       ) : null}
 
-      <div className="space-y-1.5">
+      <div className="space-y-2">
         <Label htmlFor="email">E-posta</Label>
         <Input
           id="email"
@@ -170,7 +180,7 @@ export function LoginForm() {
         />
       </div>
 
-      <div className="space-y-1.5">
+      <div className="space-y-2">
         <Label htmlFor="password">Parola</Label>
         <Input
           id="password"
@@ -188,20 +198,31 @@ export function LoginForm() {
       {error ? (
         <p
           role="alert"
-          className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+          className="flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-sm text-destructive"
         >
+          <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
           {error}
         </p>
       ) : null}
 
       {info ? (
-        <p className="rounded-md border border-border bg-muted px-3 py-2 text-sm text-muted-foreground">
+        <p className="rounded-lg border bg-muted px-3 py-2.5 text-sm text-muted-foreground">
           {info}
         </p>
       ) : null}
 
-      <Button type="submit" className="w-full" disabled={pending}>
-        {pending ? "Lutfen bekleyin..." : mode === "giris" ? "Giris yap" : "Kayit ol"}
+      <Button type="submit" className="w-full gap-2" size="lg" disabled={pending}>
+        {pending ? (
+          <>
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Lutfen bekleyin...
+          </>
+        ) : (
+          <>
+            {mode === "giris" ? "Giris yap" : "Kayit ol"}
+            <ArrowRight className="h-4 w-4" />
+          </>
+        )}
       </Button>
     </form>
   );
@@ -211,31 +232,42 @@ export function LoginForm() {
 function DemoModeNotice() {
   return (
     <div className="space-y-4">
-      <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
-        Supabase yapilandirilmamis.{" "}
-        <code className="font-mono text-xs">.env.example</code> dosyasini{" "}
-        <code className="font-mono text-xs">.env.local</code> olarak kopyalayip
-        anahtarlari doldurun. O zamana kadar panelleri demo verisiyle gezebilirsiniz.
+      <div className="flex items-start gap-2.5 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2.5 text-sm text-warning">
+        <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
+        <p>
+          Supabase yapilandirilmamis. <code className="font-mono text-xs">.env.example</code>{" "}
+          dosyasini <code className="font-mono text-xs">.env.local</code> olarak kopyalayip
+          anahtarlari doldurun. O zamana kadar panelleri demo verisiyle gezebilirsiniz.
+        </p>
       </div>
 
-      <div className="grid gap-2">
-        {ROLE_LIST.map((definition) => (
-          <Link
-            key={definition.role}
-            href={definition.path}
-            className="flex items-center justify-between rounded-md border border-border px-3 py-2.5 text-sm transition-colors hover:bg-accent"
-          >
-            <span>
-              <span className="font-medium">{definition.label}</span>
-              <span className="block text-xs text-muted-foreground">
-                {definition.description}
+      <div className="space-y-2">
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Rol secerek devam edin
+        </p>
+
+        {ROLE_LIST.map((definition) => {
+          const Icon = ROLE_ICONS[definition.role];
+
+          return (
+            <Link
+              key={definition.role}
+              href={definition.path}
+              className="flex items-center gap-3 rounded-lg border bg-card p-3 transition-colors hover:border-primary/50 hover:bg-accent"
+            >
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <Icon className="h-4.5 w-4.5" />
               </span>
-            </span>
-            <span aria-hidden className="text-muted-foreground">
-              &rarr;
-            </span>
-          </Link>
-        ))}
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-medium">{definition.label}</span>
+                <span className="block truncate text-xs text-muted-foreground">
+                  {definition.description}
+                </span>
+              </span>
+              <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+            </Link>
+          );
+        })}
       </div>
     </div>
   );

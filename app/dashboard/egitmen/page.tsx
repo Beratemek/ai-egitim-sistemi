@@ -1,10 +1,20 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import {
+  ArrowRight,
+  CalendarClock,
+  CircleDashed,
+  FileCheck2,
+  Library,
+  Sparkles,
+} from "lucide-react";
 
 import { PageHeader } from "@/components/shared/page-header";
 import { StatCard } from "@/components/shared/stat-card";
 import { SubmissionStatusBadge } from "@/components/shared/status-badge";
-import { buttonVariants } from "@/components/ui/button";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -12,21 +22,15 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Progress } from "@/components/ui/progress";
+import { Separator } from "@/components/ui/separator";
 import {
   MOCK_EXAMS,
   MOCK_QUESTIONS,
   MOCK_SUBMISSIONS,
   MOCK_USER_NAMES,
 } from "@/lib/mock-data";
-import { cn, formatDateTime, formatScore } from "@/lib/utils";
+import { cn, formatDateTime } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Egitmen" };
 
@@ -45,85 +49,148 @@ export default function EgitmenPage() {
         actions={
           <Link
             href="/dashboard/egitmen/soru-havuzu"
-            className={cn(buttonVariants({ size: "sm" }))}
+            className={cn(buttonVariants(), "gap-2")}
           >
-            Soru havuzuna git
+            <Library className="h-4 w-4" />
+            Soru havuzu
           </Link>
         }
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Onay bekleyen soru" value={pendingQuestions} />
-        <StatCard label="Havuzdaki soru" value={approvedQuestions} hint="Onaylanmis" />
-        <StatCard label="Sinav" value={MOCK_EXAMS.length} />
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          label="Onay bekleyen soru"
+          value={pendingQuestions}
+          hint="Taslak durumunda"
+          icon={CircleDashed}
+          accent="warning"
+        />
+        <StatCard
+          label="Havuzdaki soru"
+          value={approvedQuestions}
+          hint="Sinavlarda kullanilabilir"
+          icon={Library}
+          accent="success"
+        />
+        <StatCard label="Sinav" value={MOCK_EXAMS.length} icon={CalendarClock} />
         <StatCard
           label="Puan onayi bekleyen"
           value={pendingSubmissions.length}
           hint="AI degerlendirdi"
+          icon={FileCheck2}
+          accent="primary"
         />
       </div>
 
+      {/* ---------- Puan onayi bekleyen cevaplar ---------- */}
       <Card>
         <CardHeader>
-          <CardTitle>Puan onayi bekleyen cevaplar</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Sparkles className="h-4.5 w-4.5 text-primary" />
+            Puan onayi bekleyen cevaplar
+          </CardTitle>
           <CardDescription>
             AI on puan verdi; nihai puani siz belirlersiniz.
           </CardDescription>
         </CardHeader>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead>Ogrenci</TableHead>
-                <TableHead className="w-[40%]">Cevap ozeti</TableHead>
-                <TableHead>AI puani</TableHead>
-                <TableHead>Durum</TableHead>
-                <TableHead>Tarih</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {MOCK_SUBMISSIONS.map((submission) => (
-                <TableRow key={submission.id}>
-                  <TableCell className="font-medium">
-                    {MOCK_USER_NAMES[submission.student_id] ?? "Bilinmiyor"}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    <span className="line-clamp-2">{submission.answer_text}</span>
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap tabular-nums">
-                    {formatScore(submission.ai_score)}
-                  </TableCell>
-                  <TableCell>
-                    <SubmissionStatusBadge status={submission.status} />
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
-                    {formatDateTime(submission.created_at)}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+
+        <CardContent className="space-y-3">
+          {MOCK_SUBMISSIONS.map((submission) => {
+            const studentName = MOCK_USER_NAMES[submission.student_id] ?? "Bilinmiyor";
+            const initials = studentName
+              .split(" ")
+              .slice(0, 2)
+              .map((part) => part[0]?.toLocaleUpperCase("tr") ?? "")
+              .join("");
+            const finalScore =
+              submission.instructor_approved_score ?? submission.ai_score ?? 0;
+            const isApproved = submission.status === "egitmen_onayli";
+
+            return (
+              <div key={submission.id} className="rounded-xl border p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-9 w-9">
+                      <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">
+                        {initials}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="text-sm font-medium">{studentName}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatDateTime(submission.created_at)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <SubmissionStatusBadge status={submission.status} />
+                </div>
+
+                <p className="mt-3 line-clamp-3 text-sm leading-relaxed text-muted-foreground">
+                  {submission.answer_text}
+                </p>
+
+                {submission.ai_feedback ? (
+                  <p className="mt-3 rounded-lg bg-muted/60 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
+                    <span className="font-medium text-foreground">AI gerekcesi: </span>
+                    {submission.ai_feedback}
+                  </p>
+                ) : null}
+
+                <Separator className="my-3" />
+
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="min-w-[180px] flex-1 space-y-1.5">
+                    <div className="flex items-baseline justify-between text-sm">
+                      <span className="text-muted-foreground">
+                        {isApproved ? "Onaylanan puan" : "AI on puani"}
+                      </span>
+                      <span className="font-semibold tabular">{finalScore} / 100</span>
+                    </div>
+                    <Progress value={finalScore} className="h-1.5" />
+                  </div>
+
+                  {isApproved ? (
+                    <Badge variant="success" className="gap-1.5">
+                      <FileCheck2 className="h-3.5 w-3.5" />
+                      Onaylandi
+                    </Badge>
+                  ) : (
+                    <Button size="sm" variant="outline" className="gap-1.5">
+                      Puani incele
+                      <ArrowRight className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </CardContent>
       </Card>
 
+      {/* ---------- Sinavlar ---------- */}
       <Card>
         <CardHeader>
           <CardTitle>Sinavlarim</CardTitle>
+          <CardDescription>Olusturdugunuz sinavlar ve yayin durumlari.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="grid gap-3 sm:grid-cols-2">
           {MOCK_EXAMS.map((exam) => (
             <div
               key={exam.id}
-              className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border p-4"
+              className="flex flex-col gap-2 rounded-xl border p-4 transition-colors hover:border-primary/40"
             >
-              <div>
-                <p className="font-medium">{exam.title}</p>
-                <p className="text-sm text-muted-foreground">{exam.description}</p>
+              <div className="flex items-start justify-between gap-2">
+                <p className="font-medium leading-snug">{exam.title}</p>
+                <Badge variant={exam.is_published ? "success" : "soft"}>
+                  {exam.is_published ? "Yayinda" : "Taslak"}
+                </Badge>
               </div>
-              <span className="text-xs text-muted-foreground">
-                {exam.is_published ? "Yayinda" : "Taslak"} &middot;{" "}
-                {formatDateTime(exam.starts_at)}
-              </span>
+              <p className="text-sm text-muted-foreground">{exam.description}</p>
+              <p className="mt-auto flex items-center gap-1.5 pt-2 text-xs text-muted-foreground">
+                <CalendarClock className="h-3.5 w-3.5" />
+                {exam.starts_at ? formatDateTime(exam.starts_at) : "Tarih belirlenmedi"}
+              </p>
             </div>
           ))}
         </CardContent>

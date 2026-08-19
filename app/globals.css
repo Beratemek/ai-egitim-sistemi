@@ -4,44 +4,69 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
+    /* Yuzeyler */
+    --background: 210 40% 98%;
     --foreground: 222 47% 11%;
     --card: 0 0% 100%;
     --card-foreground: 222 47% 11%;
-    --primary: 243 75% 59%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+
+    /* Marka */
+    --primary: 243 75% 58%;
     --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96%;
+
+    --secondary: 214 32% 95%;
     --secondary-foreground: 222 47% 11%;
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
-    --accent: 210 40% 96%;
+    --muted: 214 32% 95%;
+    --muted-foreground: 215 16% 45%;
+    --accent: 214 32% 95%;
     --accent-foreground: 222 47% 11%;
-    --destructive: 0 72% 51%;
+
+    /* Durum (dataviz status paleti ile ayni) */
+    --destructive: 0 61% 52%;
     --destructive-foreground: 210 40% 98%;
+    --success: 120 86% 28%;
+    --success-foreground: 0 0% 100%;
+    --warning: 32 81% 39%;
+    --warning-foreground: 0 0% 100%;
+
+    /* Cizgiler */
     --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 243 75% 59%;
-    --radius: 0.6rem;
+    --input: 214 32% 88%;
+    --ring: 243 75% 58%;
+
+    --radius: 0.65rem;
   }
 
   .dark {
-    --background: 222 47% 8%;
+    --background: 222 47% 7%;
     --foreground: 210 40% 98%;
     --card: 222 45% 11%;
     --card-foreground: 210 40% 98%;
-    --primary: 243 75% 66%;
+    --popover: 222 45% 13%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 243 75% 68%;
     --primary-foreground: 222 47% 11%;
+
     --secondary: 217 33% 17%;
     --secondary-foreground: 210 40% 98%;
     --muted: 217 33% 17%;
     --muted-foreground: 215 20% 65%;
-    --accent: 217 33% 17%;
+    --accent: 217 33% 19%;
     --accent-foreground: 210 40% 98%;
-    --destructive: 0 63% 45%;
+
+    --destructive: 0 61% 55%;
     --destructive-foreground: 210 40% 98%;
+    --success: 120 60% 45%;
+    --success-foreground: 222 47% 11%;
+    --warning: 41 96% 54%;
+    --warning-foreground: 222 47% 11%;
+
     --border: 217 33% 20%;
-    --input: 217 33% 20%;
-    --ring: 243 75% 66%;
+    --input: 217 33% 24%;
+    --ring: 243 75% 68%;
   }
 
   * {
@@ -50,5 +75,21 @@
 
   body {
     @apply bg-background text-foreground antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  /* Tablolarda ve eksenlerde rakamlarin dikey hizalanmasi icin */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer utilities {
+  /* Panel arka planindaki yumusak marka parlamasi */
+  .bg-grid {
+    background-image:
+      linear-gradient(to right, hsl(var(--border) / 0.5) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--border) / 0.5) 1px, transparent 1px);
+    background-size: 56px 56px;
   }
 }

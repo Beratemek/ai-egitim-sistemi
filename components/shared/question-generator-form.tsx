@@ -1,12 +1,12 @@
 "use client";
 
 import * as React from "react";
+import { Loader2, Sparkles, TriangleAlert, Wand2 } from "lucide-react";
+import { toast } from "sonner";
 
+import { QuestionTypeBadge } from "@/components/shared/status-badge";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Card,
   CardContent,
@@ -14,7 +14,18 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { QuestionTypeBadge } from "@/components/shared/status-badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import type {
   ApiResponse,
   GenerateQuestionsRequest,
@@ -23,6 +34,15 @@ import type {
 } from "@/lib/types";
 
 type TypeChoice = QuestionType | "karisik";
+
+const DIFFICULTY_VARIANT: Record<
+  GeneratedQuestion["difficulty"],
+  "success" | "warning" | "destructive"
+> = {
+  kolay: "success",
+  orta: "warning",
+  zor: "destructive",
+};
 
 /**
  * Icerik uzmaninin kaynak metin + kazanim girip AI'dan soru taslagi
@@ -62,31 +82,39 @@ export function QuestionGeneratorForm() {
       const body = (await response.json()) as ApiResponse<GeneratedQuestion[]>;
 
       if (!body.ok) throw new Error(body.error);
+
       setResults(body.data);
+      toast.success(`${body.data.length} soru taslagi uretildi`, {
+        description: "Taslaklar egitmen onayina gonderilmeye hazir.",
+      });
     } catch (caught) {
-      setError(
-        caught instanceof Error ? caught.message : "Soru uretilirken bir hata olustu.",
-      );
+      const message =
+        caught instanceof Error ? caught.message : "Soru uretilirken bir hata olustu.";
+      setError(message);
+      toast.error("Soru uretilemedi", { description: message });
     } finally {
       setPending(false);
     }
   }
 
   return (
-    <div className="space-y-6">
-      <Card>
+    <div className="grid gap-6 lg:grid-cols-5">
+      {/* ---------- Form ---------- */}
+      <Card className="lg:col-span-2">
         <CardHeader>
-          <CardTitle>Kazanimdan soru uret</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Wand2 className="h-4.5 w-4.5 text-primary" />
+            Kazanimdan soru uret
+          </CardTitle>
           <CardDescription>
-            Kaynak metni ve kazanimi girin; model soru taslaklarini JSON olarak
-            dondursun. Taslaklar egitmen onayina gonderilir.
+            Kaynak metni ve kazanimi girin; model soru taslaklarini uretsin.
           </CardDescription>
         </CardHeader>
 
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-1.5">
+              <div className="space-y-2">
                 <Label htmlFor="topic">Konu</Label>
                 <Input
                   id="topic"
@@ -96,7 +124,7 @@ export function QuestionGeneratorForm() {
                 />
               </div>
 
-              <div className="space-y-1.5">
+              <div className="space-y-2">
                 <Label htmlFor="count">Soru adedi</Label>
                 <Input
                   id="count"
@@ -109,7 +137,7 @@ export function QuestionGeneratorForm() {
               </div>
             </div>
 
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               <Label htmlFor="kazanim">Kazanim</Label>
               <Input
                 id="kazanim"
@@ -120,92 +148,160 @@ export function QuestionGeneratorForm() {
               />
             </div>
 
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               <Label htmlFor="context">Kaynak metin</Label>
               <Textarea
                 id="context"
                 required
-                rows={8}
+                rows={9}
                 value={context}
                 onChange={(event) => setContext(event.target.value)}
                 placeholder="Sorularin uretilecegi ders metnini buraya yapistirin..."
+                className="resize-y"
               />
+              <p className="text-xs text-muted-foreground">
+                En az 20 karakter. Model yalnizca bu metinden dogrulanabilir sorular uretir.
+              </p>
             </div>
 
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               <Label htmlFor="type">Soru tipi</Label>
               <Select
-                id="type"
                 value={type}
-                onChange={(event) => setType(event.target.value as TypeChoice)}
-                className="sm:w-56"
+                onValueChange={(value) => setType(value as TypeChoice)}
               >
-                <option value="karisik">Karisik</option>
-                <option value="test">Coktan secmeli</option>
-                <option value="acik_uclu">Acik uclu</option>
+                <SelectTrigger id="type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="karisik">Karisik</SelectItem>
+                  <SelectItem value="test">Coktan secmeli</SelectItem>
+                  <SelectItem value="acik_uclu">Acik uclu</SelectItem>
+                </SelectContent>
               </Select>
             </div>
 
             {error ? (
               <p
                 role="alert"
-                className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+                className="flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-sm text-destructive"
               >
+                <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
                 {error}
               </p>
             ) : null}
 
-            <Button type="submit" disabled={pending}>
-              {pending ? "Uretiliyor..." : "Soru uret"}
+            <Button type="submit" className="w-full gap-2" disabled={pending}>
+              {pending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Uretiliyor...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4" />
+                  Soru uret
+                </>
+              )}
             </Button>
           </form>
         </CardContent>
       </Card>
 
-      {results.length > 0 ? (
-        <section className="space-y-3">
-          <h2 className="text-lg font-semibold tracking-tight">
-            Uretilen taslaklar ({results.length})
+      {/* ---------- Sonuclar ---------- */}
+      <div className="space-y-3 lg:col-span-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            Uretilen taslaklar
           </h2>
+          {results.length > 0 ? (
+            <Badge variant="soft">{results.length} soru</Badge>
+          ) : null}
+        </div>
 
+        {pending ? (
+          <div className="space-y-3">
+            {Array.from({ length: 3 }, (_, index) => (
+              <Card key={index}>
+                <CardContent className="space-y-3 p-4">
+                  <Skeleton className="h-5 w-32" />
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-4/5" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : results.length === 0 ? (
+          <Card className="border-dashed">
+            <CardContent className="flex flex-col items-center justify-center gap-2 py-16 text-center">
+              <Sparkles className="h-8 w-8 text-muted-foreground/50" />
+              <p className="font-medium">Henuz soru uretilmedi</p>
+              <p className="max-w-xs text-sm text-muted-foreground">
+                Soldaki formu doldurup &quot;Soru uret&quot; butonuna basin.
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
           <ul className="space-y-3">
             {results.map((question, index) => (
-              <li key={`${question.text}-${index}`} className="rounded-lg border border-border p-4">
-                <div className="flex flex-wrap items-center gap-2">
-                  <QuestionTypeBadge type={question.type} />
-                  <span className="text-xs text-muted-foreground">
-                    {question.topic} &middot; {question.difficulty}
-                  </span>
-                </div>
+              <li key={`${question.text}-${index}`}>
+                <Card>
+                  <CardContent className="space-y-3 p-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/10 text-xs font-semibold text-primary">
+                        {index + 1}
+                      </span>
+                      <QuestionTypeBadge type={question.type} />
+                      <Badge variant={DIFFICULTY_VARIANT[question.difficulty]}>
+                        {question.difficulty}
+                      </Badge>
+                      <span className="text-xs text-muted-foreground">
+                        {question.topic}
+                      </span>
+                    </div>
 
-                <p className="mt-2 font-medium">{question.text}</p>
+                    <p className="font-medium leading-relaxed">{question.text}</p>
 
-                {question.type === "test" ? (
-                  <ul className="mt-2 space-y-1">
-                    {(question.options ?? []).map((option) => (
-                      <li
-                        key={option.key}
-                        className={
-                          option.key === question.correct_answer
-                            ? "text-sm font-medium text-emerald-700 dark:text-emerald-400"
-                            : "text-sm text-muted-foreground"
-                        }
-                      >
-                        <span className="mr-2 font-mono">{option.key})</span>
-                        {option.text}
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <pre className="mt-2 whitespace-pre-wrap font-sans text-sm text-muted-foreground">
-                    {question.rubric}
-                  </pre>
-                )}
+                    {question.type === "test" ? (
+                      <ul className="space-y-1">
+                        {(question.options ?? []).map((option) => {
+                          const isCorrect = option.key === question.correct_answer;
+
+                          return (
+                            <li
+                              key={option.key}
+                              className={cn(
+                                "flex gap-2 rounded-md px-2 py-1.5 text-sm",
+                                isCorrect
+                                  ? "bg-success/10 font-medium text-success"
+                                  : "text-muted-foreground",
+                              )}
+                            >
+                              <span className="font-mono text-xs opacity-70">
+                                {option.key})
+                              </span>
+                              {option.text}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    ) : (
+                      <div className="rounded-lg bg-muted/60 p-3">
+                        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          Rubrik
+                        </p>
+                        <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">
+                          {question.rubric}
+                        </pre>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
               </li>
             ))}
           </ul>
-        </section>
-      ) : null}
+        )}
+      </div>
     </div>
   );
 }

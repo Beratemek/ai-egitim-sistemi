@@ -1,8 +1,15 @@
 import type { Metadata } from "next";
+import { CheckCheck, FileText, GraduationCap, Target } from "lucide-react";
 
+import {
+  ExamAverageChart,
+  QuestionStatusChart,
+  ScoreTrendChart,
+} from "@/components/shared/analytics-charts";
 import { PageHeader } from "@/components/shared/page-header";
-import { StatCard } from "@/components/shared/stat-card";
 import { RoleBadge } from "@/components/shared/status-badge";
+import { StatCard } from "@/components/shared/stat-card";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Card,
   CardContent,
@@ -18,7 +25,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { MOCK_QUESTIONS, MOCK_STATISTICS, MOCK_USERS } from "@/lib/mock-data";
+import {
+  MOCK_QUESTIONS,
+  MOCK_SCORE_TREND,
+  MOCK_STATISTICS,
+  MOCK_USERS,
+} from "@/lib/mock-data";
 import { formatScore } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Egitim Yoneticisi" };
@@ -37,13 +49,13 @@ export default function YoneticiPage() {
     0,
   );
 
-  const weightedScores = MOCK_STATISTICS.filter((row) => row.average_score !== null);
+  const scored = MOCK_STATISTICS.filter((row) => row.average_score !== null);
   const overallAverage =
-    weightedScores.length > 0
-      ? weightedScores.reduce(
+    scored.length > 0
+      ? scored.reduce(
           (total, row) => total + (row.average_score ?? 0) * row.submission_count,
           0,
-        ) / weightedScores.reduce((total, row) => total + row.submission_count, 0)
+        ) / scored.reduce((total, row) => total + row.submission_count, 0)
       : null;
 
   const approvalRate =
@@ -53,31 +65,50 @@ export default function YoneticiPage() {
     <>
       <PageHeader
         title="Istatistikler"
-        description="Sinav bazli katilim, ortalama ve egitmen onay oranlari."
+        description="Sinav bazli katilim, ortalama puan ve egitmen onay oranlari."
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Ogrenci" value={totalStudents} />
-        <StatCard label="Cevap" value={totalSubmissions} />
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          label="Ogrenci"
+          value={totalStudents}
+          icon={GraduationCap}
+          accent="primary"
+        />
+        <StatCard label="Cevap" value={totalSubmissions} icon={FileText} />
         <StatCard
           label="Genel ortalama"
-          value={overallAverage === null ? "-" : formatScore(overallAverage)}
+          value={overallAverage === null ? "-" : Math.round(overallAverage * 10) / 10}
+          hint="100 uzerinden"
+          icon={Target}
+          accent="success"
         />
         <StatCard
           label="Onay orani"
           value={`%${approvalRate}`}
           hint={`${totalApproved} / ${totalSubmissions} cevap onaylandi`}
+          icon={CheckCheck}
+          accent="warning"
         />
       </div>
 
+      <ScoreTrendChart data={MOCK_SCORE_TREND} />
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <ExamAverageChart data={MOCK_STATISTICS} />
+        <QuestionStatusChart questions={MOCK_QUESTIONS} />
+      </div>
+
+      {/* Grafiklerin tablo karsiligi - ekran okuyucu ve yazdirma icin */}
       <Card>
         <CardHeader>
           <CardTitle>Sinav bazli ozet</CardTitle>
           <CardDescription>
-            Kaynak: <code className="font-mono text-xs">public.exam_statistics</code> gorunumu.
+            Kaynak: <code className="font-mono text-xs">public.exam_statistics</code>{" "}
+            gorunumu. Yukaridaki grafiklerin sayisal karsiligi.
           </CardDescription>
         </CardHeader>
-        <CardContent className="p-0">
+        <CardContent className="px-0 sm:px-6">
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
@@ -92,16 +123,14 @@ export default function YoneticiPage() {
               {MOCK_STATISTICS.map((row) => (
                 <TableRow key={row.exam_id}>
                   <TableCell className="font-medium">{row.exam_title}</TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {row.student_count}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
+                  <TableCell className="text-right tabular">{row.student_count}</TableCell>
+                  <TableCell className="text-right tabular">
                     {row.submission_count}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums">
+                  <TableCell className="text-right tabular">
                     {row.approved_count}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums">
+                  <TableCell className="text-right tabular">
                     {formatScore(row.average_score)}
                   </TableCell>
                 </TableRow>
@@ -111,59 +140,39 @@ export default function YoneticiPage() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Soru havuzu dagilimi</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {(["onayli", "taslak", "reddedildi"] as const).map((status) => {
-              const count = MOCK_QUESTIONS.filter((q) => q.status === status).length;
-              const percentage =
-                MOCK_QUESTIONS.length > 0
-                  ? Math.round((count / MOCK_QUESTIONS.length) * 100)
-                  : 0;
+      <Card>
+        <CardHeader>
+          <CardTitle>Kullanicilar</CardTitle>
+          <CardDescription>Sistemdeki roller ve sahipleri.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-2 sm:grid-cols-2">
+          {MOCK_USERS.map((user) => {
+            const initials = user.full_name
+              .split(" ")
+              .slice(0, 2)
+              .map((part) => part[0]?.toLocaleUpperCase("tr") ?? "")
+              .join("");
 
-              return (
-                <div key={status} className="space-y-1">
-                  <div className="flex justify-between text-sm">
-                    <span className="capitalize">{status}</span>
-                    <span className="tabular-nums text-muted-foreground">
-                      {count} (%{percentage})
-                    </span>
-                  </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-muted">
-                    <div
-                      className="h-full rounded-full bg-primary"
-                      style={{ width: `${percentage}%` }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Kullanicilar</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {MOCK_USERS.map((user) => (
+            return (
               <div
                 key={user.id}
-                className="flex items-center justify-between gap-2 rounded-md border border-border px-3 py-2"
+                className="flex items-center gap-3 rounded-lg border px-3 py-2.5"
               >
-                <div>
-                  <p className="text-sm font-medium">{user.full_name}</p>
-                  <p className="text-xs text-muted-foreground">{user.email}</p>
+                <Avatar className="h-9 w-9">
+                  <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">
+                    {initials}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{user.full_name}</p>
+                  <p className="truncate text-xs text-muted-foreground">{user.email}</p>
                 </div>
                 <RoleBadge role={user.role} />
               </div>
-            ))}
-          </CardContent>
-        </Card>
-      </div>
+            );
+          })}
+        </CardContent>
+      </Card>
     </>
   );
 }

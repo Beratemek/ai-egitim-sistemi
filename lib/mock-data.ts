@@ -264,3 +264,28 @@ export const MOCK_STATISTICS: readonly ExamStatistics[] = [
 /** Id -> tam ad eslesmesi (tablolarda gostermek icin). */
 export const MOCK_USER_NAMES: Readonly<Record<string, string>> =
   Object.fromEntries(MOCK_USERS.map((user) => [user.id, user.full_name]));
+
+/* -------------------------------------------------------------------------- */
+/*  Grafik verisi (Egitim Yoneticisi panosu)                                  */
+/* -------------------------------------------------------------------------- */
+
+/** Haftalik ortalama puan trendi: AI on puani ile egitmen onayli puanin karsilastirmasi. */
+export interface ScoreTrendPoint {
+  /** Donem etiketi (hafta). */
+  period: string;
+  /** AI'in verdigi on puan ortalamasi. */
+  aiScore: number;
+  /** Egitmen onayindan sonraki nihai puan ortalamasi. */
+  approvedScore: number;
+}
+
+export const MOCK_SCORE_TREND: readonly ScoreTrendPoint[] = [
+  { period: "1. hafta", aiScore: 62.4, approvedScore: 65.1 },
+  { period: "2. hafta", aiScore: 66.8, approvedScore: 69.4 },
+  { period: "3. hafta", aiScore: 64.2, approvedScore: 68.0 },
+  { period: "4. hafta", aiScore: 71.5, approvedScore: 74.2 },
+  { period: "5. hafta", aiScore: 74.9, approvedScore: 76.8 },
+  { period: "6. hafta", aiScore: 76.3, approvedScore: 79.5 },
+  { period: "7. hafta", aiScore: 78.1, approvedScore: 80.3 },
+  { period: "8. hafta", aiScore: 79.6, approvedScore: 82.1 },
+];

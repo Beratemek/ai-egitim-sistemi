@@ -1,27 +1,34 @@
-import Link from "next/link";
+"use client";
 
-import { RoleBadge } from "@/components/shared/status-badge";
+import * as React from "react";
+import { LogOut, Menu } from "lucide-react";
+
+import { NavLinks, RoleCard } from "@/components/shared/app-nav";
+import { BrandMark } from "@/components/shared/brand-mark";
+import { ROLE_ICONS } from "@/components/shared/role-icons";
+import { ThemeToggle } from "@/components/shared/theme-toggle";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Separator } from "@/components/ui/separator";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { ROLE_DEFINITIONS } from "@/lib/roles";
 import type { UserRole } from "@/lib/types";
-
-export interface NavItem {
-  href: string;
-  label: string;
-}
-
-/** Rol basina sol menu ogeleri. */
-export const ROLE_NAV: Record<UserRole, readonly NavItem[]> = {
-  icerik_uzmani: [
-    { href: "/dashboard/icerik-uzmani", label: "Icerik & Kazanimlar" },
-  ],
-  egitmen: [
-    { href: "/dashboard/egitmen", label: "Genel Bakis" },
-    { href: "/dashboard/egitmen/soru-havuzu", label: "Soru Havuzu" },
-  ],
-  ogrenci: [{ href: "/dashboard/ogrenci", label: "Sinavlarim" }],
-  egitim_yoneticisi: [{ href: "/dashboard/yonetici", label: "Istatistikler" }],
-};
 
 export interface DashboardShellProps {
   role: UserRole;
@@ -37,58 +44,143 @@ export function DashboardShell({
   demoMode = false,
   children,
 }: DashboardShellProps) {
+  const [mobileOpen, setMobileOpen] = React.useState(false);
   const definition = ROLE_DEFINITIONS[role];
-  const navItems = ROLE_NAV[role];
+  const RoleIcon = ROLE_ICONS[role];
+
+  const initials = fullName
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toLocaleUpperCase("tr") ?? "")
+    .join("");
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur">
-        <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between gap-4 px-4 sm:px-6">
-          <div className="flex items-center gap-3">
-            <Link href="/" className="text-sm font-semibold tracking-tight">
-              AI Egitim Sistemi
-            </Link>
-            <RoleBadge role={role} />
-            {demoMode ? (
-              <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-900 dark:bg-amber-950 dark:text-amber-200">
-                Demo
-              </span>
-            ) : null}
-          </div>
-
-          <div className="flex items-center gap-3">
-            <span className="hidden text-sm text-muted-foreground sm:inline">{fullName}</span>
-            <form action="/auth/signout" method="post">
-              <Button type="submit" variant="outline" size="sm">
-                Cikis
-              </Button>
-            </form>
-          </div>
+    <div className="min-h-screen bg-background">
+      {/* ---------- Masaustu sol menu ---------- */}
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[264px] flex-col border-r bg-card lg:flex">
+        <div className="flex h-16 items-center border-b px-5">
+          <BrandMark />
         </div>
-      </header>
 
-      <div className="mx-auto flex w-full max-w-7xl flex-1 gap-8 px-4 py-8 sm:px-6">
-        <aside className="hidden w-56 shrink-0 lg:block">
-          <p className="px-3 pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            {definition.label}
+        <div className="flex-1 overflow-y-auto px-3 py-4">
+          <p className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Menu
           </p>
-          <nav className="space-y-1">
-            {navItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="block rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          <NavLinks role={role} />
+        </div>
+
+        <div className="border-t p-3">
+          <RoleCard role={role} />
+        </div>
+      </aside>
+
+      {/* ---------- Icerik sutunu ---------- */}
+      <div className="lg:pl-[264px]">
+        {/* ---------- Ust cubuk ---------- */}
+        <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b bg-background/80 px-4 backdrop-blur-md sm:px-6">
+          {/* Mobil cekmece */}
+          <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+            <SheetTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="lg:hidden"
+                aria-label="Menuyu ac"
               >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
-          <p className="mt-6 px-3 text-xs leading-relaxed text-muted-foreground">
-            {definition.description}
-          </p>
-        </aside>
+                <Menu className="h-5 w-5" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="left" className="w-[280px] p-0">
+              <SheetHeader className="h-16 justify-center border-b px-5 text-left">
+                <SheetTitle asChild>
+                  <div>
+                    <BrandMark />
+                  </div>
+                </SheetTitle>
+                <SheetDescription className="sr-only">
+                  Panel gezinti menusu
+                </SheetDescription>
+              </SheetHeader>
 
-        <main className="min-w-0 flex-1 space-y-6">{children}</main>
+              <div className="px-3 py-4">
+                <NavLinks role={role} onNavigate={() => setMobileOpen(false)} />
+              </div>
+
+              <div className="px-3">
+                <RoleCard role={role} />
+              </div>
+            </SheetContent>
+          </Sheet>
+
+          {/* Mobilde marka, masaustunde rol basligi */}
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <div className="lg:hidden">
+              <BrandMark />
+            </div>
+
+            <div className="hidden items-center gap-2 lg:flex">
+              <RoleIcon className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium">{definition.label} Paneli</span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {demoMode ? (
+              <Badge variant="warning" className="hidden sm:inline-flex">
+                Demo modu
+              </Badge>
+            ) : null}
+
+            <ThemeToggle />
+
+            <Separator orientation="vertical" className="hidden h-6 sm:block" />
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className="h-9 gap-2 px-2"
+                  aria-label="Hesap menusu"
+                >
+                  <Avatar className="h-7 w-7">
+                    <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">
+                      {initials || "?"}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="hidden max-w-[140px] truncate text-sm font-medium sm:inline">
+                    {fullName}
+                  </span>
+                </Button>
+              </DropdownMenuTrigger>
+
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>
+                  <p className="truncate text-sm font-medium">{fullName}</p>
+                  <p className="mt-0.5 text-xs font-normal text-muted-foreground">
+                    {definition.label}
+                  </p>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <form action="/auth/signout" method="post" className="w-full">
+                    <button
+                      type="submit"
+                      className="flex w-full items-center gap-2 text-left"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      Cikis yap
+                    </button>
+                  </form>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </header>
+
+        <main className="mx-auto w-full max-w-[1400px] space-y-6 px-4 py-6 sm:px-6 sm:py-8">
+          {children}
+        </main>
       </div>
     </div>
   );

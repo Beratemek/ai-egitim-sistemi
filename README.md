@@ -8,7 +8,10 @@ baslangic projesi.
 
 | Katman | Teknoloji |
 | --- | --- |
-| Arayuz | Next.js 15 (App Router), React 19, Tailwind CSS 3, TypeScript (strict) |
+| Arayuz | Next.js 15 (App Router), React 19, TypeScript (strict) |
+| Tasarim sistemi | Tailwind CSS 3 + **shadcn/ui** (Radix primitifleri), lucide ikonlari, Inter (next/font) |
+| Tema | next-themes ile acik/koyu mod; renkler CSS degiskenleri uzerinden |
+| Grafik | Recharts (shadcn chart sarmalayicisi) |
 | API | Next.js Route Handlers (Node.js runtime) |
 | Veritabani / Yetki | Supabase (`@supabase/supabase-js`, `@supabase/ssr`) |
 | Yapay zeka | Vercel AI SDK (`ai`) + `@ai-sdk/openai`, semali cikti icin `zod` |
@@ -86,11 +89,22 @@ app/
     signout/route.ts             POST -> oturum kapatma
 
 components/
-  ui/                            Button, Input, Textarea, Label, Select,
-                                 Card, Badge, Table (shadcn tarzi)
-  shared/                        DashboardShell, PageHeader, StatCard,
-                                 LoginForm, QuestionPoolTable,
-                                 QuestionGeneratorForm, AnswerForm, rozetler
+  ui/                            shadcn/ui bilesenleri: Button, Input, Textarea,
+                                 Label, Select, Card, Badge, Table, Tabs, Sheet,
+                                 DropdownMenu, Dialog, Avatar, Progress, Skeleton,
+                                 Separator, Tooltip, ScrollArea, Sonner, Chart
+  theme-provider.tsx             next-themes sarmalayicisi
+  shared/
+    dashboard-shell.tsx          sabit sol menu + mobil Sheet cekmece + hesap menusu
+    app-nav.tsx                  rol bazli menu ogeleri (istemci; usePathname)
+    brand-mark.tsx               logo (sunucu bileseni)
+    role-icons.ts                rol ikonlari (RSC sinirini gecebilmek icin ayri)
+    theme-toggle.tsx             acik/koyu tema anahtari
+    analytics-charts.tsx         Recharts grafikleri (trend, ortalama, durum)
+    question-pool-table.tsx      masaustunde tablo, mobilde kart listesi
+    question-generator-form.tsx  AI soru uretim formu
+    answer-form.tsx              ogrenci cevap + AI puan gorunumu
+    page-header.tsx, stat-card.tsx, status-badge.tsx, login-form.tsx
 
 lib/
   types.ts                       domain tipleri + Supabase Database generic'i

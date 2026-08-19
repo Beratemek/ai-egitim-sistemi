@@ -1,11 +1,32 @@
 "use client";
 
 import * as React from "react";
+import {
+  Check,
+  ChevronDown,
+  Search,
+  Sparkles,
+  UserPen,
+  X,
+} from "lucide-react";
+import { toast } from "sonner";
 
+import {
+  QuestionStatusBadge,
+  QuestionTypeBadge,
+} from "@/components/shared/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -14,10 +35,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { QuestionStatusBadge, QuestionTypeBadge } from "@/components/shared/status-badge";
-import { formatDateTime } from "@/lib/utils";
+import { cn, formatDateTime } from "@/lib/utils";
 import {
-  QUESTION_STATUSES,
   QUESTION_TYPES,
   type Question,
   type QuestionStatus,
@@ -37,16 +56,17 @@ export interface QuestionPoolTableProps {
   onStatusChange?: (questionId: string, status: QuestionStatus) => Promise<void> | void;
 }
 
-const STATUS_LABELS: Record<QuestionStatus, string> = {
-  taslak: "Taslak",
-  onayli: "Onayli",
-  reddedildi: "Reddedildi",
-};
-
 const TYPE_LABELS: Record<QuestionType, string> = {
   test: "Coktan secmeli",
   acik_uclu: "Acik uclu",
 };
+
+const STATUS_TABS: readonly { value: StatusFilter; label: string }[] = [
+  { value: "hepsi", label: "Tumu" },
+  { value: "taslak", label: "Taslak" },
+  { value: "onayli", label: "Onayli" },
+  { value: "reddedildi", label: "Reddedildi" },
+];
 
 export function QuestionPoolTable({ questions, onStatusChange }: QuestionPoolTableProps) {
   const [rows, setRows] = React.useState<readonly Question[]>(questions);
@@ -56,7 +76,6 @@ export function QuestionPoolTable({ questions, onStatusChange }: QuestionPoolTab
   const [expandedId, setExpandedId] = React.useState<string | null>(null);
   const [pendingId, setPendingId] = React.useState<string | null>(null);
 
-  // Sunucudan gelen veri degisirse tabloyu tazele.
   React.useEffect(() => {
     setRows(questions);
   }, [questions]);
@@ -78,7 +97,7 @@ export function QuestionPoolTable({ questions, onStatusChange }: QuestionPoolTab
 
   const counts = React.useMemo(
     () => ({
-      toplam: rows.length,
+      hepsi: rows.length,
       taslak: rows.filter((q) => q.status === "taslak").length,
       onayli: rows.filter((q) => q.status === "onayli").length,
       reddedildi: rows.filter((q) => q.status === "reddedildi").length,
@@ -86,22 +105,28 @@ export function QuestionPoolTable({ questions, onStatusChange }: QuestionPoolTab
     [rows],
   );
 
-  async function updateStatus(questionId: string, status: QuestionStatus) {
-    setPendingId(questionId);
-    // Iyimser guncelleme: once arayuz, sonra kalici katman.
+  async function updateStatus(question: Question, status: QuestionStatus) {
+    setPendingId(question.id);
     const previous = rows;
+
+    // Iyimser guncelleme: once arayuz, sonra kalici katman.
     setRows((current) =>
-      current.map((question) =>
-        question.id === questionId
-          ? { ...question, status, updated_at: new Date().toISOString() }
-          : question,
+      current.map((row) =>
+        row.id === question.id
+          ? { ...row, status, updated_at: new Date().toISOString() }
+          : row,
       ),
     );
 
     try {
-      await onStatusChange?.(questionId, status);
+      await onStatusChange?.(question.id, status);
+      toast.success(
+        status === "onayli" ? "Soru havuza eklendi" : "Soru reddedildi",
+        { description: question.text.slice(0, 70) + "..." },
+      );
     } catch {
       setRows(previous); // basarisiz olursa geri al
+      toast.error("Islem kaydedilemedi", { description: "Lutfen tekrar deneyin." });
     } finally {
       setPendingId(null);
     }
@@ -109,145 +134,270 @@ export function QuestionPoolTable({ questions, onStatusChange }: QuestionPoolTab
 
   return (
     <div className="space-y-4">
-      {/* Ozet + filtreler */}
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-          <Badge variant="outline" className="border-border">
-            Toplam {counts.toplam}
-          </Badge>
-          <Badge variant="secondary">Taslak {counts.taslak}</Badge>
-          <Badge variant="success">Onayli {counts.onayli}</Badge>
-          <Badge variant="destructive">Reddedildi {counts.reddedildi}</Badge>
-        </div>
+      {/* ---------- Filtre cubugu ---------- */}
+      <div className="flex flex-col gap-3">
+        <Tabs
+          value={statusFilter}
+          onValueChange={(value) => setStatusFilter(value as StatusFilter)}
+        >
+          <TabsList className="w-full justify-start overflow-x-auto sm:w-auto">
+            {STATUS_TABS.map((tab) => (
+              <TabsTrigger key={tab.value} value={tab.value} className="gap-2">
+                {tab.label}
+                <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] font-semibold text-muted-foreground">
+                  {counts[tab.value]}
+                </span>
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
 
         <div className="flex flex-col gap-2 sm:flex-row">
-          <Input
-            type="search"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Soru veya konu ara..."
-            aria-label="Soru ara"
-            className="sm:w-64"
-          />
-          <Select
-            value={statusFilter}
-            onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}
-            aria-label="Duruma gore filtrele"
-            className="sm:w-44"
-          >
-            <option value="hepsi">Tum durumlar</option>
-            {QUESTION_STATUSES.map((status) => (
-              <option key={status} value={status}>
-                {STATUS_LABELS[status]}
-              </option>
-            ))}
-          </Select>
+          <div className="relative flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              type="search"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Soru veya konu ara..."
+              aria-label="Soru ara"
+              className="pl-9"
+            />
+          </div>
+
           <Select
             value={typeFilter}
-            onChange={(event) => setTypeFilter(event.target.value as TypeFilter)}
-            aria-label="Tipe gore filtrele"
-            className="sm:w-44"
+            onValueChange={(value) => setTypeFilter(value as TypeFilter)}
           >
-            <option value="hepsi">Tum tipler</option>
-            {QUESTION_TYPES.map((type) => (
-              <option key={type} value={type}>
-                {TYPE_LABELS[type]}
-              </option>
-            ))}
+            <SelectTrigger className="sm:w-52" aria-label="Tipe gore filtrele">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="hepsi">Tum soru tipleri</SelectItem>
+              {QUESTION_TYPES.map((type) => (
+                <SelectItem key={type} value={type}>
+                  {TYPE_LABELS[type]}
+                </SelectItem>
+              ))}
+            </SelectContent>
           </Select>
         </div>
       </div>
 
-      {/* Tablo */}
-      <div className="rounded-lg border border-border">
-        <Table>
-          <TableHeader>
-            <TableRow className="hover:bg-transparent">
-              <TableHead className="w-[38%]">Soru</TableHead>
-              <TableHead>Konu</TableHead>
-              <TableHead>Tip</TableHead>
-              <TableHead>Durum</TableHead>
-              <TableHead>Kaynak</TableHead>
-              <TableHead>Guncelleme</TableHead>
-              <TableHead className="text-right">Islem</TableHead>
-            </TableRow>
-          </TableHeader>
+      {visibleRows.length === 0 ? (
+        <EmptyState />
+      ) : (
+        <>
+          {/* ---------- Masaustu: tablo ---------- */}
+          <Card className="hidden md:block">
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="w-[40%]">Soru</TableHead>
+                  <TableHead>Konu</TableHead>
+                  <TableHead>Tip</TableHead>
+                  <TableHead>Durum</TableHead>
+                  <TableHead>Kaynak</TableHead>
+                  <TableHead className="text-right">Islem</TableHead>
+                </TableRow>
+              </TableHeader>
 
-          <TableBody>
-            {visibleRows.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
-                  Filtrelere uyan soru bulunamadi.
-                </TableCell>
-              </TableRow>
-            ) : (
-              visibleRows.map((question) => {
-                const isExpanded = expandedId === question.id;
-                const isPending = pendingId === question.id;
+              <TableBody>
+                {visibleRows.map((question) => {
+                  const isExpanded = expandedId === question.id;
 
-                return (
-                  <React.Fragment key={question.id}>
-                    <TableRow>
-                      <TableCell className="max-w-md">
-                        <button
-                          type="button"
-                          onClick={() => setExpandedId(isExpanded ? null : question.id)}
-                          className="text-left font-medium hover:underline"
-                          aria-expanded={isExpanded}
-                        >
-                          {question.text}
-                        </button>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">{question.topic}</TableCell>
-                      <TableCell>
-                        <QuestionTypeBadge type={question.type} />
-                      </TableCell>
-                      <TableCell>
-                        <QuestionStatusBadge status={question.status} />
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {question.ai_generated ? "AI uretimi" : "Manuel"}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
-                        {formatDateTime(question.updated_at)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={isPending || question.status === "onayli"}
-                            onClick={() => void updateStatus(question.id, "onayli")}
+                  return (
+                    <React.Fragment key={question.id}>
+                      <TableRow>
+                        <TableCell className="max-w-md align-top">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setExpandedId(isExpanded ? null : question.id)
+                            }
+                            className="group flex items-start gap-2 text-left"
+                            aria-expanded={isExpanded}
                           >
-                            Onayla
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            disabled={isPending || question.status === "reddedildi"}
-                            onClick={() => void updateStatus(question.id, "reddedildi")}
-                          >
-                            Reddet
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-
-                    {isExpanded ? (
-                      <TableRow className="bg-muted/40 hover:bg-muted/40">
-                        <TableCell colSpan={7} className="py-4">
-                          <QuestionDetail question={question} />
+                            <ChevronDown
+                              className={cn(
+                                "mt-0.5 h-4 w-4 shrink-0 text-muted-foreground transition-transform",
+                                isExpanded && "rotate-180",
+                              )}
+                            />
+                            <span className="font-medium group-hover:underline">
+                              {question.text}
+                            </span>
+                          </button>
+                        </TableCell>
+                        <TableCell className="align-top text-muted-foreground">
+                          {question.topic}
+                        </TableCell>
+                        <TableCell className="align-top">
+                          <QuestionTypeBadge type={question.type} />
+                        </TableCell>
+                        <TableCell className="align-top">
+                          <QuestionStatusBadge status={question.status} />
+                        </TableCell>
+                        <TableCell className="align-top">
+                          <SourceBadge aiGenerated={question.ai_generated} />
+                        </TableCell>
+                        <TableCell className="align-top text-right">
+                          <RowActions
+                            question={question}
+                            pending={pendingId === question.id}
+                            onUpdate={updateStatus}
+                          />
                         </TableCell>
                       </TableRow>
+
+                      {isExpanded ? (
+                        <TableRow className="bg-muted/40 hover:bg-muted/40">
+                          <TableCell colSpan={6} className="py-4">
+                            <QuestionDetail question={question} />
+                          </TableCell>
+                        </TableRow>
+                      ) : null}
+                    </React.Fragment>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </Card>
+
+          {/* ---------- Mobil: kart listesi ---------- */}
+          <div className="space-y-3 md:hidden">
+            {visibleRows.map((question) => {
+              const isExpanded = expandedId === question.id;
+
+              return (
+                <Card key={question.id}>
+                  <CardContent className="space-y-3 p-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <QuestionStatusBadge status={question.status} />
+                      <QuestionTypeBadge type={question.type} />
+                    </div>
+
+                    <p className="text-sm font-medium leading-relaxed">
+                      {question.text}
+                    </p>
+
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                      <span>{question.topic}</span>
+                      <span aria-hidden>&middot;</span>
+                      <span>{formatDateTime(question.updated_at)}</span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setExpandedId(isExpanded ? null : question.id)}
+                      className="flex items-center gap-1.5 text-xs font-medium text-primary"
+                      aria-expanded={isExpanded}
+                    >
+                      <ChevronDown
+                        className={cn(
+                          "h-3.5 w-3.5 transition-transform",
+                          isExpanded && "rotate-180",
+                        )}
+                      />
+                      {isExpanded ? "Detayi gizle" : "Secenekler / rubrik"}
+                    </button>
+
+                    {isExpanded ? (
+                      <div className="rounded-lg bg-muted/50 p-3">
+                        <QuestionDetail question={question} />
+                      </div>
                     ) : null}
-                  </React.Fragment>
-                );
-              })
-            )}
-          </TableBody>
-        </Table>
-      </div>
+
+                    <RowActions
+                      question={question}
+                      pending={pendingId === question.id}
+                      onUpdate={updateStatus}
+                      className="pt-1"
+                      fullWidth
+                    />
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      <p className="text-xs text-muted-foreground">
+        {visibleRows.length} / {rows.length} soru gosteriliyor
+      </p>
     </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+
+function RowActions({
+  question,
+  pending,
+  onUpdate,
+  className,
+  fullWidth = false,
+}: {
+  question: Question;
+  pending: boolean;
+  onUpdate: (question: Question, status: QuestionStatus) => Promise<void>;
+  className?: string;
+  fullWidth?: boolean;
+}) {
+  return (
+    <div className={cn("flex gap-2", fullWidth ? "w-full" : "justify-end", className)}>
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={pending || question.status === "onayli"}
+        onClick={() => void onUpdate(question, "onayli")}
+        className={cn("gap-1.5", fullWidth && "flex-1")}
+      >
+        <Check className="h-3.5 w-3.5" />
+        Onayla
+      </Button>
+      <Button
+        size="sm"
+        variant="ghost"
+        disabled={pending || question.status === "reddedildi"}
+        onClick={() => void onUpdate(question, "reddedildi")}
+        className={cn(
+          "gap-1.5 text-muted-foreground hover:text-destructive",
+          fullWidth && "flex-1",
+        )}
+      >
+        <X className="h-3.5 w-3.5" />
+        Reddet
+      </Button>
+    </div>
+  );
+}
+
+function SourceBadge({ aiGenerated }: { aiGenerated: boolean }) {
+  return (
+    <Badge variant="outline" className="gap-1.5 font-normal text-muted-foreground">
+      {aiGenerated ? (
+        <Sparkles className="h-3.5 w-3.5" />
+      ) : (
+        <UserPen className="h-3.5 w-3.5" />
+      )}
+      {aiGenerated ? "AI" : "Manuel"}
+    </Badge>
+  );
+}
+
+function EmptyState() {
+  return (
+    <Card>
+      <CardContent className="flex flex-col items-center justify-center gap-2 py-16 text-center">
+        <Search className="h-8 w-8 text-muted-foreground/50" />
+        <p className="font-medium">Filtrelere uyan soru bulunamadi</p>
+        <p className="text-sm text-muted-foreground">
+          Arama terimini veya filtreleri degistirmeyi deneyin.
+        </p>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -258,21 +408,23 @@ function QuestionDetail({ question }: { question: Question }) {
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Secenekler
         </p>
-        <ul className="space-y-1">
+        <ul className="space-y-1.5">
           {(question.options_json ?? []).map((option) => {
             const isCorrect = option.key === question.correct_answer;
+
             return (
               <li
                 key={option.key}
-                className={
-                  isCorrect
-                    ? "text-sm font-medium text-emerald-700 dark:text-emerald-400"
-                    : "text-sm text-foreground"
-                }
+                className={cn(
+                  "flex items-start gap-2 rounded-md px-2 py-1.5 text-sm",
+                  isCorrect && "bg-success/10 font-medium text-success",
+                )}
               >
-                <span className="mr-2 font-mono">{option.key})</span>
-                {option.text}
-                {isCorrect ? <span className="ml-2 text-xs">(dogru cevap)</span> : null}
+                <span className="font-mono text-xs opacity-70">{option.key})</span>
+                <span>{option.text}</span>
+                {isCorrect ? (
+                  <Check className="ml-auto h-4 w-4 shrink-0" aria-label="Dogru cevap" />
+                ) : null}
               </li>
             );
           })}
@@ -286,7 +438,7 @@ function QuestionDetail({ question }: { question: Question }) {
       <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         Puanlama rubrigi
       </p>
-      <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-foreground">
+      <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">
         {question.rubric ?? "Rubrik tanimlanmamis."}
       </pre>
     </div>

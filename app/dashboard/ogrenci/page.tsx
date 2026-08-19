@@ -1,9 +1,14 @@
 import type { Metadata } from "next";
+import { CalendarClock, FileText, Target } from "lucide-react";
 
 import { AnswerForm } from "@/components/shared/answer-form";
 import { PageHeader } from "@/components/shared/page-header";
 import { StatCard } from "@/components/shared/stat-card";
-import { SubmissionStatusBadge } from "@/components/shared/status-badge";
+import {
+  QuestionTypeBadge,
+  SubmissionStatusBadge,
+} from "@/components/shared/status-badge";
+import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
@@ -11,8 +16,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import { MOCK_EXAMS, MOCK_QUESTIONS, MOCK_SUBMISSIONS } from "@/lib/mock-data";
-import { formatDateTime, formatScore } from "@/lib/utils";
+import { formatDateTime } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Ogrenci" };
 
@@ -41,75 +47,109 @@ export default function OgrenciPage() {
       />
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard label="Aktif sinav" value={publishedExams.length} />
-        <StatCard label="Gonderilen cevap" value={MOCK_SUBMISSIONS.length} />
+        <StatCard
+          label="Aktif sinav"
+          value={publishedExams.length}
+          icon={CalendarClock}
+          accent="primary"
+        />
+        <StatCard
+          label="Gonderilen cevap"
+          value={MOCK_SUBMISSIONS.length}
+          icon={FileText}
+        />
         <StatCard
           label="Ortalama"
-          value={average === null ? "-" : formatScore(average)}
-          hint="Onaylanmis puanlar dahil"
+          value={average === null ? "-" : Math.round(average * 10) / 10}
+          hint="100 uzerinden"
+          icon={Target}
+          accent="success"
         />
       </div>
 
-      {openQuestion && openQuestion.rubric ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>{openQuestion.text}</CardTitle>
-            <CardDescription>
-              {openQuestion.topic} &middot; Acik uclu soru
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <AnswerForm
-              questionId={openQuestion.id}
-              questionText={openQuestion.text}
-              rubric={openQuestion.rubric}
-            />
-          </CardContent>
-        </Card>
-      ) : null}
+      <div className="grid gap-6 lg:grid-cols-5">
+        {/* ---------- Aktif soru ---------- */}
+        <div className="lg:col-span-3">
+          {openQuestion && openQuestion.rubric ? (
+            <Card>
+              <CardHeader>
+                <div className="flex flex-wrap items-center gap-2">
+                  <QuestionTypeBadge type={openQuestion.type} />
+                  <Badge variant="soft">{openQuestion.topic}</Badge>
+                </div>
+                <CardTitle className="mt-2 leading-snug">{openQuestion.text}</CardTitle>
+                <CardDescription>
+                  Cevabiniz rubrige gore degerlendirilecek. Nihai puani egitmen onaylar.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <AnswerForm
+                  questionId={openQuestion.id}
+                  questionText={openQuestion.text}
+                  rubric={openQuestion.rubric}
+                />
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="border-dashed">
+              <CardContent className="py-16 text-center text-sm text-muted-foreground">
+                Su an yanitlanacak acik uclu soru yok.
+              </CardContent>
+            </Card>
+          )}
+        </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Gecmis cevaplarim</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
+        {/* ---------- Gecmis cevaplar ---------- */}
+        <div className="space-y-3 lg:col-span-2">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            Gecmis cevaplarim
+          </h2>
+
           {MOCK_SUBMISSIONS.map((submission) => {
             const finalScore =
               submission.instructor_approved_score ?? submission.ai_score;
 
             return (
-              <div key={submission.id} className="rounded-lg border border-border p-4">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <SubmissionStatusBadge status={submission.status} />
-                  <span className="text-sm font-semibold tabular-nums">
-                    {formatScore(finalScore)}
-                  </span>
-                </div>
+              <Card key={submission.id}>
+                <CardContent className="space-y-3 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <SubmissionStatusBadge status={submission.status} />
+                    <span className="text-sm font-semibold tabular">
+                      {finalScore === null ? "-" : `${finalScore} / 100`}
+                    </span>
+                  </div>
 
-                <p className="mt-2 text-sm">{submission.answer_text}</p>
+                  {finalScore !== null ? (
+                    <Progress value={finalScore} className="h-1.5" />
+                  ) : null}
 
-                {submission.ai_feedback ? (
-                  <p className="mt-2 rounded-md bg-muted/60 px-3 py-2 text-sm text-muted-foreground">
-                    <span className="font-medium text-foreground">Geri bildirim: </span>
-                    {submission.ai_feedback}
+                  <p className="line-clamp-3 text-sm leading-relaxed text-muted-foreground">
+                    {submission.answer_text}
                   </p>
-                ) : null}
 
-                {submission.instructor_note ? (
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    <span className="font-medium text-foreground">Egitmen notu: </span>
-                    {submission.instructor_note}
+                  {submission.ai_feedback ? (
+                    <p className="rounded-lg bg-muted/60 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
+                      <span className="font-medium text-foreground">Geri bildirim: </span>
+                      {submission.ai_feedback}
+                    </p>
+                  ) : null}
+
+                  {submission.instructor_note ? (
+                    <p className="rounded-lg bg-success/10 px-3 py-2 text-xs leading-relaxed text-success">
+                      <span className="font-medium">Egitmen notu: </span>
+                      {submission.instructor_note}
+                    </p>
+                  ) : null}
+
+                  <p className="text-xs text-muted-foreground">
+                    {formatDateTime(submission.created_at)}
                   </p>
-                ) : null}
-
-                <p className="mt-2 text-xs text-muted-foreground">
-                  {formatDateTime(submission.created_at)}
-                </p>
-              </div>
+                </CardContent>
+              </Card>
             );
           })}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </>
   );
 }
