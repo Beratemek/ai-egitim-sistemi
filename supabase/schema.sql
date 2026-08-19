@@ -386,7 +386,12 @@ create policy "submissions_update_egitmen" on public.submissions
 -- 6. ISTATISTIK GORUNUMU (Egitim Yoneticisi dashboard'u icin)
 -- ===========================================================================
 
-create or replace view public.exam_statistics as
+-- security_invoker = true SART: aksi halde view, sahibinin (postgres) yetkisiyle
+-- calisir ve alttaki tablolarin RLS politikalarini ATLAR; boylece herhangi bir
+-- ogrenci tum sinavlarin istatistiklerini gorebilirdi.
+create or replace view public.exam_statistics
+  with (security_invoker = true)
+as
 select
   e.id                                                            as exam_id,
   e.title                                                         as exam_title,
