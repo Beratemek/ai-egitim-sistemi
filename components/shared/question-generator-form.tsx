@@ -12,6 +12,11 @@ import {
 import { toast } from "sonner";
 
 import { saveGeneratedQuestions } from "@/app/actions/questions";
+import {
+  DENEYAP_CATEGORY_OPTIONS,
+  categoryLabel,
+  type DeneyapCategory,
+} from "@/lib/deneyap";
 import { GeneratedQuestionCard } from "@/components/shared/generated-question-card";
 import { SourceTextField } from "@/components/shared/source-text-field";
 import { Badge } from "@/components/ui/badge";
@@ -37,22 +42,17 @@ import type {
   ApiResponse,
   GenerateQuestionsRequest,
   GeneratedQuestion,
-  LearningOutcome,
   QuestionType,
 } from "@/lib/types";
 
 type TypeChoice = QuestionType | "karisik";
 
 export interface QuestionGeneratorFormProps {
-  /** Uretilen sorularin baglanacagi kazanim secenekleri. */
-  outcomes: LearningOutcome[];
   /** AI'in bugune kadar ogrendigi ornek sayilari. */
   preferenceStats: { liked: number; disliked: number };
   /** Supabase yoksa kaydetme kapali olur. */
   canPersist: boolean;
 }
-
-const NO_OUTCOME = "yok";
 
 /**
  * Icerik uzmaninin kaynak metin + kazanim girip AI'dan soru taslagi
@@ -63,10 +63,11 @@ const NO_OUTCOME = "yok";
  * ornek olarak verilir. Begenilen taslaklar tek tikla havuza gonderilir.
  */
 export function QuestionGeneratorForm({
-  outcomes,
   preferenceStats,
   canPersist,
 }: QuestionGeneratorFormProps) {
+  /** DENEYAP atolye dali - uretilen sorular bu dala baglanir. */
+  const [category, setCategory] = React.useState<DeneyapCategory | "">("");
   const [topic, setTopic] = React.useState("");
   const [kazanim, setKazanim] = React.useState("");
   const [context, setContext] = React.useState("");
@@ -77,7 +78,6 @@ export function QuestionGeneratorForm({
    */
   const [count, setCount] = React.useState("5");
   const [type, setType] = React.useState<TypeChoice>("karisik");
-  const [outcomeId, setOutcomeId] = React.useState<string>(NO_OUTCOME);
 
   const [pending, setPending] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
@@ -89,28 +89,6 @@ export function QuestionGeneratorForm({
 
   /** Alan bos veya gecersizse 5'e duser; her zaman 1-20 araliginda. */
   const resolvedCount = Math.min(Math.max(Number.parseInt(count, 10) || 5, 1), 20);
-
-  /**
-   * Kazanim secilince konu/kazanim/metin alanlarini doldurur.
-   * "Kazanim secme (elle gir)" secilirse alanlari BOSALTIR - aksi halde onceki
-   * kazanimin metni ekranda kalir ve kullanici elle giremedigini sanir.
-   */
-  function applyOutcome(id: string) {
-    setOutcomeId(id);
-
-    const outcome = outcomes.find((item) => item.id === id);
-
-    if (!outcome) {
-      setTopic("");
-      setKazanim("");
-      setContext("");
-      return;
-    }
-
-    setTopic(outcome.topic);
-    setKazanim(outcome.outcome_text);
-    if (outcome.source_text) setContext(outcome.source_text);
-  }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -131,6 +109,7 @@ export function QuestionGeneratorForm({
       context,
       kazanim,
       topic: topic || undefined,
+      ...(category ? { category } : {}),
       count: resolvedCount,
       type,
     };
@@ -177,7 +156,7 @@ export function QuestionGeneratorForm({
     setSaving(true);
     const result = await saveGeneratedQuestions({
       questions: chosen,
-      ...(outcomeId !== NO_OUTCOME ? { outcomeId } : {}),
+      ...(category ? { category } : {}),
     });
     setSaving(false);
 
@@ -215,31 +194,33 @@ export function QuestionGeneratorForm({
               Kazanimdan soru uret
             </CardTitle>
             <CardDescription>
-              Kayitli bir kazanim secin ya da alanlari elle doldurun.
+              Konu ve kazanimi yazin, kaynak metni girin.
             </CardDescription>
           </CardHeader>
 
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
-              {outcomes.length > 0 ? (
-                <div className="space-y-2">
-                  <Label htmlFor="outcome">Kayitli kazanim</Label>
-                  <Select value={outcomeId} onValueChange={applyOutcome}>
-                    <SelectTrigger id="outcome">
-                      <SelectValue placeholder="Kazanim secin" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={NO_OUTCOME}>Kazanim secme (elle gir)</SelectItem>
-                      {outcomes.map((outcome) => (
-                        <SelectItem key={outcome.id} value={outcome.id}>
-                          {outcome.topic} — {outcome.outcome_text.slice(0, 40)}
-                          {outcome.outcome_text.length > 40 ? "..." : ""}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              ) : null}
+              <div className="space-y-2">
+                <Label htmlFor="category">Atolye dali</Label>
+                <Select
+                  value={category}
+                  onValueChange={(value) => setCategory(value as DeneyapCategory)}
+                >
+                  <SelectTrigger id="category">
+                    <SelectValue placeholder="DENEYAP dali secin" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DENEYAP_CATEGORY_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Uretilen sorular bu dala kaydedilir; havuz dal bazinda filtrelenir.
+                </p>
+              </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
@@ -417,7 +398,7 @@ export function QuestionGeneratorForm({
                   index={index}
                   selected={selected.has(index)}
                   onToggleSelected={(value) => toggleSelected(index, value)}
-                  {...(outcomeId !== NO_OUTCOME ? { outcomeId } : {})}
+                  {...(category ? { categoryName: categoryLabel(category) } : {})}
                 />
               </li>
             ))}

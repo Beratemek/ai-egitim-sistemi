@@ -114,6 +114,8 @@ const gradingResultSchema = z.object({
 /* -------------------------------------------------------------------------- */
 
 export interface GenerateQuestionsOptions {
+  /** DENEYAP atolye dali adi; modele alan baglami olarak verilir. */
+  categoryLabel?: string;
   /** Uretilecek soru adedi. Varsayilan: 5 */
   count?: number;
   /** Istenen soru tipi. "karisik" ise model her ikisini de uretir. */
@@ -243,7 +245,7 @@ export async function generateQuestions(
   kazanim: string,
   options: GenerateQuestionsOptions = {},
 ): Promise<GeneratedQuestion[]> {
-  const { count = 5, type = "karisik", topic, styleGuide } = options;
+  const { count = 5, type = "karisik", topic, styleGuide, categoryLabel } = options;
 
   if (!context.trim() || !kazanim.trim()) {
     throw new Error("[ai] generateQuestions: context ve kazanim bos olamaz.");

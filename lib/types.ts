@@ -3,6 +3,8 @@
  * `supabase/schema.sql` ile birebir hizali tutulmalidir.
  */
 
+import type { DeneyapCategory } from "@/lib/deneyap";
+
 /* -------------------------------------------------------------------------- */
 /*  Roller                                                                    */
 /* -------------------------------------------------------------------------- */
@@ -58,6 +60,8 @@ export type UserProfile = {
 
 export type LearningOutcome = {
   id: string;
+  /** DENEYAP atolye dali. */
+  category: DeneyapCategory | null;
   topic: string;
   outcome_text: string;
   source_text: string;
@@ -67,6 +71,8 @@ export type LearningOutcome = {
 
 export type Question = {
   id: string;
+  /** DENEYAP atolye dali (bkz. lib/deneyap.ts). Eski kayitlarda null olabilir. */
+  category: DeneyapCategory | null;
   topic: string;
   text: string;
   type: QuestionType;
@@ -199,6 +205,8 @@ export type ApiResponse<T> =
 export interface GenerateQuestionsRequest {
   context: string;
   kazanim: string;
+  /** DENEYAP atolye dali. */
+  category?: DeneyapCategory;
   topic?: string;
   count?: number;
   type?: QuestionType | "karisik";
@@ -242,7 +250,10 @@ export interface Database {
       >;
       learning_outcomes: TableDefinition<
         LearningOutcome,
-        Insertable<LearningOutcome, "id" | "created_at" | "created_by" | "source_text">
+        Insertable<
+          LearningOutcome,
+          "id" | "created_at" | "created_by" | "source_text" | "category"
+        >
       >;
       questions: TableDefinition<
         Question,
@@ -251,6 +262,7 @@ export interface Database {
           | "id"
           | "created_at"
           | "updated_at"
+          | "category"
           | "status"
           | "outcome_id"
           | "created_by"
@@ -322,6 +334,7 @@ export interface Database {
       };
     };
     Enums: {
+      deneyap_category: DeneyapCategory;
       user_role: UserRole;
       question_type: QuestionType;
       question_status: QuestionStatus;

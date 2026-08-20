@@ -24,6 +24,8 @@ const DIFFICULTY_VARIANT: Record<
 
 export interface GeneratedQuestionCardProps {
   question: GeneratedQuestion;
+  /** Secili DENEYAP atolye dali adi; rozet olarak gosterilir. */
+  categoryName?: string;
   index: number;
   /** Havuza gonderilmek uzere secili mi? */
   selected: boolean;
@@ -40,6 +42,7 @@ export interface GeneratedQuestionCardProps {
  */
 export function GeneratedQuestionCard({
   question,
+  categoryName,
   index,
   selected,
   onToggleSelected,
@@ -111,6 +114,11 @@ export function GeneratedQuestionCard({
           <Badge variant={DIFFICULTY_VARIANT[question.difficulty]}>
             {question.difficulty}
           </Badge>
+          {categoryName ? (
+            <Badge variant="soft" className="font-normal">
+              {categoryName}
+            </Badge>
+          ) : null}
           <span className="text-xs text-muted-foreground">{question.topic}</span>
 
           {verdict ? (
