@@ -3,8 +3,8 @@ import Link from "next/link";
 import {
   ArrowRight,
   CalendarClock,
-  CircleDashed,
   FileCheck2,
+  Layers,
   Library,
   Sparkles,
 } from "lucide-react";
@@ -43,8 +43,10 @@ export default async function EgitmenPage() {
       getUserNameMap(),
     ]);
 
-  const pendingQuestions = questions.filter((q) => q.status === "taslak").length;
-  const approvedQuestions = questions.filter((q) => q.status === "onayli").length;
+  // Egitmen yalnizca havuza dusmus (onayli) sorularla ilgilenir; taslak
+  // inceleme ve onay/red icerik uzmaninin ekranindadir.
+  const approved = questions.filter((q) => q.status === "onayli");
+  const topicCount = new Set(approved.map((q) => q.topic)).size;
   const pendingSubmissions = submissions.filter(
     (submission) => submission.status === "ai_degerlendirildi",
   );
@@ -53,32 +55,32 @@ export default async function EgitmenPage() {
     <>
       <PageHeader
         title="Genel Bakis"
-        description="Onay bekleyen soru taslaklarini ve ogrenci cevaplarini buradan yonetin."
+        description="Havuzdan sinav olusturun, ogrenci cevaplarinin puanlarini onaylayin."
         actions={
           <Link
             href="/dashboard/egitmen/soru-havuzu"
             className={cn(buttonVariants(), "gap-2")}
           >
             <Library className="h-4 w-4" />
-            Soru havuzu
+            Sinav olustur
           </Link>
         }
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
-          label="Onay bekleyen soru"
-          value={pendingQuestions}
-          hint="Taslak durumunda"
-          icon={CircleDashed}
-          accent="warning"
-        />
-        <StatCard
           label="Havuzdaki soru"
-          value={approvedQuestions}
+          value={approved.length}
           hint="Sinavlarda kullanilabilir"
           icon={Library}
           accent="success"
+        />
+        <StatCard
+          label="Konu"
+          value={topicCount}
+          hint="Havuzda temsil edilen"
+          icon={Layers}
+          accent="primary"
         />
         <StatCard label="Sinav" value={exams.length} icon={CalendarClock} />
         <StatCard

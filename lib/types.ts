@@ -67,6 +67,8 @@ export type LearningOutcome = {
 
 export type Question = {
   id: string;
+  /** Ders adi. Havuz "ders -> konu -> soru" olarak kirilir. */
+  subject: string;
   topic: string;
   text: string;
   type: QuestionType;
@@ -251,6 +253,7 @@ export interface Database {
           | "id"
           | "created_at"
           | "updated_at"
+          | "subject"
           | "status"
           | "outcome_id"
           | "created_by"

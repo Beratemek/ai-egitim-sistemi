@@ -86,6 +86,14 @@ export async function deletePreference(id: string): Promise<ActionResult> {
 export interface SaveQuestionsInput {
   questions: GeneratedQuestion[];
   outcomeId?: string;
+  /** Bu partideki tum sorularin yazilacagi ders. Zorunlu. */
+  subject: string;
+  /**
+   * Bu partideki tum sorularin yazilacagi konu.
+   * Verilmezse modelin soru basina urettigi konu kullanilir - ama o zaman
+   * havuz konu bazinda parcalanir, bu yuzden formda zorunlu tutuluyor.
+   */
+  topic?: string;
 }
 
 /**
@@ -106,8 +114,19 @@ export async function saveGeneratedQuestions(
 
   const supabase = await createServerSupabaseClient();
 
+  const subject = input.subject?.trim() ?? "";
+  if (!subject) {
+    return { ok: false, error: "Ders alani zorunlu. Sorularin hangi derse yazilacagini secin." };
+  }
+
+  const topic = input.topic?.trim() ?? "";
+
   const rows = input.questions.map((question) => ({
-    topic: question.topic,
+    subject,
+    // Egitmenin havuzu ders -> konu olarak kirildigi icin parti genelinde
+    // TEK konu anahtari kullanilir; model her soruya farkli bir konu adi
+    // uydurursa havuz gereksiz yere dagilir.
+    topic: topic || question.topic,
     text: question.text,
     type: question.type,
     options_json: question.options,
@@ -134,7 +153,7 @@ export async function saveGeneratedQuestions(
 /*  Egitmen onayi                                                             */
 /* -------------------------------------------------------------------------- */
 
-/** Egitmenin bir taslagi onaylamasi / reddetmesi. */
+/** Icerik uzmaninin bir taslagi onaylamasi / reddetmesi. */
 export async function updateQuestionStatus(
   questionId: string,
   status: QuestionStatus,
@@ -153,6 +172,7 @@ export async function updateQuestionStatus(
 
   if (error) return { ok: false, error: error.message };
 
+  revalidatePath("/dashboard/icerik-uzmani");
   revalidatePath("/dashboard/egitmen/soru-havuzu");
   revalidatePath("/dashboard/egitmen");
   return { ok: true, data: undefined };

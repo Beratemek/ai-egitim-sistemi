@@ -3,6 +3,7 @@ import { BookOpen, CircleDashed, Sparkles, ThumbsUp } from "lucide-react";
 
 import { PageHeader } from "@/components/shared/page-header";
 import { QuestionGeneratorForm } from "@/components/shared/question-generator-form";
+import { QuestionPoolTable } from "@/components/shared/question-pool-table";
 import { StatCard } from "@/components/shared/stat-card";
 import {
   Card,
@@ -24,6 +25,11 @@ export default async function IcerikUzmaniPage() {
     getPreferenceStats(),
   ]);
 
+  // Forma oneri olarak verilir; ayni ders iki farkli yazimla girilmesin.
+  const subjects = [...new Set(questions.map((question) => question.subject))].sort(
+    (a, b) => a.localeCompare(b, "tr"),
+  );
+
   const aiGenerated = questions.filter((question) => question.ai_generated).length;
   const pending = questions.filter((question) => question.status === "taslak").length;
 
@@ -31,7 +37,7 @@ export default async function IcerikUzmaniPage() {
     <>
       <PageHeader
         title="Icerik & Kazanimlar"
-        description="Kaynak metinleri yukleyin, AI ile soru taslagi uretin ve begendiklerinizi havuza gonderin."
+        description="Kaynak metinleri yukleyin, AI ile soru taslagi uretin, onaylayarak havuza gonderin."
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -51,7 +57,7 @@ export default async function IcerikUzmaniPage() {
         <StatCard
           label="Onay bekleyen"
           value={pending}
-          hint="Egitmen incelemesinde"
+          hint="Sizin incelemenizde"
           icon={CircleDashed}
           accent="warning"
         />
@@ -65,9 +71,25 @@ export default async function IcerikUzmaniPage() {
 
       <QuestionGeneratorForm
         outcomes={outcomes}
+        subjects={subjects}
         preferenceStats={preferenceStats}
         canPersist={isSupabaseConfigured}
       />
+
+      {/* ---------- Havuz onayi ---------- */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Soru havuzu onayi</CardTitle>
+          <CardDescription>
+            Onayladiginiz sorular egitmenin havuzuna duser ve sinavlarda
+            kullanilabilir hale gelir. Reddedilenler havuza girmez.
+            {isSupabaseConfigured ? null : " Demo modunda degisiklikler kaydedilmez."}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <QuestionPoolTable questions={questions} persist={isSupabaseConfigured} />
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

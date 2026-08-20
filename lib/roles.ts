@@ -22,14 +22,14 @@ export const ROLE_DEFINITIONS: Record<UserRole, RoleDefinition> = {
   icerik_uzmani: {
     role: "icerik_uzmani",
     label: "Icerik Uzmani",
-    description: "Kaynak metin ve kazanim yukler, AI ile soru taslagi uretir.",
+    description: "Kaynak metin yukler, AI ile soru uretir, havuza onaylar.",
     path: "/dashboard/icerik-uzmani",
     badgeClass: "bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-200",
   },
   egitmen: {
     role: "egitmen",
     label: "Egitmen",
-    description: "Soru taslaklarini inceler, havuza ekler ve puanlari onaylar.",
+    description: "Havuzdan sinav olusturur ve ogrenci puanlarini onaylar.",
     path: "/dashboard/egitmen",
     badgeClass:
       "bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-200",

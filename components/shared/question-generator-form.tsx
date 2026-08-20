@@ -46,6 +46,8 @@ type TypeChoice = QuestionType | "karisik";
 export interface QuestionGeneratorFormProps {
   /** Uretilen sorularin baglanacagi kazanim secenekleri. */
   outcomes: LearningOutcome[];
+  /** Havuzda halihazirda kullanilan ders adlari; yazim birligi icin oneri olarak sunulur. */
+  subjects?: readonly string[];
   /** AI'in bugune kadar ogrendigi ornek sayilari. */
   preferenceStats: { liked: number; disliked: number };
   /** Supabase yoksa kaydetme kapali olur. */
@@ -64,9 +66,11 @@ const NO_OUTCOME = "yok";
  */
 export function QuestionGeneratorForm({
   outcomes,
+  subjects = [],
   preferenceStats,
   canPersist,
 }: QuestionGeneratorFormProps) {
+  const [subject, setSubject] = React.useState("");
   const [topic, setTopic] = React.useState("");
   const [kazanim, setKazanim] = React.useState("");
   const [context, setContext] = React.useState("");
@@ -148,6 +152,8 @@ export function QuestionGeneratorForm({
     setSaving(true);
     const result = await saveGeneratedQuestions({
       questions: chosen,
+      subject,
+      topic,
       ...(outcomeId !== NO_OUTCOME ? { outcomeId } : {}),
     });
     setSaving(false);
@@ -212,14 +218,32 @@ export function QuestionGeneratorForm({
                 </div>
               ) : null}
 
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-4 sm:grid-cols-3">
+                <div className="space-y-2">
+                  <Label htmlFor="subject">Ders</Label>
+                  <Input
+                    id="subject"
+                    required
+                    list="ders-onerileri"
+                    value={subject}
+                    onChange={(event) => setSubject(event.target.value)}
+                    placeholder="Matematik"
+                  />
+                  <datalist id="ders-onerileri">
+                    {subjects.map((item) => (
+                      <option key={item} value={item} />
+                    ))}
+                  </datalist>
+                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="topic">Konu</Label>
                   <Input
                     id="topic"
+                    required
                     value={topic}
                     onChange={(event) => setTopic(event.target.value)}
-                    placeholder="Fotosentez"
+                    placeholder="Trigonometri"
                   />
                 </div>
 
@@ -235,6 +259,13 @@ export function QuestionGeneratorForm({
                   />
                 </div>
               </div>
+
+              <p className="text-xs text-muted-foreground">
+                <strong>Ders</strong> ve <strong>Konu</strong> havuzun anahtaridir:
+                onayladiginiz sorular egitmenin havuzunda bu ders kutucugunun
+                altindaki bu konuda listelenir. Ders havuzda yoksa kutucugu
+                kendiliginden olusur; sorusu kalmayan ders kutucugu ise gorunmez.
+              </p>
 
               <div className="space-y-2">
                 <Label htmlFor="kazanim">Kazanim</Label>

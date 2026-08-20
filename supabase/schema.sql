@@ -78,6 +78,7 @@ comment on table public.learning_outcomes is 'Icerik uzmani tarafindan yuklenen 
 -- --- questions -------------------------------------------------------------
 create table if not exists public.questions (
   id             uuid primary key default gen_random_uuid(),
+  subject        text not null default 'Ders atanmamis',  -- ders: havuzun ust kirilimi
   topic          text not null,
   text           text not null,
   type           public.question_type not null,
@@ -101,10 +102,15 @@ create table if not exists public.questions (
 );
 
 comment on table public.questions is 'Soru havuzu. AI uretir, egitmen onaylar.';
+comment on column public.questions.subject is 'Ders adi. Havuz ders -> konu -> soru olarak kirilir.';
 
-create index if not exists questions_status_idx on public.questions (status);
-create index if not exists questions_topic_idx  on public.questions (topic);
-create index if not exists questions_type_idx   on public.questions (type);
+-- Semayi daha once kurmus veritabanlari icin: sutunu sonradan ekle.
+alter table public.questions add column if not exists subject text not null default 'Ders atanmamis';
+
+create index if not exists questions_status_idx  on public.questions (status);
+create index if not exists questions_subject_idx on public.questions (subject);
+create index if not exists questions_topic_idx   on public.questions (topic);
+create index if not exists questions_type_idx    on public.questions (type);
 
 -- --- exams -----------------------------------------------------------------
 create table if not exists public.exams (
@@ -309,10 +315,17 @@ create policy "questions_insert" on public.questions
     public.has_role('egitmen') or public.has_role('icerik_uzmani')
   );
 
+-- Onay / red icerik uzmaninin isidir; egitmen de yazim duzeltmesi
+-- yapabilsin diye ikisine birden acik.
 drop policy if exists "questions_update_egitmen" on public.questions;
-create policy "questions_update_egitmen" on public.questions
-  for update using (public.has_role('egitmen'))
-  with check (public.has_role('egitmen'));
+drop policy if exists "questions_update" on public.questions;
+create policy "questions_update" on public.questions
+  for update using (
+    public.has_role('icerik_uzmani') or public.has_role('egitmen')
+  )
+  with check (
+    public.has_role('icerik_uzmani') or public.has_role('egitmen')
+  );
 
 drop policy if exists "questions_delete_egitmen" on public.questions;
 create policy "questions_delete_egitmen" on public.questions

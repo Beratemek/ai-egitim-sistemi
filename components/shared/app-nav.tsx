@@ -30,7 +30,7 @@ export const ROLE_NAV: Record<UserRole, readonly NavItem[]> = {
       href: "/dashboard/icerik-uzmani",
       label: "Icerik & Kazanimlar",
       icon: BookOpen,
-      description: "Metin yukle, AI ile soru uret",
+      description: "Soru uret ve havuza onayla",
     },
   ],
   egitmen: [
@@ -38,13 +38,13 @@ export const ROLE_NAV: Record<UserRole, readonly NavItem[]> = {
       href: "/dashboard/egitmen",
       label: "Genel Bakis",
       icon: LayoutDashboard,
-      description: "Onay bekleyen isler",
+      description: "Sinavlar ve puan onaylari",
     },
     {
       href: "/dashboard/egitmen/soru-havuzu",
       label: "Soru Havuzu",
       icon: Library,
-      description: "Taslaklari incele ve onayla",
+      description: "Konu bazli havuz, sinav olustur",
     },
   ],
   ogrenci: [
