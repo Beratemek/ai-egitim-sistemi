@@ -67,7 +67,6 @@ export default async function IcerikUzmaniPage() {
       {serverEnv.aiMockMode ? <AiMockNotice capability="uretim" /> : null}
 
       <QuestionGeneratorForm
-        outcomes={outcomes}
         preferenceStats={preferenceStats}
         canPersist={isSupabaseConfigured}
       />

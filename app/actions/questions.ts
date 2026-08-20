@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { demoGuard, type ActionResult } from "@/app/actions/shared";
+import type { DeneyapCategory } from "@/lib/deneyap";
 import { isSupabaseConfigured } from "@/lib/env";
 import { createServerSupabaseClient, getCurrentUser } from "@/lib/supabase-server";
 import type {
@@ -74,6 +75,8 @@ export async function deletePreference(id: string): Promise<ActionResult> {
 
 export interface SaveQuestionsInput {
   questions: GeneratedQuestion[];
+  /** DENEYAP atolye dali; sorular bu dala baglanir. */
+  category?: DeneyapCategory;
   outcomeId?: string;
 }
 
@@ -96,6 +99,7 @@ export async function saveGeneratedQuestions(
   const supabase = await createServerSupabaseClient();
 
   const rows = input.questions.map((question) => ({
+    category: input.category ?? null,
     topic: question.topic,
     text: question.text,
     type: question.type,

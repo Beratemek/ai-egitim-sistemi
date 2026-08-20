@@ -37,6 +37,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  DENEYAP_CATEGORY_OPTIONS,
+  categoryLabel,
+  type DeneyapCategory,
+} from "@/lib/deneyap";
 import { cn, formatDateTime } from "@/lib/utils";
 import {
   QUESTION_TYPES,
@@ -47,6 +52,7 @@ import {
 
 type StatusFilter = QuestionStatus | "hepsi";
 type TypeFilter = QuestionType | "hepsi";
+type CategoryFilter = DeneyapCategory | "hepsi";
 
 export interface QuestionPoolTableProps {
   /** Baslangic verisi. Su an mock; Supabase'e gecerken sunucudan gecirin. */
@@ -78,6 +84,7 @@ export function QuestionPoolTable({
   const [search, setSearch] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState<StatusFilter>("hepsi");
   const [typeFilter, setTypeFilter] = React.useState<TypeFilter>("hepsi");
+  const [categoryFilter, setCategoryFilter] = React.useState<CategoryFilter>("hepsi");
   const [expandedId, setExpandedId] = React.useState<string | null>(null);
   const [pendingId, setPendingId] = React.useState<string | null>(null);
 
@@ -91,6 +98,7 @@ export function QuestionPoolTable({
     return rows.filter((question) => {
       if (statusFilter !== "hepsi" && question.status !== statusFilter) return false;
       if (typeFilter !== "hepsi" && question.type !== typeFilter) return false;
+      if (categoryFilter !== "hepsi" && question.category !== categoryFilter) return false;
       if (!needle) return true;
 
       return (
@@ -98,7 +106,7 @@ export function QuestionPoolTable({
         question.topic.toLocaleLowerCase("tr").includes(needle)
       );
     });
-  }, [rows, search, statusFilter, typeFilter]);
+  }, [rows, search, statusFilter, typeFilter, categoryFilter]);
 
   const counts = React.useMemo(
     () => ({
@@ -191,6 +199,23 @@ export function QuestionPoolTable({
               ))}
             </SelectContent>
           </Select>
+
+          <Select
+            value={categoryFilter}
+            onValueChange={(value) => setCategoryFilter(value as CategoryFilter)}
+          >
+            <SelectTrigger className="sm:w-64" aria-label="Atolye dalina gore filtrele">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="hepsi">Tum atolye dallari</SelectItem>
+              {DENEYAP_CATEGORY_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
@@ -203,7 +228,8 @@ export function QuestionPoolTable({
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
-                  <TableHead className="w-[40%]">Soru</TableHead>
+                  <TableHead className="w-[34%]">Soru</TableHead>
+                  <TableHead>Atolye dali</TableHead>
                   <TableHead>Konu</TableHead>
                   <TableHead>Tip</TableHead>
                   <TableHead>Durum</TableHead>
@@ -239,6 +265,11 @@ export function QuestionPoolTable({
                             </span>
                           </button>
                         </TableCell>
+                        <TableCell className="align-top">
+                          <Badge variant="soft" className="font-normal">
+                            {categoryLabel(question.category)}
+                          </Badge>
+                        </TableCell>
                         <TableCell className="align-top text-muted-foreground">
                           {question.topic}
                         </TableCell>
@@ -262,7 +293,7 @@ export function QuestionPoolTable({
 
                       {isExpanded ? (
                         <TableRow className="bg-muted/40 hover:bg-muted/40">
-                          <TableCell colSpan={6} className="py-4">
+                          <TableCell colSpan={7} className="py-4">
                             <QuestionDetail question={question} />
                           </TableCell>
                         </TableRow>
@@ -285,6 +316,9 @@ export function QuestionPoolTable({
                     <div className="flex flex-wrap items-center gap-2">
                       <QuestionStatusBadge status={question.status} />
                       <QuestionTypeBadge type={question.type} />
+                      <Badge variant="soft" className="font-normal">
+                        {categoryLabel(question.category)}
+                      </Badge>
                     </div>
 
                     <p className="text-sm font-medium leading-relaxed">

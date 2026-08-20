@@ -1,5 +1,6 @@
 import { generateQuestions } from "@/lib/ai";
 import { errorMessage, jsonError, jsonOk, readJson, requireRole } from "@/lib/api";
+import { categoryLabel, isDeneyapCategory } from "@/lib/deneyap";
 import { getStyleGuide } from "@/lib/queries";
 import type { GenerateQuestionsRequest, GeneratedQuestion } from "@/lib/types";
 
@@ -43,6 +44,10 @@ export async function POST(request: Request) {
         type: body.type ?? "karisik",
         styleGuide,
         ...(body.topic ? { topic: body.topic } : {}),
+        // Atolye dali modele alan baglami olarak verilir; gecersiz deger atlanir.
+        ...(isDeneyapCategory(body.category)
+          ? { categoryLabel: categoryLabel(body.category) }
+          : {}),
       },
     );
 

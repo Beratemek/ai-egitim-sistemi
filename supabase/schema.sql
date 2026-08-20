@@ -42,6 +42,24 @@ begin
       'egitmen_onayli'      -- Egitmen puani onayladi/duzeltti (nihai)
     );
   end if;
+
+  -- DENEYAP Teknoloji Atolyeleri ders dallari.
+  -- lib/deneyap.ts icindeki DENEYAP_CATEGORIES ile ayni sirada tutulmalidir.
+  if not exists (select 1 from pg_type where typname = 'deneyap_category') then
+    create type public.deneyap_category as enum (
+      'yazilim_teknolojileri',
+      'siber_guvenlik',
+      'ileri_robotik',
+      'enerji_teknolojileri',
+      'tasarim_ve_uretim',
+      'mobil_uygulama',
+      'elektronik_programlama_ve_iot',
+      'yapay_zeka',
+      'havacilik_ve_uzay',
+      'robotik_ve_kodlama',
+      'nanoteknoloji_ve_malzeme'
+    );
+  end if;
 end
 $$;
 
@@ -101,6 +119,16 @@ create table if not exists public.questions (
 );
 
 comment on table public.questions is 'Soru havuzu. AI uretir, egitmen onaylar.';
+
+-- Atolye dali kolonu. Tablo daha once olusmus kurulumlarda da eklenmesi icin
+-- "create table" yerine "alter table ... if not exists" kullaniliyor.
+alter table public.questions
+  add column if not exists category public.deneyap_category;
+
+alter table public.learning_outcomes
+  add column if not exists category public.deneyap_category;
+
+create index if not exists questions_category_idx on public.questions (category);
 
 create index if not exists questions_status_idx on public.questions (status);
 create index if not exists questions_topic_idx  on public.questions (topic);

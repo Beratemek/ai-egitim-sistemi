@@ -56,6 +56,7 @@ export const MOCK_USERS: readonly UserProfile[] = [
 export const MOCK_OUTCOMES: readonly LearningOutcome[] = [
   {
     id: "10000000-0000-4000-8000-000000000001",
+    category: null,
     topic: "Fotosentez",
     outcome_text: "Ogrenci fotosentezin isik ve karanlik evrelerini aciklar.",
     source_text:
@@ -65,6 +66,7 @@ export const MOCK_OUTCOMES: readonly LearningOutcome[] = [
   },
   {
     id: "10000000-0000-4000-8000-000000000002",
+    category: null,
     topic: "Newton Yasalari",
     outcome_text: "Ogrenci Newton'un hareket yasalarini ornekle aciklar.",
     source_text:
@@ -77,6 +79,7 @@ export const MOCK_OUTCOMES: readonly LearningOutcome[] = [
 export const MOCK_QUESTIONS: readonly Question[] = [
   {
     id: "20000000-0000-4000-8000-000000000001",
+    category: null,
     topic: "Fotosentez",
     text: "Fotosentezin isik evresi hucrenin hangi yapisinda gerceklesir?",
     type: "test",
@@ -98,6 +101,7 @@ export const MOCK_QUESTIONS: readonly Question[] = [
   },
   {
     id: "20000000-0000-4000-8000-000000000002",
+    category: null,
     topic: "Fotosentez",
     text: "Calvin dongusunun fotosentezdeki rolunu aciklayiniz.",
     type: "acik_uclu",
@@ -118,6 +122,7 @@ export const MOCK_QUESTIONS: readonly Question[] = [
   },
   {
     id: "20000000-0000-4000-8000-000000000003",
+    category: null,
     topic: "Newton Yasalari",
     text: "Bir cismin ivmesi ile uzerine etki eden net kuvvet arasindaki iliski nedir?",
     type: "test",
@@ -139,6 +144,7 @@ export const MOCK_QUESTIONS: readonly Question[] = [
   },
   {
     id: "20000000-0000-4000-8000-000000000004",
+    category: null,
     topic: "Newton Yasalari",
     text: "Etki-tepki ilkesini gunluk hayattan bir ornekle aciklayiniz.",
     type: "acik_uclu",
@@ -159,6 +165,7 @@ export const MOCK_QUESTIONS: readonly Question[] = [
   },
   {
     id: "20000000-0000-4000-8000-000000000005",
+    category: null,
     topic: "Fotosentez",
     text: "Fotosentez sirasinda uretilen oksijen hangi molekulden kaynaklanir?",
     type: "test",
