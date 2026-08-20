@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { demoGuard, type ActionResult } from "@/app/actions/shared";
 import { isSupabaseConfigured } from "@/lib/env";
 import { createServerSupabaseClient, getCurrentUser } from "@/lib/supabase-server";
 import type {
@@ -9,18 +10,6 @@ import type {
   PreferenceVerdict,
   QuestionStatus,
 } from "@/lib/types";
-
-export type ActionResult<T = undefined> =
-  | { ok: true; data: T }
-  | { ok: false; error: string };
-
-function demoGuard(): { ok: false; error: string } {
-  return {
-    ok: false,
-    error:
-      "Bu islem icin Supabase baglantisi gerekiyor. .env.local dosyasini doldurup sunucuyu yeniden baslatin.",
-  };
-}
 
 /* -------------------------------------------------------------------------- */
 /*  Tercih hafizasi                                                           */

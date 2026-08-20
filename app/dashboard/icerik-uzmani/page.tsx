@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { BookOpen, CircleDashed, Sparkles, ThumbsUp } from "lucide-react";
 
+import { AiMockNotice } from "@/components/shared/ai-mock-notice";
 import { PageHeader } from "@/components/shared/page-header";
 import { QuestionGeneratorForm } from "@/components/shared/question-generator-form";
 import { StatCard } from "@/components/shared/stat-card";
@@ -11,7 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { isSupabaseConfigured } from "@/lib/env";
+import { isSupabaseConfigured, serverEnv } from "@/lib/env";
 import { getOutcomes, getPreferenceStats, getQuestions } from "@/lib/queries";
 import { formatDateTime } from "@/lib/utils";
 
@@ -62,6 +63,8 @@ export default async function IcerikUzmaniPage() {
           icon={ThumbsUp}
         />
       </div>
+
+      {serverEnv.aiMockMode ? <AiMockNotice capability="uretim" /> : null}
 
       <QuestionGeneratorForm
         outcomes={outcomes}

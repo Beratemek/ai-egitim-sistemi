@@ -1,6 +1,6 @@
-import { gradeAnswer } from "@/lib/ai";
 import { errorMessage, jsonError, jsonOk, readJson, requireRole } from "@/lib/api";
 import { isSupabaseConfigured } from "@/lib/env";
+import { autoGrade } from "@/lib/grading";
 import { MOCK_SUBMISSIONS } from "@/lib/mock-data";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import type { Submission } from "@/lib/types";
@@ -45,9 +45,8 @@ export async function GET(request: Request) {
 interface CreateSubmissionBody {
   examId: string;
   questionId: string;
+  /** Coktan secmelide sik anahtari ("B"), acik ucluda serbest metin. */
   answerText: string;
-  /** Puanlamada kullanilacak rubrik. Verilmezse sorudan okunur. */
-  rubric?: string;
 }
 
 /**
@@ -80,10 +79,10 @@ export async function POST(request: Request) {
 
     const supabase = await createServerSupabaseClient();
 
-    // Rubrigi sorudan oku - istemciden gelen rubrige guvenilmez.
+    // Rubrik ve dogru cevap SORUDAN okunur - istemciden gelene guvenilmez.
     const { data: question, error: questionError } = await supabase
       .from("questions")
-      .select("text, rubric, type")
+      .select("text, type, rubric, correct_answer")
       .eq("id", body.questionId)
       .single();
 
@@ -91,16 +90,7 @@ export async function POST(request: Request) {
       return jsonError("Soru bulunamadi.", 404);
     }
 
-    let aiScore: number | null = null;
-    let aiFeedback: string | null = null;
-
-    if (question.type === "acik_uclu" && question.rubric) {
-      const grading = await gradeAnswer(body.answerText, question.rubric, {
-        questionText: question.text,
-      });
-      aiScore = grading.score;
-      aiFeedback = grading.feedback;
-    }
+    const grade = await autoGrade(question, body.answerText);
 
     const { data, error } = await supabase
       .from("submissions")
@@ -109,9 +99,9 @@ export async function POST(request: Request) {
         question_id: body.questionId,
         student_id: studentId,
         answer_text: body.answerText,
-        ai_score: aiScore,
-        ai_feedback: aiFeedback,
-        status: aiScore === null ? "gonderildi" : "ai_degerlendirildi",
+        ai_score: grade.score,
+        ai_feedback: grade.feedback,
+        status: grade.status,
       })
       .select()
       .single();
