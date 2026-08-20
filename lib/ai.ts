@@ -175,8 +175,65 @@ function buildStyleGuidePrompt(styleGuide: StyleGuide | undefined): string {
   ].join("\n");
 }
 
+/* -------------------------------------------------------------------------- */
+/*  Kaynaga atif yapan sorulari eleme                                         */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Turkce metni ASCII'ye indirger.
+ *
+ * Desenleri tek bicimde yazabilmek icin: "Kitabın" -> "kitabin",
+ * "MÜFREDAT" -> "mufredat". JS'in `i` bayragi Turkce'ye ozgu i/I ayrimini
+ * dogru cevirmedigi icin donusum elle yapiliyor.
+ */
+function toAscii(value: string): string {
+  return value
+    .toLocaleLowerCase("tr")
+    .replace(/[ıi̇]/g, "i")
+    .replace(/ş/g, "s")
+    .replace(/ğ/g, "g")
+    .replace(/ü/g, "u")
+    .replace(/ö/g, "o")
+    .replace(/ç/g, "c");
+}
+
+/**
+ * Soru, olculmesi gereken bilgiyi degil KAYNAGIN KENDISINI soruyorsa gecersizdir.
+ *
+ * Model, prompt'ta yasaklanan "kaynak metne gore" kalibini bulamayinca
+ * "kitabin haftalik mufredatina gore ... kacinci haftada" gibi baska bir
+ * atif kalibi uretebiliyor. Ogrenci sinavda ne metni ne mufredati gorecegi
+ * icin bu tur sorular kullanilamaz; sadece rica etmek yetmiyor, cikti
+ * dogrulanip eleniyor.
+ */
+const META_QUESTION_PATTERNS: readonly RegExp[] = [
+  // Metne / parcaya / dokumana atif
+  /(kaynak|verilen|yukaridaki|asagidaki)\s+metn/,
+  /metinde\s+(belirtil|gecen|verilen|anlatil)/,
+  /metne\s+gore/,
+  /parca(ya|da)\s+gore/,
+  /(kitabin|kitapta|kitapciktaki|mufredat|dokumanda|tabloya\s+gore|listeye\s+gore)/,
+  // Sira / takvim sorulari: "kacinci haftada", "hangi unitede"
+  /(kacinci|hangi)\s+(hafta|unite|modul|bolum|asama)/,
+  /kac\s+(hafta|ay|saat|gun|ders)\s+(surer|surmekte|ayrilmis)/,
+  // Idari / tanitim bilgisi
+  /(ucretsiz\s+mi|kontenjan|basvuru\s+tarih|kac\s+ilde|hangi\s+illerde)/,
+];
+
+/** Soru kaynaga atif yapiyor mu? */
+function looksLikeMetaQuestion(text: string): boolean {
+  const ascii = toAscii(text);
+  return META_QUESTION_PATTERNS.some((pattern) => pattern.test(ascii));
+}
+
 /**
  * Kaynak metin ve kazanimdan soru taslaklari uretir.
+ *
+ * Uretilen sorular iki asamadan gecer:
+ *   1. `normalizeGeneratedQuestion` - veritabani kisitlarina uyum
+ *   2. `looksLikeMetaQuestion` - kaynaga atif yapan sorular elenir
+ * Eleme sonucu istenen adet tutmazsa BIR kez daha, daha kati bir uyariyla
+ * eksik kadar soru istenir.
  *
  * @param context  Icerik uzmaninin yukledigi kaynak metin.
  * @param kazanim  Hedeflenen ogrenme kazanimi.
@@ -203,31 +260,110 @@ export async function generateQuestions(
         ? "Tum sorular coktan secmeli (test) olsun; her birinde 4 sik bulunsun."
         : "Tum sorular acik uclu olsun; her biri icin ayrintili rubrik yaz.";
 
+  /*
+    Sistem talimati iki hatayi acikca yasakliyor:
+
+      1. "Kaynak metne gore..." kalibi. Model "yalnizca kaynak metinden uret"
+         talimatini metne ATIFTA BULUN diye anliyordu; oysa ogrenci sinavda o
+         metni gormuyor ve soru havada kaliyor.
+      2. Idari/tanitim bilgisi sormak. Yuklenen dosya cogu zaman brosur veya
+         program kitapcigi oluyor; model "kurs kac ay surer", "ucretsiz mi"
+         gibi konu disi bilgileri olcmeye kalkiyordu. Sinav KAZANIMI olcer.
+  */
   const { object } = await generateObject({
     model: getModel(serverEnv.aiModelGeneration),
     schema: generateQuestionsSchema,
     system: [
-      "Sen deneyimli bir olcme-degerlendirme uzmanisin.",
-      "Verilen kaynak metne ve kazanima dayali, Turkce sinav sorulari yazarsin.",
-      "Sorular yalnizca kaynak metinden dogrulanabilecek bilgileri olcmelidir; bilgi uydurma.",
-      "Coktan secmeli sorularda celdiriciler makul olmali, tek bir dogru cevap bulunmalidir.",
-      "Acik uclu sorularda rubrik madde madde yazilmali ve maddelerin puan toplami 100 olmalidir.",
+      "Sen deneyimli bir olcme-degerlendirme uzmanisin ve Turkce sinav sorulari yazarsin.",
+      "SORULAR KAZANIMI OLCER. Kaynak metin yalnizca bilgiyi dogrulamak icindir, sorunun konusu degildir.",
+      "ASLA metne atifta bulunma: 'kaynak metne gore', 'metinde belirtildigi gibi', 'yukaridaki metne gore', 'parcaya gore' gibi ifadeleri KULLANMA.",
+      "Ogrenci sinavda kaynak metni GORMEYECEK; soru kendi basina anlasilir ve cevaplanabilir olmalidir.",
+      "Kurum tanitimi, program suresi, ucret, basvuru tarihi, sehir, kontenjan gibi IDARI bilgileri sorma; konunun kendisini sor (kavram, tanim, sebep-sonuc, islem, uygulama).",
+      "Ezber yerine kavrama ve uygulama olc: neden olur, ne ise yarar, hangi durumda kullanilir gibi kurgular tercih et.",
+      "Metinde kazanimla ilgili bilgi yoksa bilgi UYDURMA; metnin kazanima en yakin kismindan soru kur.",
+      "Coktan secmeli sorularda 4 sik olur, celdiriciler makul ve yakin olur, tek bir dogru cevap bulunur.",
+      "Acik uclu sorularda rubrik madde madde yazilir ve maddelerin puan toplami 100 olur.",
       "Istekte TARZ REHBERI varsa, uzmanin begendigi kurguya yaklas ve reddettigi kaliplardan uzak dur.",
     ].join(" "),
     prompt: [
-      `KAZANIM:\n${kazanim}`,
+      `OLCULECEK KAZANIM:\n${kazanim}`,
       topic ? `KONU:\n${topic}` : "",
-      `KAYNAK METIN:\n${context}`,
+      `BILGI KAYNAGI (yalnizca dogrulama icin, soruda ona atif YAPMA):\n${context}`,
       `GOREV: Yukaridaki kazanimi olcen ${count} adet soru uret. ${typeInstruction}`,
+      "HATIRLATMA: Her soru, kaynak metni hic gormemis bir ogrenci tarafindan okunup cevaplanabilmeli.",
       buildStyleGuidePrompt(styleGuide),
     ]
       .filter(Boolean)
       .join("\n\n"),
   });
 
-  return object.questions.map((question) =>
-    normalizeGeneratedQuestion(question, topic ?? kazanim),
-  );
+  const first = collectUsable(object.questions, topic ?? kazanim);
+
+  // Eleme sonucu adet tutuyorsa is bitti.
+  if (first.length >= count) return first.slice(0, count);
+
+  /*
+    Elenen soru varsa BIR kez daha deniyoruz. Ikinci istekte hangi kalibin
+    reddedildigi acikca yaziliyor; boylece model ayni hataya donmuyor.
+    Tek tekrar ile sinirli: her deneme 20-40 saniye suruyor.
+  */
+  const missing = count - first.length;
+
+  const { object: retry } = await generateObject({
+    model: getModel(serverEnv.aiModelGeneration),
+    schema: generateQuestionsSchema,
+    system: [
+      "Sen deneyimli bir olcme-degerlendirme uzmanisin ve Turkce sinav sorulari yazarsin.",
+      "Onceki denemede sorulari REDDEDILDI cunku kaynagin kendisini soruyordu.",
+      "Sinav sorusu; kitap, mufredat, tablo, hafta sirasi, program suresi, ucret gibi",
+      "seylere ATIFTA BULUNAMAZ. Ogrenci yalnizca soruyu gorur.",
+      "Konunun kendisini sor: kavram, tanim, sebep-sonuc, islem adimi, uygulama.",
+      "Coktan secmeli sorularda 4 sik olur, tek dogru cevap bulunur.",
+      "Acik uclu sorularda rubrik madde madde yazilir, puan toplami 100 olur.",
+    ].join(" "),
+    prompt: [
+      `OLCULECEK KAZANIM:\n${kazanim}`,
+      topic ? `KONU:\n${topic}` : "",
+      `BILGI KAYNAGI (yalnizca dogrulama icin, soruda ona atif YAPMA):\n${context}`,
+      `GOREV: Kazanimi olcen ${missing} adet soru uret. ${typeInstruction}`,
+      "YASAK KALIPLAR: 'kaynak metne gore', 'kitabin mufredatina gore', 'kacinci haftada', 'kac hafta surer', 'ucretsiz mi'.",
+    ]
+      .filter(Boolean)
+      .join("\n\n"),
+  });
+
+  const combined = [...first, ...collectUsable(retry.questions, topic ?? kazanim)];
+
+  if (combined.length === 0) {
+    throw new Error(
+      "[ai] Uretilen sorularin tamami kaynaga atif yaptigi icin elendi. " +
+        "Kaynak metin bir mufredat/tanitim dokumani olabilir; kazanimla ilgili " +
+        "anlatim iceren bir bolum yukleyip tekrar deneyin.",
+    );
+  }
+
+  return combined.slice(0, count);
+}
+
+/** Model ciktisini normalize eder ve kaynaga atif yapanlari eler. */
+function collectUsable(
+  questions: z.infer<typeof generateQuestionsSchema>["questions"],
+  fallbackTopic: string,
+): GeneratedQuestion[] {
+  const usable: GeneratedQuestion[] = [];
+
+  for (const question of questions) {
+    if (looksLikeMetaQuestion(question.text)) continue;
+
+    try {
+      usable.push(normalizeGeneratedQuestion(question, fallbackTopic));
+    } catch {
+      // Eksik uretilmis soru (sik veya rubrik yok) sessizce atlanir;
+      // cagiran katman eksik adedi tekrar isteyerek telafi eder.
+    }
+  }
+
+  return usable;
 }
 
 /* -------------------------------------------------------------------------- */
