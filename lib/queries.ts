@@ -23,7 +23,9 @@ import type {
   ExamStatistics,
   LearningOutcome,
   Question,
+  QuestionOption,
   QuestionStatus,
+  QuestionType,
   StyleGuide,
   Submission,
   UserProfile,
@@ -148,6 +150,214 @@ export async function getExamDetail(examId: string): Promise<ExamDetail | null> 
     .filter((item): item is Question & { points: number; position: number } => item !== null);
 
   return { exam, questions: ordered };
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Sinav listeleri                                                           */
+/* -------------------------------------------------------------------------- */
+
+/** Egitmenin sinav listesi icin ozet satiri. */
+export interface ExamSummary extends Exam {
+  questionCount: number;
+  submissionCount: number;
+}
+
+/**
+ * Egitmenin sinavlarini soru ve cevap sayilariyla dondurur.
+ * Sayimlar tek tek sorgu yerine iki toplu okumadan JS tarafinda cikarilir.
+ */
+export async function getExamSummaries(): Promise<ExamSummary[]> {
+  const exams = await getExams();
+
+  if (!isSupabaseConfigured) {
+    const approved = MOCK_QUESTIONS.filter((q) => q.status === "onayli").length;
+    return exams.map((exam) => ({
+      ...exam,
+      questionCount: approved,
+      submissionCount: MOCK_SUBMISSIONS.filter((s) => s.exam_id === exam.id).length,
+    }));
+  }
+
+  if (exams.length === 0) return [];
+
+  const supabase = await createServerSupabaseClient();
+  const examIds = exams.map((exam) => exam.id);
+
+  const [links, submissions] = await Promise.all([
+    supabase.from("exam_questions").select("exam_id").in("exam_id", examIds),
+    supabase.from("submissions").select("exam_id").in("exam_id", examIds),
+  ]);
+
+  const countBy = (rows: { exam_id: string }[] | null): Map<string, number> => {
+    const map = new Map<string, number>();
+    for (const row of rows ?? []) {
+      map.set(row.exam_id, (map.get(row.exam_id) ?? 0) + 1);
+    }
+    return map;
+  };
+
+  const questionCounts = countBy(links.data);
+  const submissionCounts = countBy(submissions.data);
+
+  return exams.map((exam) => ({
+    ...exam,
+    questionCount: questionCounts.get(exam.id) ?? 0,
+    submissionCount: submissionCounts.get(exam.id) ?? 0,
+  }));
+}
+
+/** Ogrencinin sinav kartlari: kac soru var, kacini yanitladi. */
+export interface StudentExamCard extends Exam {
+  questionCount: number;
+  answeredCount: number;
+}
+
+/**
+ * Ogrencinin girebilecegi (yayindaki) sinavlar.
+ * `submissions` uzerindeki RLS politikasi ogrencinin yalnizca kendi
+ * cevaplarini gormesini sagladigi icin sayim dogrudan kendi ilerlemesidir.
+ */
+export async function getStudentExams(): Promise<StudentExamCard[]> {
+  const exams = await getExams({ onlyPublished: true });
+
+  if (!isSupabaseConfigured) {
+    const approved = MOCK_QUESTIONS.filter((q) => q.status === "onayli").length;
+    return exams.map((exam) => ({
+      ...exam,
+      questionCount: approved,
+      answeredCount: MOCK_SUBMISSIONS.filter((s) => s.exam_id === exam.id).length,
+    }));
+  }
+
+  if (exams.length === 0) return [];
+
+  const supabase = await createServerSupabaseClient();
+  const examIds = exams.map((exam) => exam.id);
+
+  const [links, submissions] = await Promise.all([
+    supabase.from("exam_questions").select("exam_id").in("exam_id", examIds),
+    supabase.from("submissions").select("exam_id").in("exam_id", examIds),
+  ]);
+
+  const countBy = (rows: { exam_id: string }[] | null): Map<string, number> => {
+    const map = new Map<string, number>();
+    for (const row of rows ?? []) {
+      map.set(row.exam_id, (map.get(row.exam_id) ?? 0) + 1);
+    }
+    return map;
+  };
+
+  const questionCounts = countBy(links.data);
+  const answered = countBy(submissions.data);
+
+  return exams.map((exam) => ({
+    ...exam,
+    questionCount: questionCounts.get(exam.id) ?? 0,
+    answeredCount: answered.get(exam.id) ?? 0,
+  }));
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Ogrencinin sinav ekrani                                                   */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Ogrenciye gonderilen soru alani.
+ *
+ * `correct_answer` ve `rubric` BILINCLI OLARAK YOK: bu nesne istemciye kadar
+ * gidiyor ve ikisi de tarayici kaynagindan okunabilir olurdu. Puanlama zaten
+ * sunucuda, veritabanindan okunan rubrik/dogru cevap ile yapiliyor
+ * (bkz. lib/grading.ts).
+ */
+export interface StudentQuestion {
+  id: string;
+  topic: string;
+  text: string;
+  type: QuestionType;
+  options_json: QuestionOption[] | null;
+  position: number;
+  points: number;
+}
+
+export interface StudentExamDetail {
+  exam: Exam;
+  questions: StudentQuestion[];
+  /** Ogrencinin bu sinavda daha once verdigi cevaplar. */
+  submissions: Submission[];
+}
+
+export async function getStudentExamDetail(
+  examId: string,
+): Promise<StudentExamDetail | null> {
+  if (!isSupabaseConfigured) {
+    const exam = MOCK_EXAMS.find((item) => item.id === examId);
+    if (!exam) return null;
+
+    return {
+      exam,
+      questions: MOCK_QUESTIONS.filter((q) => q.status === "onayli").map(
+        (question, index) => ({
+          id: question.id,
+          topic: question.topic,
+          text: question.text,
+          type: question.type,
+          options_json: question.options_json,
+          position: index,
+          points: 10,
+        }),
+      ),
+      submissions: MOCK_SUBMISSIONS.filter((s) => s.exam_id === examId),
+    };
+  }
+
+  const supabase = await createServerSupabaseClient();
+
+  const { data: exam } = await supabase
+    .from("exams")
+    .select("*")
+    .eq("id", examId)
+    .maybeSingle();
+
+  if (!exam) return null;
+
+  const [{ data: links }, { data: submissions }] = await Promise.all([
+    supabase
+      .from("exam_questions")
+      .select("question_id, position, points")
+      .eq("exam_id", examId)
+      .order("position", { ascending: true }),
+    supabase.from("submissions").select("*").eq("exam_id", examId),
+  ]);
+
+  const questionIds = (links ?? []).map((link) => link.question_id);
+  if (questionIds.length === 0) {
+    return { exam, questions: [], submissions: submissions ?? [] };
+  }
+
+  const { data: questions } = await supabase
+    .from("questions")
+    .select("id, topic, text, type, options_json")
+    .in("id", questionIds);
+
+  const byId = new Map((questions ?? []).map((question) => [question.id, question]));
+
+  const ordered = (links ?? [])
+    .map((link): StudentQuestion | null => {
+      const question = byId.get(link.question_id);
+      if (!question) return null;
+      return {
+        id: question.id,
+        topic: question.topic,
+        text: question.text,
+        type: question.type,
+        options_json: question.options_json,
+        position: link.position,
+        points: link.points,
+      };
+    })
+    .filter((item): item is StudentQuestion => item !== null);
+
+  return { exam, questions: ordered, submissions: submissions ?? [] };
 }
 
 /* -------------------------------------------------------------------------- */

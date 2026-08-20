@@ -13,6 +13,7 @@ import { toast } from "sonner";
 
 import { saveGeneratedQuestions } from "@/app/actions/questions";
 import { GeneratedQuestionCard } from "@/components/shared/generated-question-card";
+import { SourceTextField } from "@/components/shared/source-text-field";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,7 +33,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Textarea } from "@/components/ui/textarea";
 import type {
   ApiResponse,
   GenerateQuestionsRequest,
@@ -70,7 +70,12 @@ export function QuestionGeneratorForm({
   const [topic, setTopic] = React.useState("");
   const [kazanim, setKazanim] = React.useState("");
   const [context, setContext] = React.useState("");
-  const [count, setCount] = React.useState(5);
+  /**
+   * Soru adedi METIN olarak tutulur: `Number(value) || 1` kalibi alani
+   * bosaltilir bosaltilmaz 1'e cevirdigi icin kullanici istedigi sayiyi
+   * yazamiyordu. Gonderirken sayiya cevrilip 1-20 araligina sikistirilir.
+   */
+  const [count, setCount] = React.useState("5");
   const [type, setType] = React.useState<TypeChoice>("karisik");
   const [outcomeId, setOutcomeId] = React.useState<string>(NO_OUTCOME);
 
@@ -82,11 +87,25 @@ export function QuestionGeneratorForm({
 
   const learnedTotal = preferenceStats.liked + preferenceStats.disliked;
 
-  /** Kazanim secilince konu/kazanim/metin alanlarini doldurur. */
+  /** Alan bos veya gecersizse 5'e duser; her zaman 1-20 araliginda. */
+  const resolvedCount = Math.min(Math.max(Number.parseInt(count, 10) || 5, 1), 20);
+
+  /**
+   * Kazanim secilince konu/kazanim/metin alanlarini doldurur.
+   * "Kazanim secme (elle gir)" secilirse alanlari BOSALTIR - aksi halde onceki
+   * kazanimin metni ekranda kalir ve kullanici elle giremedigini sanir.
+   */
   function applyOutcome(id: string) {
     setOutcomeId(id);
+
     const outcome = outcomes.find((item) => item.id === id);
-    if (!outcome) return;
+
+    if (!outcome) {
+      setTopic("");
+      setKazanim("");
+      setContext("");
+      return;
+    }
 
     setTopic(outcome.topic);
     setKazanim(outcome.outcome_text);
@@ -95,6 +114,16 @@ export function QuestionGeneratorForm({
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    // Metin alani sekmelerden birinde gizli kalabildigi icin dogrulama burada.
+    if (context.trim().length < 20) {
+      const message =
+        "Kaynak metin en az 20 karakter olmalidir. Metni yapistirin ya da bir dosya yukleyin.";
+      setError(message);
+      toast.error("Kaynak metin eksik", { description: message });
+      return;
+    }
+
     setPending(true);
     setError(null);
 
@@ -102,7 +131,7 @@ export function QuestionGeneratorForm({
       context,
       kazanim,
       topic: topic || undefined,
-      count,
+      count: resolvedCount,
       type,
     };
 
@@ -228,10 +257,12 @@ export function QuestionGeneratorForm({
                   <Input
                     id="count"
                     type="number"
+                    inputMode="numeric"
                     min={1}
                     max={20}
                     value={count}
-                    onChange={(event) => setCount(Number(event.target.value) || 1)}
+                    onChange={(event) => setCount(event.target.value)}
+                    onBlur={() => setCount(String(resolvedCount))}
                   />
                 </div>
               </div>
@@ -247,21 +278,11 @@ export function QuestionGeneratorForm({
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="context">Kaynak metin</Label>
-                <Textarea
-                  id="context"
-                  required
-                  rows={8}
-                  value={context}
-                  onChange={(event) => setContext(event.target.value)}
-                  placeholder="Sorularin uretilecegi ders metnini buraya yapistirin..."
-                  className="resize-y"
-                />
-                <p className="text-xs text-muted-foreground">
-                  En az 20 karakter. Model yalnizca bu metinden dogrulanabilir sorular uretir.
-                </p>
-              </div>
+              <SourceTextField
+                value={context}
+                onChange={setContext}
+                disabled={pending}
+              />
 
               <div className="space-y-2">
                 <Label htmlFor="type">Soru tipi</Label>

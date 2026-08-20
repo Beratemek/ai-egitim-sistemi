@@ -166,6 +166,12 @@ create index if not exists submissions_exam_idx    on public.submissions (exam_i
 create index if not exists submissions_student_idx on public.submissions (student_id);
 create index if not exists submissions_status_idx  on public.submissions (status);
 
+-- Bir ogrenci ayni sinavdaki ayni soruyu yalnizca bir kez yanitlar.
+-- Constraint yerine UNIQUE INDEX kullaniliyor: "if not exists" destekledigi icin
+-- bu dosya tekrar calistirilabilir kaliyor.
+create unique index if not exists submissions_one_answer_per_question_uniq
+  on public.submissions (exam_id, question_id, student_id);
+
 -- ===========================================================================
 -- 3. TRIGGER'LAR
 -- ===========================================================================

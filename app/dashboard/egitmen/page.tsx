@@ -1,20 +1,22 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import {
-  ArrowRight,
   CalendarClock,
+  ClipboardList,
   CircleDashed,
   FileCheck2,
   Library,
   Sparkles,
 } from "lucide-react";
 
+import { AiMockNotice } from "@/components/shared/ai-mock-notice";
 import { PageHeader } from "@/components/shared/page-header";
 import { StatCard } from "@/components/shared/stat-card";
+import { SubmissionReviewDialog } from "@/components/shared/submission-review-dialog";
 import { SubmissionStatusBadge } from "@/components/shared/status-badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -24,6 +26,7 @@ import {
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
+import { isSupabaseConfigured, serverEnv } from "@/lib/env";
 import {
   getExams,
   getQuestions,
@@ -43,6 +46,9 @@ export default async function EgitmenPage() {
       getUserNameMap(),
     ]);
 
+  // Cevap -> soru metni eslesmesi: onay diyalogunda soruyu da gosterebilmek icin.
+  const questionTextById = new Map(questions.map((q) => [q.id, q.text]));
+
   const pendingQuestions = questions.filter((q) => q.status === "taslak").length;
   const approvedQuestions = questions.filter((q) => q.status === "onayli").length;
   const pendingSubmissions = submissions.filter(
@@ -55,13 +61,22 @@ export default async function EgitmenPage() {
         title="Genel Bakis"
         description="Onay bekleyen soru taslaklarini ve ogrenci cevaplarini buradan yonetin."
         actions={
-          <Link
-            href="/dashboard/egitmen/soru-havuzu"
-            className={cn(buttonVariants(), "gap-2")}
-          >
-            <Library className="h-4 w-4" />
-            Soru havuzu
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href="/dashboard/egitmen/soru-havuzu"
+              className={cn(buttonVariants({ variant: "outline" }), "gap-2")}
+            >
+              <Library className="h-4 w-4" />
+              Soru havuzu
+            </Link>
+            <Link
+              href="/dashboard/egitmen/sinavlar"
+              className={cn(buttonVariants(), "gap-2")}
+            >
+              <ClipboardList className="h-4 w-4" />
+              Sinavlar
+            </Link>
+          </div>
         }
       />
 
@@ -89,6 +104,8 @@ export default async function EgitmenPage() {
           accent="primary"
         />
       </div>
+
+      {serverEnv.aiMockMode ? <AiMockNotice capability="puanlama" /> : null}
 
       {/* ---------- Puan onayi bekleyen cevaplar ---------- */}
       <Card>
@@ -164,10 +181,19 @@ export default async function EgitmenPage() {
                       Onaylandi
                     </Badge>
                   ) : (
-                    <Button size="sm" variant="outline" className="gap-1.5">
-                      Puani incele
-                      <ArrowRight className="h-3.5 w-3.5" />
-                    </Button>
+                    <SubmissionReviewDialog
+                      submission={submission}
+                      studentName={studentName}
+                      canPersist={isSupabaseConfigured}
+                      {...(submission.question_id &&
+                      questionTextById.has(submission.question_id)
+                        ? {
+                            questionText: questionTextById.get(
+                              submission.question_id,
+                            ) as string,
+                          }
+                        : {})}
+                    />
                   )}
                 </div>
               </div>

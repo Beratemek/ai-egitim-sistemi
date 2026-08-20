@@ -74,8 +74,8 @@ saglayiciya (OpenRouter, Groq, yerel LLM) yonlendirebilirsiniz.
 | Rol | Enum degeri | Panel |
 | --- | --- | --- |
 | Icerik Uzmani | `icerik_uzmani` | `/dashboard/icerik-uzmani` |
-| Egitmen | `egitmen` | `/dashboard/egitmen`, `/dashboard/egitmen/soru-havuzu` |
-| Ogrenci | `ogrenci` | `/dashboard/ogrenci` |
+| Egitmen | `egitmen` | `/dashboard/egitmen`, `/dashboard/egitmen/soru-havuzu`, `/dashboard/egitmen/sinavlar` |
+| Ogrenci | `ogrenci` | `/dashboard/ogrenci`, `/dashboard/ogrenci/sinav/[examId]` |
 | Egitim Yoneticisi | `egitim_yoneticisi` | `/dashboard/yonetici` |
 
 Rol -> yol eslesmesinin tek kaynagi [`lib/roles.ts`](lib/roles.ts) dosyasidir;
@@ -106,6 +106,12 @@ app/
     callback/route.ts            e-posta dogrulama / magic link donusu
     signout/route.ts             POST -> oturum kapatma
 
+  actions/                       Server Action'lar (arayuzun kalici yazma yolu)
+    shared.ts                    ActionResult tipi + demo modu korumasi
+    questions.ts                 taslak kaydetme, onay/red, kazanim, tercihler
+    exams.ts                     sinav olustur, soru ekle/cikar, yayina al
+    submissions.ts               cevap gonder (on puanlama), nihai puan onayi
+
 components/
   ui/                            shadcn/ui bilesenleri: Button, Input, Textarea,
                                  Label, Select, Card, Badge, Table, Tabs, Sheet,
@@ -121,7 +127,10 @@ components/
     analytics-charts.tsx         Recharts grafikleri (trend, ortalama, durum)
     question-pool-table.tsx      masaustunde tablo, mobilde kart listesi
     question-generator-form.tsx  AI soru uretim formu
-    answer-form.tsx              ogrenci cevap + AI puan gorunumu
+    answer-form.tsx              ogrenci cevabi + AI puan gorunumu (kalici)
+    exam-create-dialog.tsx       yeni sinav formu
+    exam-builder.tsx             sinava soru ekle/cikar, yayina al
+    submission-review-dialog.tsx egitmenin nihai puan onayi
     page-header.tsx, stat-card.tsx, status-badge.tsx, login-form.tsx
 
 lib/
@@ -131,6 +140,7 @@ lib/
   supabase.ts                    tarayici istemcisi
   supabase-server.ts             sunucu / admin istemcisi, getCurrentUser
   ai.ts                          generateQuestions, gradeAnswer
+  grading.ts                     autoGrade: coktan secmeli + rubrik on puanlama
   api.ts                         JSON yanit yardimcilari, requireRole
   utils.ts                       cn, formatDateTime, formatScore
   mock-data.ts                   demo verisi
@@ -176,24 +186,30 @@ soruda rubrik garanti edilir.
   `createAdminSupabaseClient()` tarafindan kullanilir ve `NEXT_PUBLIC_` on eki
   tasimaz; istemciye asla gonderilmez.
 
-## Mock veriden gercek veriye gecis
+## Veri katmani
 
-Paneller su an `lib/mock-data.ts` kullaniyor. Ornegin soru havuzu icin
-[`app/dashboard/egitmen/soru-havuzu/page.tsx`](app/dashboard/egitmen/soru-havuzu/page.tsx)
-dosyasini soyle degistirin:
+Paneller dogrudan `supabase.from(...)` cagirmaz; hepsi
+[`lib/queries.ts`](lib/queries.ts) uzerinden okur. Bu katman Supabase
+yapilandirilmamissa otomatik olarak `lib/mock-data.ts` demo verisine duser,
+boylece anahtar girmeden klonlanan proje de calisir.
 
-```tsx
-const supabase = await createServerSupabaseClient();
-const { data: questions } = await supabase
-  .from("questions")
-  .select("*")
-  .order("created_at", { ascending: false });
+Yazma islemleri `app/actions/*.ts` icindeki Server Action'lardan gecer ve demo
+modunda okunabilir bir hata dondurur ("Supabase baglantisi gerekiyor").
+Tek istisna cevap gonderimidir: demo modunda da puanlama calisir ama sonuc
+veritabanina yazilmaz, arayuz bunu acikca soyler.
 
-return <QuestionPoolTable questions={questions ?? []} />;
-```
+### Sinav akisi
 
-`QuestionPoolTable` ayrica `onStatusChange` prop'u alir; `PATCH /api/questions`
-cagrisini bagladiginizda onay/red islemi kalici hale gelir.
+1. Icerik uzmani kazanimdan soru taslagi uretir -> havuza gonderir.
+2. Egitmen [soru havuzunda](app/dashboard/egitmen/soru-havuzu/page.tsx)
+   taslaklari onaylar.
+3. Egitmen [sinav olusturur](app/dashboard/egitmen/sinavlar/page.tsx), havuzdan
+   **yalnizca onayli** sorulari secip sinava ekler ve yayina alir.
+4. Ogrenci sinava girer; coktan secmeli sorular dogru sik karsilastirmasiyla,
+   acik uclu sorular rubrige gore AI ile **on** puanlanir
+   ([`lib/grading.ts`](lib/grading.ts)).
+5. Egitmen her cevapta AI puanini gorur onaylar veya duzeltir; puan ancak o
+   zaman nihai olur.
 
 ## Komutlar
 

@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   BarChart3,
   BookOpen,
+  ClipboardList,
   GraduationCap,
   LayoutDashboard,
   Library,
@@ -45,6 +46,12 @@ export const ROLE_NAV: Record<UserRole, readonly NavItem[]> = {
       label: "Soru Havuzu",
       icon: Library,
       description: "Taslaklari incele ve onayla",
+    },
+    {
+      href: "/dashboard/egitmen/sinavlar",
+      label: "Sinavlar",
+      icon: ClipboardList,
+      description: "Sinav olustur ve yayina al",
     },
   ],
   ogrenci: [

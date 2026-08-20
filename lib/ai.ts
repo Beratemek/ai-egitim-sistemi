@@ -14,8 +14,10 @@
  * Bu modul yalnizca sunucu tarafinda calistirilmalidir (API route / server action).
  */
 
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
 import { generateObject } from "ai";
+import type { LanguageModelV1 } from "ai";
 import { z } from "zod";
 
 import { serverEnv } from "@/lib/env";
@@ -30,11 +32,28 @@ import type {
 /*  Saglayici                                                                 */
 /* -------------------------------------------------------------------------- */
 
-function getProvider() {
-  return createOpenAI({
+/**
+ * Istenen modeli secilen saglayicidan dondurur.
+ *
+ * `AI_PROVIDER` (ya da anahtarin oneki) "google" ise Gemini, aksi halde
+ * OpenAI kullanilir. OpenAI yolu `OPENAI_BASE_URL` ile OpenAI-uyumlu baska
+ * saglayicilara (Groq, OpenRouter, yerel LLM) da yonlendirilebilir.
+ *
+ * Iki saglayici da sema zorlamali cikti (structured output) destekler; bu
+ * yuzden `generateObject` cagrilari saglayiciya gore degismez.
+ */
+function getModel(modelId: string): LanguageModelV1 {
+  if (serverEnv.aiProvider === "google") {
+    const google = createGoogleGenerativeAI({ apiKey: serverEnv.openaiApiKey });
+    return google(modelId);
+  }
+
+  const openai = createOpenAI({
     apiKey: serverEnv.openaiApiKey,
     ...(serverEnv.openaiBaseUrl ? { baseURL: serverEnv.openaiBaseUrl } : {}),
   });
+
+  return openai(modelId);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -184,10 +203,8 @@ export async function generateQuestions(
         ? "Tum sorular coktan secmeli (test) olsun; her birinde 4 sik bulunsun."
         : "Tum sorular acik uclu olsun; her biri icin ayrintili rubrik yaz.";
 
-  const provider = getProvider();
-
   const { object } = await generateObject({
-    model: provider(serverEnv.aiModelGeneration),
+    model: getModel(serverEnv.aiModelGeneration),
     schema: generateQuestionsSchema,
     system: [
       "Sen deneyimli bir olcme-degerlendirme uzmanisin.",
@@ -254,10 +271,8 @@ export async function gradeAnswer(
     return mockGradeAnswer(studentAnswer, rubric, maxScore);
   }
 
-  const provider = getProvider();
-
   const { object } = await generateObject({
-    model: provider(serverEnv.aiModelGrading),
+    model: getModel(serverEnv.aiModelGrading),
     schema: gradingResultSchema,
     system: [
       "Sen tarafsiz bir sinav degerlendiricisisin.",
