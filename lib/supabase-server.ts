@@ -10,6 +10,7 @@
  * Bu modulu bir Client Component'ten import etmeyin.
  */
 
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { createClient as createSupabaseJsClient } from "@supabase/supabase-js";
@@ -82,11 +83,15 @@ export interface AuthenticatedUser {
  * Oturum acmis kullanicinin auth kaydini ve `public.users` profilini dondurur.
  * Oturum yoksa `null` doner.
  *
+ * `cache()` ile sarmalidir: ayni istek icinde layout ve sayfa birlikte cagirsa
+ * bile Supabase'e yalnizca BIR kez gidilir. Onbellek istek bittiginde silinir,
+ * yani kullanicilar arasinda sizinti olmaz.
+ *
  * Gelistirme modunda `dev_role` cerezi varsa profilin rolu o degerle degistirilir
  * (bkz. lib/dev-mode.ts). Bu yalnizca ARAYUZU etkiler - veritabanindaki RLS
  * politikalari her zaman gercek kullaniciya gore calisir.
  */
-export async function getCurrentUser(): Promise<AuthenticatedUser | null> {
+export const getCurrentUser = cache(async (): Promise<AuthenticatedUser | null> => {
   const client = await createServerSupabaseClient();
 
   const {
@@ -121,7 +126,7 @@ export async function getCurrentUser(): Promise<AuthenticatedUser | null> {
     actualRole,
     impersonatedRole,
   };
-}
+});
 
 /** Kullanicinin rolunu dondurur; oturum yoksa `null`. */
 export async function getCurrentRole(): Promise<UserRole | null> {

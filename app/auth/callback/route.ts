@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { EmailOtpType } from "@supabase/supabase-js";
 
 import { dashboardPathFor } from "@/lib/roles";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
@@ -6,26 +7,107 @@ import { isUserRole } from "@/lib/types";
 
 export const runtime = "nodejs";
 
+/** Supabase'in e-posta baglantilarinda kullandigi dogrulama tipleri. */
+const OTP_TYPES: readonly EmailOtpType[] = [
+  "signup",
+  "invite",
+  "magiclink",
+  "recovery",
+  "email_change",
+  "email",
+];
+
+function isOtpType(value: string | null): value is EmailOtpType {
+  return value !== null && (OTP_TYPES as readonly string[]).includes(value);
+}
+
 /**
- * GET /auth/callback?code=...
+ * `next` parametresi yalnizca kendi sitemizde bir YOL olabilir.
+ * "//evil.com" veya "/\evil.com" gibi degerler acik yonlendirmeye
+ * (open redirect) kapi aralar; bu yuzden tek "/" ile baslamasi sart.
+ */
+function safeNextPath(value: string | null): string | null {
+  if (!value) return null;
+  if (!value.startsWith("/")) return null;
+  if (value.startsWith("//") || value.startsWith("/\\")) return null;
+  return value;
+}
+
+/**
+ * GET /auth/callback
  *
- * Supabase e-posta dogrulama / magic link baglantilarinin dondugu adres.
- * Kod oturuma cevrilir, ardindan kullanici kendi paneline yonlendirilir.
+ * Supabase e-posta dogrulama / magic link / OAuth donuslerini karsilar.
+ * Iki akisi birden destekler:
+ *
+ *   1. `?token_hash=...&type=signup`  -> verifyOtp
+ *      Sunucu tarafinda dogrulanir, PKCE dogrulayici cerezine ihtiyac duymaz.
+ *      Kullanici maili BASKA bir cihazda/tarayicida acsa bile calisir.
+ *
+ *   2. `?code=...`                    -> exchangeCodeForSession
+ *      PKCE akisi. Yalnizca kaydin baslatildigi tarayicida calisir, cunku
+ *      code verifier o tarayicinin cerezinde durur. OAuth donusu de buradan gecer.
+ *
+ * Hata durumunda kullanici sessizce giris sayfasina atilmaz; sebep
+ * `?error=` ile tasinir ve giris ekraninda gosterilir.
  */
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
-  const code = searchParams.get("code");
-  const next = searchParams.get("next");
 
-  if (!code) {
-    return NextResponse.redirect(`${origin}/login?error=kod_bulunamadi`);
+  const next = safeNextPath(searchParams.get("next"));
+  const tokenHash = searchParams.get("token_hash");
+  const type = searchParams.get("type");
+  const code = searchParams.get("code");
+
+  // Supabase'in kendisi hata ile geri dondurduyse (suresi dolmus baglanti vb.)
+  // mesaji oldugu gibi tasi - "kod bulunamadi" demek yaniltici olurdu.
+  const providerError =
+    searchParams.get("error_description") ?? searchParams.get("error");
+
+  if (providerError) {
+    return NextResponse.redirect(
+      `${origin}/login?error=${encodeURIComponent(providerError)}`,
+    );
   }
 
   const supabase = await createServerSupabaseClient();
-  const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
-  if (error || !data.user) {
-    return NextResponse.redirect(`${origin}/login?error=oturum_acilamadi`);
+  let userId: string | null = null;
+
+  if (tokenHash && isOtpType(type)) {
+    const { data, error } = await supabase.auth.verifyOtp({
+      token_hash: tokenHash,
+      type,
+    });
+
+    if (error || !data.user) {
+      return NextResponse.redirect(
+        `${origin}/login?error=${encodeURIComponent(
+          error?.message ??
+            "Dogrulama baglantisi gecersiz veya suresi dolmus. Yeni bir baglanti isteyin.",
+        )}`,
+      );
+    }
+
+    userId = data.user.id;
+  } else if (code) {
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+
+    if (error || !data.user) {
+      return NextResponse.redirect(
+        `${origin}/login?error=${encodeURIComponent(
+          error?.message ??
+            "Oturum acilamadi. Baglantiyi kaydi baslattiginiz tarayicida acmayi deneyin.",
+        )}`,
+      );
+    }
+
+    userId = data.user.id;
+  } else {
+    return NextResponse.redirect(
+      `${origin}/login?error=${encodeURIComponent(
+        "Dogrulama bilgisi bulunamadi. Baglantinin tamamini kopyaladiginizdan emin olun.",
+      )}`,
+    );
   }
 
   if (next) return NextResponse.redirect(`${origin}${next}`);
@@ -33,8 +115,8 @@ export async function GET(request: Request) {
   const { data: profile } = await supabase
     .from("users")
     .select("role")
-    .eq("id", data.user.id)
-    .single();
+    .eq("id", userId)
+    .maybeSingle();
 
   const role = isUserRole(profile?.role) ? profile.role : "ogrenci";
 

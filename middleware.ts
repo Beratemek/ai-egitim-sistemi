@@ -1,19 +1,30 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
+import { ROLE_CACHE_COOKIE } from "@/lib/auth-cookies";
 import { DEV_ROLE_COOKIE, isDevRoleSwitchEnabled } from "@/lib/dev-mode";
 import { isSupabaseConfigured, publicEnv } from "@/lib/env";
 import { dashboardPathFor, roleForPath } from "@/lib/roles";
 import { isUserRole } from "@/lib/types";
-import type { Database } from "@/lib/types";
+import type { Database, UserRole } from "@/lib/types";
 
 /**
- * Middleware iki is yapar:
+ * Rolun onbelleklendigi cerez.
+ *
+ * Rol her istekte veritabanindan okunursa her sayfa gecisi fazladan bir ag
+ * gidis-donusu maliyeti tasir. Rol nadiren degistigi icin kisa omurlu bir
+ * cerezde tutulur; sure dolunca yeniden sorgulanir. Bu cerez YETKI KAYNAGI
+ * DEGILDIR - veri erisimini her zaman veritabanindaki RLS politikalari belirler,
+ * cerez yalnizca hangi panele yonlendirilecegini soyler.
+ */
+const ROLE_CACHE_MAX_AGE = 300; // 5 dakika
+
+/**
+ * Middleware uc is yapar:
  *  1. Supabase oturum cerezini tazeler (aksi halde token suresi dolar).
  *  2. /dashboard altini korur ve kullaniciyi kendi rolunun paneline yonlendirir.
- *
- * Ayrica her istege `x-pathname` basligini ekler; dashboard layout'u aktif
- * yolu buradan okur (Server Component'lerde `usePathname` yoktur).
+ *  3. Her istege `x-pathname` basligini ekler; dashboard layout'u aktif yolu
+ *     buradan okur (Server Component'lerde `usePathname` yoktur).
  */
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -53,6 +64,7 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const isDashboard = pathname.startsWith("/dashboard");
+  const isLogin = pathname === "/login";
 
   if (!user) {
     if (isDashboard) {
@@ -63,40 +75,86 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
-  // Oturum acikken /login'e gidilirse kendi paneline gonder.
-  const { data: profile } = await supabase
-    .from("users")
-    .select("role")
-    .eq("id", user.id)
-    .single();
+  /**
+   * E-postasi dogrulanmamis kullanici panele giremez.
+   *
+   * Supabase zaten "Confirm email" acikken dogrulanmamis kullaniciya oturum
+   * vermez; bu kontrol ikinci bir savunma katmani. Proje ayari sonradan
+   * gevsetilse bile uygulama dogrulanmamis hesabi iceri almaz.
+   */
+  if (!user.email_confirmed_at && isDashboard) {
+    return NextResponse.redirect(new URL("/auth/dogrulama-bekleniyor", request.url));
+  }
 
-  const actualRole = isUserRole(profile?.role) ? profile.role : "ogrenci";
+  // Rol yalnizca yonlendirme kararinin gerektigi yerlerde lazim.
+  // Tanitim sayfasi, /auth/* gibi yollarda sorgulamaya gerek yok.
+  if (!isDashboard && !isLogin) return response;
+
+  const actualRole = await resolveRole(request, response, supabase, user.id);
 
   // Gelistirici rol degistiricisi: yalnizca yonlendirme kurallarini etkiler.
-  // RLS her zaman gercek kullaniciya gore calismaya devam eder.
   const devRole = request.cookies.get(DEV_ROLE_COOKIE)?.value;
-  const role =
-    isDevRoleSwitchEnabled && isUserRole(devRole) ? devRole : actualRole;
+  const role = isDevRoleSwitchEnabled && isUserRole(devRole) ? devRole : actualRole;
 
-  if (pathname === "/login") {
+  // Oturum acikken /login'e gidilirse kendi paneline gonder.
+  if (isLogin) {
     return NextResponse.redirect(new URL(dashboardPathFor(role), request.url));
   }
 
-  if (isDashboard) {
-    const requiredRole = roleForPath(pathname);
+  const requiredRole = roleForPath(pathname);
 
-    // /dashboard kok yolu -> role gore dagit
-    if (pathname === "/dashboard") {
-      return NextResponse.redirect(new URL(dashboardPathFor(role), request.url));
-    }
+  // /dashboard kok yolu -> role gore dagit
+  if (pathname === "/dashboard") {
+    return NextResponse.redirect(new URL(dashboardPathFor(role), request.url));
+  }
 
-    // Baska bir rolun alanina girilmisse kendi paneline geri gonder.
-    if (requiredRole && requiredRole !== role) {
-      return NextResponse.redirect(new URL(dashboardPathFor(role), request.url));
-    }
+  // Baska bir rolun alanina girilmisse kendi paneline geri gonder.
+  if (requiredRole && requiredRole !== role) {
+    return NextResponse.redirect(new URL(dashboardPathFor(role), request.url));
   }
 
   return response;
+}
+
+/**
+ * Rolu once cerez onbelleginden, yoksa veritabanindan okur ve onbellege yazar.
+ *
+ * Onbellek degeri "<userId>:<rol>" bicimindedir. Kullanici kimligini de
+ * anahtara katmak sart: ayni tarayicida baska bir hesaba gecildiginde eski
+ * rolun yapisip yanlis panele yonlendirmesini onler.
+ */
+async function resolveRole(
+  request: NextRequest,
+  response: NextResponse,
+  supabase: ReturnType<typeof createServerClient<Database>>,
+  userId: string,
+): Promise<UserRole> {
+  const cached = request.cookies.get(ROLE_CACHE_COOKIE)?.value;
+
+  if (cached) {
+    const separator = cached.indexOf(":");
+    const cachedUserId = cached.slice(0, separator);
+    const cachedRole = cached.slice(separator + 1);
+
+    if (cachedUserId === userId && isUserRole(cachedRole)) return cachedRole;
+  }
+
+  const { data: profile } = await supabase
+    .from("users")
+    .select("role")
+    .eq("id", userId)
+    .maybeSingle();
+
+  const role = isUserRole(profile?.role) ? profile.role : "ogrenci";
+
+  response.cookies.set(ROLE_CACHE_COOKIE, `${userId}:${role}`, {
+    httpOnly: true,
+    sameSite: "lax",
+    path: "/",
+    maxAge: ROLE_CACHE_MAX_AGE,
+  });
+
+  return role;
 }
 
 export const config = {
