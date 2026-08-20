@@ -3,8 +3,10 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Loader2, TriangleAlert } from "lucide-react";
+import { ArrowRight, Loader2, MailCheck, TriangleAlert } from "lucide-react";
 
+import { GoogleSignInButton } from "@/components/shared/google-sign-in-button";
+import { ResendConfirmation } from "@/components/shared/resend-confirmation";
 import { ROLE_ICONS } from "@/components/shared/role-icons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,7 +26,12 @@ import { isUserRole, type UserRole } from "@/lib/types";
 
 type Mode = "giris" | "kayit";
 
-export function LoginForm() {
+export interface LoginFormProps {
+  /** /auth/callback tarafindan ?error= ile tasinan hata mesaji. */
+  callbackError?: string | null;
+}
+
+export function LoginForm({ callbackError = null }: LoginFormProps) {
   const router = useRouter();
 
   const [mode, setMode] = React.useState<Mode>("giris");
@@ -33,8 +40,10 @@ export function LoginForm() {
   const [fullName, setFullName] = React.useState("");
   const [role, setRole] = React.useState<UserRole>("ogrenci");
   const [pending, setPending] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
+  const [error, setError] = React.useState<string | null>(callbackError);
   const [info, setInfo] = React.useState<string | null>(null);
+  /** Supabase "email not confirmed" dediyse yeniden gonderme secenegi sunulur. */
+  const [unconfirmed, setUnconfirmed] = React.useState(false);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -93,11 +102,14 @@ export function LoginForm() {
       router.replace(dashboardPathFor(resolvedRole));
       router.refresh();
     } catch (caught) {
-      setError(
+      const message =
         caught instanceof Error
           ? caught.message
-          : "Beklenmeyen bir hata olustu. Lutfen tekrar deneyin.",
-      );
+          : "Beklenmeyen bir hata olustu. Lutfen tekrar deneyin.";
+
+      // Supabase bu durumda "Email not confirmed" dondurur.
+      setUnconfirmed(/not confirmed/i.test(message));
+      setError(message);
     } finally {
       setPending(false);
     }
@@ -200,17 +212,21 @@ export function LoginForm() {
       </div>
 
       {error ? (
-        <p
-          role="alert"
-          className="flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-sm text-destructive"
-        >
-          <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
-          {error}
-        </p>
+        <div className="space-y-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2.5">
+          <p role="alert" className="flex items-start gap-2 text-sm text-destructive">
+            <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
+            {error}
+          </p>
+
+          {unconfirmed ? (
+            <ResendConfirmation email={email} />
+          ) : null}
+        </div>
       ) : null}
 
       {info ? (
-        <p className="rounded-lg border bg-muted px-3 py-2.5 text-sm text-muted-foreground">
+        <p className="flex items-start gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2.5 text-sm text-muted-foreground">
+          <MailCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
           {info}
         </p>
       ) : null}
@@ -228,6 +244,17 @@ export function LoginForm() {
           </>
         )}
       </Button>
+
+      <div className="relative py-1">
+        <div className="absolute inset-0 flex items-center" aria-hidden>
+          <span className="w-full border-t" />
+        </div>
+        <div className="relative flex justify-center">
+          <span className="bg-background px-2 text-xs text-muted-foreground">veya</span>
+        </div>
+      </div>
+
+      <GoogleSignInButton disabled={pending} />
     </form>
   );
 }

@@ -1,18 +1,18 @@
-<!--
+{{/*
   Supabase > Authentication > Emails > "Confirm signup" sablonu.
+  Panel'deki sablon kutusuna bu dosyanin TAMAMINI yapistirin.
 
-  Supabase panelindeki sablon kutusuna bu dosyanin TAMAMINI yapistirin.
+  Kullanilabilir degiskenler: ConfirmationURL, Email, Token, TokenHash,
+  SiteURL, RedirectTo ve kayit meta verisi icin Data (ornek: Data.full_name).
 
-  Kullanilabilir degiskenler (Go template):
-    {{ .ConfirmationURL }}  dogrulama baglantisi
-    {{ .Email }}            alicinin e-postasi
-    {{ .Token }}            6 haneli kod
-    {{ .SiteURL }}          proje Site URL'i
+  NOT: Bu blok bilerek Go sablon yorumu ({{ slash-yildiz ... yildiz-slash }})
+  olarak yazildi, HTML yorumu <!-- --> olarak DEGIL. Go sablon motoru HTML
+  yorumlarini tanimaz; icine yazilan degiskenler yine islenir ve dogrulama
+  baglantisi ile token gonderilen e-postanin kaynagina sizardi.
 
-  E-posta istemcileri modern CSS'i desteklemez; bu yuzden duzen <table> ile
-  kurulur ve tum stiller satir ici (inline) yazilir. Harici gorsel/font yok -
-  cogu istemci varsayilan olarak engelliyor.
--->
+  E-posta istemcileri modern CSS'i desteklemez; duzen <table> ile kurulur ve
+  tum stiller satir ici yazilir. Harici gorsel/font yok - cogu istemci engeller.
+*/}}
 <!doctype html>
 <html lang="tr">
   <head>
@@ -90,7 +90,7 @@
                 <table role="presentation" cellpadding="0" cellspacing="0" border="0">
                   <tr>
                     <td style="background-color:#4f46e5; border-radius:10px;">
-                      <a href="{{ .ConfirmationURL }}"
+                      <a href="{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=signup"
                          style="display:inline-block; padding:14px 34px; font-size:15px; font-weight:600;
                                 color:#ffffff; text-decoration:none; border-radius:10px;">
                         Hesabimi dogrula
@@ -108,8 +108,8 @@
                   Buton calismiyorsa bu adresi tarayicinizin adres cubuguna yapistirin:
                 </p>
                 <p style="margin:0; font-size:12px; line-height:1.6; word-break:break-all;">
-                  <a href="{{ .ConfirmationURL }}" style="color:#4f46e5; text-decoration:underline;">
-                    {{ .ConfirmationURL }}
+                  <a href="{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=signup" style="color:#4f46e5; text-decoration:underline;">
+                    {{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=signup
                   </a>
                 </p>
               </td>

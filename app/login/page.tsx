@@ -17,7 +17,13 @@ const HIGHLIGHTS: readonly string[] = [
   "Nihai karar her zaman egitmende",
 ];
 
-export default function LoginPage() {
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string; next?: string }>;
+}) {
+  const params = await searchParams;
+  const callbackError = params.error ?? null;
   return (
     <main className="grid min-h-screen lg:grid-cols-2">
       {/* ---------- Sol: marka paneli (yalnizca genis ekran) ---------- */}
@@ -87,7 +93,7 @@ export default function LoginPage() {
               </p>
             </div>
 
-            <LoginForm />
+            <LoginForm callbackError={callbackError} />
 
             <p className="text-center text-xs text-muted-foreground">
               Sorun mu yasiyorsunuz?{" "}
