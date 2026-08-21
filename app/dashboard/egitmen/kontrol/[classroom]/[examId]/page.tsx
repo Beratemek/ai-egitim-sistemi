@@ -8,7 +8,7 @@ import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { isSupabaseConfigured } from "@/lib/env";
-import { getClassroomExamDetail } from "@/lib/queries";
+import { getClassroomExamDetail, UNASSIGNED_CLASSROOM } from "@/lib/queries";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Sınav Değerlendirme" };
@@ -64,6 +64,13 @@ export default async function KontrolDetayPage({ params }: PageProps) {
           </div>
         }
       />
+
+      {classroom === UNASSIGNED_CLASSROOM ? (
+        <p className="rounded-lg border border-dashed px-3 py-2.5 text-sm leading-relaxed text-muted-foreground">
+          Bu öğrencilere henüz sınıf atanmamış. Sistem yöneticisi sınıf
+          atadığında kendi sınıf kutularına taşınırlar.
+        </p>
+      ) : null}
 
       <ClassroomExamReview detail={detail} canPersist={isSupabaseConfigured} />
     </>

@@ -2,7 +2,6 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { DashboardShell } from "@/components/shared/dashboard-shell";
-import { isDevRoleSwitchEnabled } from "@/lib/dev-mode";
 import { isSupabaseConfigured } from "@/lib/env";
 import { roleForPath } from "@/lib/roles";
 import { getCurrentUser } from "@/lib/supabase-server";
@@ -26,36 +25,38 @@ export default async function DashboardLayout({
 
   const current = await getCurrentUser();
 
-  // Middleware zaten yonlendiriyor; bu yalnızca ek guvenlik katmanidir.
+  // Middleware zaten yonlendiriyor; bu yalnizca ek guvenlik katmanidir.
   if (!current) redirect("/login");
 
   /**
-   * `admin` her panele girebilir. Hangi paneldeyse basliklarda ve rol
-   * kartinda O rol gorunur - egitmen sayfasindaysa "Egitmen Paneli". Sol
-   * menu ise `navRole` ile admin'de kalir, boylece paneller arasinda
-   * gezinmeye devam edebilir.
+   * Kullaniciya VERILMIS roller. Yetkinin tek kaynagi budur.
+   *
+   * `roles` kolonu eklenmeden once olusmus kayitlarda kume bos olabilir;
+   * o durumda etkin rol tek eleman olarak kabul edilir.
    */
-  const isAdmin = current.profile.role === "admin";
+  const grantedRoles: UserRole[] =
+    current.profile.roles && current.profile.roles.length > 0
+      ? current.profile.roles
+      : [current.profile.role];
+
+  /**
+   * Icinde bulunulan panel.
+   *
+   * Yol bir rolun alanina isaret ediyorsa VE o rol kullaniciya verilmisse o
+   * rolun paneli gosterilir; menu, baslik ve rol karti hep ayni rolu anlatir.
+   * Aksi halde etkin role dusulur. `admin` icin ayricalikli bir dal YOK -
+   * sistem yoneticisi de yalnizca kendisine atanmis rollere girer.
+   */
   const requestHeaders = await headers();
-  const activeRole: UserRole = isAdmin
-    ? (roleForPath(requestHeaders.get("x-pathname") ?? "/dashboard") ?? "admin")
-    : current.profile.role;
+  const pathRole = roleForPath(requestHeaders.get("x-pathname") ?? "/dashboard");
+  const activeRole: UserRole =
+    pathRole && grantedRoles.includes(pathRole) ? pathRole : current.profile.role;
 
   return (
     <DashboardShell
       role={activeRole}
-      navRole={current.profile.role}
-      grantedRoles={
-        current.profile.roles && current.profile.roles.length > 0
-          ? current.profile.roles
-          : [current.profile.role]
-      }
+      grantedRoles={grantedRoles}
       fullName={current.profile.full_name || current.user.email || "Kullanici"}
-      devSwitch={
-        isDevRoleSwitchEnabled && current.actualRole === "admin"
-      }
-      actualRole={current.actualRole}
-      impersonating={current.impersonatedRole !== null}
     >
       {children}
     </DashboardShell>

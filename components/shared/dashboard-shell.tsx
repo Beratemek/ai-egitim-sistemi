@@ -6,7 +6,6 @@ import { LogOut, Menu, UserRound } from "lucide-react";
 
 import { NavLinks, RoleCard } from "@/components/shared/app-nav";
 import { ActiveRoleSwitcher } from "@/components/shared/active-role-switcher";
-import { DevRoleSwitcher } from "@/components/shared/dev-role-switcher";
 import { BrandMark } from "@/components/shared/brand-mark";
 import { ROLE_ICONS } from "@/components/shared/role-icons";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
@@ -36,41 +35,22 @@ import type { UserRole } from "@/lib/types";
 export interface DashboardShellProps {
   /** Basliklarda ve rol kartinda gosterilen rol. */
   role: UserRole;
-  /**
-   * Sol menunun hangi role gore cizilecegi.
-   *
-   * `admin` icin bu `admin` kalir: yonetici her panele girebildigi icin
-   * menusu tum rollerin birlesimidir. `role` ise bulundugu sayfaya gore
-   * degisir - egitmen sayfasindaysa baslikta "Egitmen Paneli" yazar.
-   */
-  navRole?: UserRole;
   /** Kullaniciya verilmis roller; birden fazlaysa rol degistirici cikar. */
   grantedRoles?: readonly UserRole[];
   fullName: string;
   /** Supabase yapilandirilmadiginda demo rozeti gösterilir. */
   demoMode?: boolean;
-  /** Geliştirici rol degistiricisi açık mi? */
-  devSwitch?: boolean;
-  /** Veritabanındaki gerçek rol (rol değiştirici için). */
-  actualRole?: UserRole;
-  /** Su an başka bir rol taklit ediliyor mu? */
-  impersonating?: boolean;
   children: React.ReactNode;
 }
 
 export function DashboardShell({
   role,
-  navRole,
   grantedRoles = [],
   fullName,
   demoMode = false,
-  devSwitch = false,
-  actualRole,
-  impersonating = false,
   children,
 }: DashboardShellProps) {
   const [mobileOpen, setMobileOpen] = React.useState(false);
-  const menuRole = navRole ?? role;
   const definition = ROLE_DEFINITIONS[role];
   const RoleIcon = ROLE_ICONS[role];
 
@@ -93,7 +73,7 @@ export function DashboardShell({
           <p className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             Menü
           </p>
-          <NavLinks role={menuRole} />
+          <NavLinks role={role} />
         </div>
 
         <div className="border-t p-3">
@@ -130,7 +110,7 @@ export function DashboardShell({
               </SheetHeader>
 
               <div className="px-3 py-4">
-                <NavLinks role={menuRole} onNavigate={() => setMobileOpen(false)} />
+                <NavLinks role={role} onNavigate={() => setMobileOpen(false)} />
               </div>
 
               <div className="px-3">
@@ -159,14 +139,6 @@ export function DashboardShell({
             ) : null}
 
             <ActiveRoleSwitcher activeRole={role} roles={grantedRoles} />
-
-            {devSwitch ? (
-              <DevRoleSwitcher
-                currentRole={role}
-                actualRole={actualRole ?? role}
-                impersonating={impersonating}
-              />
-            ) : null}
 
             <ThemeToggle />
 

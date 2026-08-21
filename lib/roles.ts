@@ -74,7 +74,14 @@ export const SELECTABLE_ROLES: readonly RoleDefinition[] = Object.values(
 /** Tum roller (gizli olanlar dahil). Yalnizca ic kullanim icin. */
 export const ROLE_LIST: readonly RoleDefinition[] = Object.values(ROLE_DEFINITIONS);
 
-/** Sitedeki her sayfaya ve her isleme yetkili mi? */
+/**
+ * Gizli sistem yoneticisi rolu mu?
+ *
+ * DIKKAT: bu "her seye yetkili" demek DEGILDIR. Sistem yoneticisi de yalnizca
+ * kendisine ATANMIS rollerin panellerine girer; her panele girmesi
+ * isteniyorsa cozum ona o rolleri atamaktir. Veritabanindaki `is_admin()`
+ * yalnizca rol/sinif/ders yonetimi islemlerini yetkilendirir.
+ */
 export function isAdminRole(role: UserRole): boolean {
   return role === "admin";
 }

@@ -16,9 +16,7 @@ import { createServerClient } from "@supabase/ssr";
 import { createClient as createSupabaseJsClient } from "@supabase/supabase-js";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 
-import { DEV_ROLE_COOKIE, isDevRoleSwitchEnabled } from "@/lib/dev-mode";
 import { requireSupabaseEnv, serverEnv } from "@/lib/env";
-import { isUserRole } from "@/lib/types";
 import type { Database, UserProfile, UserRole } from "@/lib/types";
 
 export type TypedServerClient = SupabaseClient<Database>;
@@ -74,9 +72,8 @@ export interface AuthenticatedUser {
   /** Arayuzun kullandigi profil. Rol taklidi aktifse `role` degistirilmis olur. */
   profile: UserProfile;
   /** Veritabanindaki gercek rol. */
+  /** Veritabanindaki gercek etkin rol. */
   actualRole: UserRole;
-  /** Gelistirici rol degistiricisiyle taklit edilen rol; yoksa `null`. */
-  impersonatedRole: UserRole | null;
 }
 
 /**
@@ -109,23 +106,15 @@ export const getCurrentUser = cache(async (): Promise<AuthenticatedUser | null> 
 
   if (!profile) return null;
 
-  const actualRole = profile.role;
-  let impersonatedRole: UserRole | null = null;
-
-  if (isDevRoleSwitchEnabled) {
-    const cookieStore = await cookies();
-    const candidate = cookieStore.get(DEV_ROLE_COOKIE)?.value;
-    if (isUserRole(candidate) && candidate !== actualRole) {
-      impersonatedRole = candidate;
-    }
-  }
-
-  return {
-    user,
-    profile: impersonatedRole ? { ...profile, role: impersonatedRole } : profile,
-    actualRole,
-    impersonatedRole,
-  };
+  /**
+   * Rol TAKLIDI kaldirildi.
+   *
+   * Onceden bir gelistirici cerezi `profile.role`u degistirebiliyordu; bu,
+   * kullaniciya ATANMAMIS bir rolun paneline girmenin yoluydu. Yetkinin tek
+   * kaynagi verilmis roller kumesi olmali - baska bir panel gerekiyorsa
+   * cozum o rolu atamaktir. `actualRole` alani cagrilar icin korunuyor.
+   */
+  return { user, profile, actualRole: profile.role };
 });
 
 /** Kullanicinin rolunu dondurur; oturum yoksa `null`. */

@@ -215,9 +215,10 @@ export async function setInstructorSubjects(
     return { ok: false, error: error.message };
   }
 
+  // Yalnizca yonetim ekranlari tazelenir. Egitmen layout'unu ve profili de
+  // gecersiz kilmak, ders yetkisi her isaretlendiginde o agaclari da yeniden
+  // kurduruyordu - tek bir tikin maliyetini gereksiz yere buyutuyordu.
   revalidateUserPaths();
-  revalidatePath("/dashboard/egitmen", "layout");
-  revalidatePath("/dashboard/profil");
 
   return { ok: true, data: { subjects: (data as string[] | null) ?? cleaned } };
 }

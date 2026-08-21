@@ -581,21 +581,36 @@ export interface ApproveSubmissionsInput {
   submissionIds: readonly string[];
 }
 
+export interface ApproveSubmissionsResult {
+  /** Puani kesinlestirilen cevap sayisi. */
+  approved: number;
+  /** AI on puani olmadigi icin atlanan cevap sayisi; elle puanlanmali. */
+  skipped: number;
+  /** Sonucu yeniden hesaplanamayan ogrenci sayisi. */
+  unfinished: number;
+}
+
 /**
  * AI on puanlarini toplu olarak onaylar.
  *
  * Egitmen sinavi BUTUN olarak degerlendirir: 30 ogrencinin 20 cevabini tek
- * tek acmak yerine, AI puanini oldugu gibi kabul eder ve yalnizca itiraz
+ * tek acmak yerine AI puanini oldugu gibi kabul eder ve yalnizca itiraz
  * ettigi cevaba dokunur.
  *
  * Her satirin puani farkli oldugu icin PostgREST ile tek UPDATE yeterli
  * degil; satirlar AYNI PUANA gore gruplanip grup basina tek istek atilir.
  * AI puanlari kumelendigi icin (cok sayida 100 ve 0) bu genelde bir avuc
- * istege iner - satir basina istekten cok daha ucuz.
+ * istege iner.
+ *
+ * KISMI BASARI kurali: bir grup ya da bir sonuc hesaplamasi basarisiz olursa
+ * fonksiyon ERKEN DONMEZ. Yazma islemleri geri alinamadigi icin erken donus,
+ * yazilmis puanlari raporlanmadan birakir ve tekrar denendiginde o satirlar
+ * artik "onay bekleyen" olmadigindan bir daha islenmezdi. Bunun yerine tum
+ * gruplar denenir, sonuc dogru sayilarla raporlanir.
  */
 export async function approveSubmissions(
   input: ApproveSubmissionsInput,
-): Promise<ActionResult<{ approved: number }>> {
+): Promise<ActionResult<ApproveSubmissionsResult>> {
   if (!isSupabaseConfigured) return demoGuard();
 
   const ids = [...new Set(input.submissionIds)].filter(Boolean);
@@ -606,8 +621,8 @@ export async function approveSubmissions(
 
   const supabase = await createServerSupabaseClient();
 
-  // Yalnizca gercekten onay bekleyenler; zaten onaylanmis bir cevabin
-  // puanini AI puanina geri cekmek egitmenin duzeltmesini silerdi.
+  // Yalnizca gercekten onay bekleyenler; zaten onaylanmis bir cevabin puanini
+  // AI puanina geri cekmek egitmenin duzeltmesini silerdi.
   const { data: pending, error: readError } = await supabase
     .from("submissions")
     .select("id, exam_id, student_id, ai_score")
@@ -621,9 +636,14 @@ export async function approveSubmissions(
   }
 
   const byScore = new Map<number, string[]>();
+  let skipped = 0;
+
   for (const row of pending) {
     // AI puani uretilmemisse 0 sayilmaz; egitmen elle puanlamali.
-    if (row.ai_score === null) continue;
+    if (row.ai_score === null) {
+      skipped += 1;
+      continue;
+    }
     const score = Math.round(row.ai_score * 100) / 100;
     const bucket = byScore.get(score) ?? [];
     bucket.push(row.id);
@@ -637,7 +657,9 @@ export async function approveSubmissions(
     };
   }
 
-  let approved = 0;
+  /** Gercekten yazilan satirlar; sonuc hesaplamasi bunlardan turetilir. */
+  const written = new Set<string>();
+  const failures: string[] = [];
 
   for (const [score, groupIds] of byScore) {
     // `.select()` sart: RLS eslesmezse PostgREST hata dondurmez, sessizce
@@ -653,26 +675,35 @@ export async function approveSubmissions(
       .eq("status", "ai_degerlendirildi")
       .select("id");
 
-    if (error) return { ok: false, error: error.message };
-    approved += updated?.length ?? 0;
+    if (error) {
+      failures.push(error.message);
+      continue;
+    }
+
+    for (const row of updated ?? []) written.add(row.id);
   }
 
-  if (approved === 0) {
+  if (written.size === 0) {
     return {
       ok: false,
       error:
+        failures[0] ??
         "Puanlar kaydedilemedi: bu cevaplari onaylama yetkiniz yok ya da cevaplar artik mevcut degil.",
     };
   }
 
-  // Etkilenen her (sinav, ogrenci) ikilisi icin sonuc yeniden hesaplanir.
+  // Sonuc yalnizca GERCEKTEN yazilan satirlarin sahipleri icin hesaplanir;
+  // yazma basarisiz olan ogrenci icin bosuna cagri yapilmaz.
   const pairs = new Map<string, { exam: string; student: string }>();
   for (const row of pending) {
-    pairs.set(`${row.exam_id} ${row.student_id}`, {
+    if (!written.has(row.id)) continue;
+    pairs.set(`${row.exam_id} ${row.student_id}`, {
       exam: row.exam_id,
       student: row.student_id,
     });
   }
+
+  let unfinished = 0;
 
   for (const pair of pairs.values()) {
     const { error } = await supabase.rpc("recalculate_exam_attempt_result", {
@@ -681,7 +712,8 @@ export async function approveSubmissions(
     });
     // Ogrenci akisi henuz kurulmamis ortamlarda bu RPC yok; onay yine gecerli.
     if (error && !isStudentFlowUnavailable(error)) {
-      return { ok: false, error: error.message };
+      unfinished += 1;
+      failures.push(error.message);
     }
   }
 
@@ -689,5 +721,5 @@ export async function approveSubmissions(
   revalidatePath("/dashboard/ogrenci");
   revalidatePath("/dashboard/yonetici");
 
-  return { ok: true, data: { approved } };
+  return { ok: true, data: { approved: written.size, skipped, unfinished } };
 }

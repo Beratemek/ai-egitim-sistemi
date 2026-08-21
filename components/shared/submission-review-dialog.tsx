@@ -50,12 +50,28 @@ export function SubmissionReviewDialog({
   const aiScore = submission.ai_score;
 
   const [open, setOpen] = React.useState(false);
-  const [score, setScore] = React.useState<string>(
-    aiScore === null ? "" : String(aiScore),
+
+  /**
+   * Baslangic degeri VARSA egitmenin onceki karari, yoksa AI on puani.
+   *
+   * Onceden hep `ai_score` ile baslatiliyordu: onaylanmis bir cevap tekrar
+   * acilip kaydedildiginde egitmenin duzeltmesi sessizce AI puanina geri
+   * doner, notu da silinirdi.
+   */
+  const [score, setScore] = React.useState<string>(() =>
+    initialScore(submission),
   );
-  const [note, setNote] = React.useState("");
+  const [note, setNote] = React.useState(submission.instructor_note ?? "");
   const [pending, setPending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+
+  // Sunucudan yeni veri gelince (router.refresh) formu tazele; diyalog acikken
+  // dokunma, kullanicinin yazdigini altindan cekmis oluruz.
+  React.useEffect(() => {
+    if (open) return;
+    setScore(initialScore(submission));
+    setNote(submission.instructor_note ?? "");
+  }, [open, submission]);
 
   const parsedScore = Number(score);
   const isScoreValid =
@@ -79,7 +95,7 @@ export function SubmissionReviewDialog({
     const result = await approveSubmission({
       submissionId: submission.id,
       score: parsedScore,
-      ...(note.trim() ? { note } : {}),
+      note,
     });
 
     setPending(false);
@@ -259,4 +275,12 @@ export function SubmissionReviewDialog({
       </DialogContent>
     </Dialog>
   );
+}
+
+/** Diyalogun acilis puani: egitmen kararı > AI on puani > bos. */
+function initialScore(submission: Submission): string {
+  if (submission.instructor_approved_score !== null) {
+    return String(submission.instructor_approved_score);
+  }
+  return submission.ai_score === null ? "" : String(submission.ai_score);
 }
