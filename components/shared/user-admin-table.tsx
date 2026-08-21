@@ -2,10 +2,21 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, Check, Loader2, Search, ShieldAlert } from "lucide-react";
+import {
+  BookMarked,
+  ChevronDown,
+  Check,
+  Loader2,
+  Search,
+  ShieldAlert,
+} from "lucide-react";
 import { toast } from "sonner";
 
-import { setUserClassroom, setUserRoles } from "@/app/actions/admin";
+import {
+  setInstructorSubjects,
+  setUserClassroom,
+  setUserRoles,
+} from "@/app/actions/admin";
 import { RoleBadge } from "@/components/shared/status-badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -46,9 +57,18 @@ export interface UserAdminTableProps {
   users: readonly UserProfile[];
   /** Oturumdaki yoneticinin kimligi; kendi satiri kilitlenir. */
   currentUserId: string;
+  /** Secilebilir ders adlari; soru havuzundan turetilir. */
+  subjectOptions?: readonly string[];
+  /** Kullanici kimligi -> yetkili oldugu dersler. */
+  subjectsByUser?: Record<string, string[]>;
 }
 
-export function UserAdminTable({ users, currentUserId }: UserAdminTableProps) {
+export function UserAdminTable({
+  users,
+  currentUserId,
+  subjectOptions = [],
+  subjectsByUser = {},
+}: UserAdminTableProps) {
   const router = useRouter();
   const [search, setSearch] = React.useState("");
   const [pendingId, setPendingId] = React.useState<string | null>(null);
@@ -91,6 +111,34 @@ export function UserAdminTable({ users, currentUserId }: UserAdminTableProps) {
       router.refresh();
     } catch (caught) {
       toast.error("Roller değiştirilemedi", {
+        description:
+          caught instanceof Error ? caught.message : "Lütfen tekrar deneyin.",
+      });
+    } finally {
+      setPendingId(null);
+    }
+  }
+
+  async function toggleSubject(user: UserProfile, subject: string) {
+    const current = subjectsByUser[user.id] ?? [];
+    const next = current.includes(subject)
+      ? current.filter((item) => item !== subject)
+      : [...current, subject];
+
+    setPendingId(user.id);
+
+    try {
+      const result = await setInstructorSubjects(user.id, next);
+      if (!result.ok) throw new Error(result.error);
+
+      toast.success(
+        result.data.subjects.length === 0
+          ? "Ders yetkisi kaldırıldı"
+          : `Ders yetkisi: ${result.data.subjects.join(", ")}`,
+      );
+      router.refresh();
+    } catch (caught) {
+      toast.error("Ders yetkisi güncellenemedi", {
         description:
           caught instanceof Error ? caught.message : "Lütfen tekrar deneyin.",
       });
@@ -146,6 +194,7 @@ export function UserAdminTable({ users, currentUserId }: UserAdminTableProps) {
               <TableHead>Mevcut rol</TableHead>
               <TableHead className="w-[190px]">Rolü değiştir</TableHead>
               <TableHead className="w-[200px]">Sınıf</TableHead>
+              <TableHead className="w-[210px]">Ders yetkisi</TableHead>
             </TableRow>
           </TableHeader>
 
@@ -242,7 +291,7 @@ export function UserAdminTable({ users, currentUserId }: UserAdminTableProps) {
                   </TableCell>
 
                   <TableCell>
-                    {user.role === "ogrenci" ? (
+                    {grantedRoles(user).includes("ogrenci") ? (
                       <ClassroomField
                         value={user.classroom ?? ""}
                         disabled={busy}
@@ -254,13 +303,32 @@ export function UserAdminTable({ users, currentUserId }: UserAdminTableProps) {
                       </span>
                     )}
                   </TableCell>
+
+                  <TableCell>
+                    {!grantedRoles(user).includes("egitmen") ? (
+                      <span className="text-xs text-muted-foreground">
+                        Yalnızca eğitmenlere atanır
+                      </span>
+                    ) : subjectOptions.length === 0 ? (
+                      <span className="text-xs text-muted-foreground">
+                        Havuzda ders yok
+                      </span>
+                    ) : (
+                      <SubjectField
+                        selected={subjectsByUser[user.id] ?? []}
+                        options={subjectOptions}
+                        disabled={busy}
+                        onToggle={(subject) => void toggleSubject(user, subject)}
+                      />
+                    )}
+                  </TableCell>
                 </TableRow>
               );
             })}
 
             {visible.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className="py-10 text-center text-sm text-muted-foreground">
+                <TableCell colSpan={5} className="py-10 text-center text-sm text-muted-foreground">
                   Aramaya uyan kullanıcı bulunamadı.
                 </TableCell>
               </TableRow>
@@ -343,4 +411,76 @@ function initials(name: string): string {
     .slice(0, 2)
     .map((part) => part[0]?.toLocaleUpperCase("tr") ?? "")
     .join("");
+}
+
+/**
+ * Bir egitmenin ders yetkileri.
+ *
+ * Bir hocaya BIRDEN FAZLA ders atanabilir, bu yuzden tek secimli bir kutu
+ * degil isaretlemeli liste. Secili dersler rozet olarak altta gorunur ki
+ * yonetici menuyu acmadan kimin neye yetkili oldugunu gorebilsin.
+ */
+function SubjectField({
+  selected,
+  options,
+  disabled,
+  onToggle,
+}: {
+  selected: readonly string[];
+  options: readonly string[];
+  disabled: boolean;
+  onToggle: (subject: string) => void;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full justify-between gap-2 font-normal"
+            disabled={disabled}
+          >
+            <span className="flex min-w-0 items-center gap-1.5">
+              <BookMarked className="h-3.5 w-3.5 shrink-0 opacity-70" />
+              <span className="truncate">
+                {selected.length === 0
+                  ? "Ders atanmadı"
+                  : `${selected.length} ders`}
+              </span>
+            </span>
+            <ChevronDown className="h-4 w-4 shrink-0 opacity-60" />
+          </Button>
+        </DropdownMenuTrigger>
+
+        <DropdownMenuContent align="start" className="max-h-72 w-56 overflow-y-auto">
+          <DropdownMenuLabel>Ders yetkisi</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          {options.map((subject) => (
+            <DropdownMenuCheckboxItem
+              key={subject}
+              checked={selected.includes(subject)}
+              onSelect={(event) => {
+                // Menu her tikta kapanmasin; birden fazla ders secilebilmeli.
+                event.preventDefault();
+                onToggle(subject);
+              }}
+            >
+              {subject}
+            </DropdownMenuCheckboxItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      {selected.length > 0 ? (
+        <div className="flex flex-wrap gap-1">
+          {selected.map((subject) => (
+            <Badge key={subject} variant="soft" className="font-normal">
+              {subject}
+            </Badge>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
 }

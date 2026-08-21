@@ -1169,3 +1169,77 @@ function average(values: readonly number[]): number | null {
   const total = values.reduce((sum, value) => sum + value, 0);
   return Math.round((total / values.length) * 10) / 10;
 }
+
+/* -------------------------------------------------------------------------- */
+/*  Ders yetkisi                                                              */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Sistemde gecen ders adlari.
+ *
+ * Ayri bir "dersler" tablosu YOK: dersler soru havuzundan turetilir, tipki
+ * havuzdaki kutucuklar gibi. Boylece icerik uzmani yeni bir ders adiyla soru
+ * uretince o ders kendiliginden secilebilir hale gelir; altinda sorusu
+ * olmayan ders ise hic gorunmez.
+ */
+export async function getSubjectOptions(): Promise<string[]> {
+  const questions = await getQuestions();
+
+  const seen = new Map<string, string>();
+  for (const question of questions) {
+    const subject = question.subject?.trim();
+    if (!subject) continue;
+    // Ayni dersin farkli yazimlarini tek kayda indir ("Matematik"/"matematik").
+    seen.set(subject.toLocaleLowerCase("tr"), subject);
+  }
+
+  const exams = await getExams();
+  for (const exam of exams) {
+    const subject = exam.subject?.trim();
+    if (!subject) continue;
+    seen.set(subject.toLocaleLowerCase("tr"), subject);
+  }
+
+  return [...seen.values()].sort((a, b) => a.localeCompare(b, "tr"));
+}
+
+/** Etkin kullanicinin yetkili oldugu dersler. */
+export async function getMySubjects(): Promise<string[]> {
+  if (!isSupabaseConfigured) return [];
+
+  const supabase = await createServerSupabaseClient();
+  const { data, error } = await supabase.rpc("my_subjects");
+
+  // RPC henuz kurulmamis ortamlarda (migration calistirilmadi) bos don:
+  // profil ekrani "ders atanmamis" der, hata gostermez.
+  if (error) return [];
+  return data ?? [];
+}
+
+/**
+ * Kullanici kimligi -> yetkili oldugu dersler.
+ *
+ * Sistem yoneticisinin kullanici tablosu icin. Tabloyu satir basina sorgu
+ * atmadan doldurabilmek adina tek okumada gelir.
+ */
+export async function getInstructorSubjectMap(): Promise<Record<string, string[]>> {
+  if (!isSupabaseConfigured) return {};
+
+  const supabase = await createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("instructor_subjects")
+    .select("user_id, subject");
+
+  if (error) return {};
+
+  const map: Record<string, string[]> = {};
+  for (const row of data ?? []) {
+    (map[row.user_id] ??= []).push(row.subject);
+  }
+
+  for (const subjects of Object.values(map)) {
+    subjects.sort((a, b) => a.localeCompare(b, "tr"));
+  }
+
+  return map;
+}

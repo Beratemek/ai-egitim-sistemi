@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/shared/page-header";
 import { ProfileForm } from "@/components/shared/profile-form";
 import { isSupabaseConfigured } from "@/lib/env";
+import { getMySubjects } from "@/lib/queries";
 import { getCurrentUser } from "@/lib/supabase-server";
 import type { UserProfile, UserRole } from "@/lib/types";
 
@@ -39,7 +40,7 @@ export default async function ProfilePage() {
     );
   }
 
-  const current = await getCurrentUser();
+  const [current, subjects] = await Promise.all([getCurrentUser(), getMySubjects()]);
   if (!current) redirect("/login");
 
   // Profil satirinda e-posta bos kalabilir (eski kayitlar); kimlik
@@ -69,7 +70,12 @@ export default async function ProfilePage() {
         description="Ad soyadınızı güncelleyin; e-posta, rol ve sınıf bilgisi yöneticiden gelir."
       />
       <div className="max-w-2xl">
-        <ProfileForm profile={profile} roles={roles} activeRole={activeRole} />
+        <ProfileForm
+          profile={profile}
+          roles={roles}
+          activeRole={activeRole}
+          subjects={subjects}
+        />
       </div>
     </>
   );

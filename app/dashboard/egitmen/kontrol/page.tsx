@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, ClipboardCheck, Inbox, Users } from "lucide-react";
+import { ArrowRight, BookMarked, ClipboardCheck, Inbox, Users } from "lucide-react";
 
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -94,6 +94,12 @@ export default async function KontrolPage() {
                     <CardTitle className="mt-2 text-base leading-snug">
                       {review.exam.title}
                     </CardTitle>
+                    {review.exam.subject ? (
+                      <span className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <BookMarked className="h-3 w-3" />
+                        {review.exam.subject}
+                      </span>
+                    ) : null}
                     {review.exam.description ? (
                       <CardDescription className="line-clamp-2">
                         {review.exam.description}

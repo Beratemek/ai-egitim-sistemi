@@ -22,6 +22,12 @@ function revalidateExamPaths(examId?: string): void {
 export interface CreateExamInput {
   title: string;
   description?: string;
+  /**
+   * Sinavin dersi. Ders yetkisinin dayanagi budur: yalnizca bu derse
+   * yetkili egitmenler sinavi ve cevaplarini gorur. Bos birakilirsa sinav
+   * tum egitmenlere acik kalir.
+   */
+  subject?: string;
   /** ISO tarih-saat; bos birakilabilir. */
   startsAt?: string;
   endsAt?: string;
@@ -53,6 +59,7 @@ export async function createExam(
     .insert({
       title,
       description: input.description?.trim() ?? "",
+      subject: input.subject?.trim() || null,
       instructor_id: current.user.id,
       starts_at: input.startsAt ?? null,
       ends_at: input.endsAt ?? null,

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Users } from "lucide-react";
+import { ArrowLeft, BookMarked, Users } from "lucide-react";
 
 import { ClassroomExamReview } from "@/components/shared/classroom-exam-review";
 import { PageHeader } from "@/components/shared/page-header";
@@ -50,10 +50,18 @@ export default async function KontrolDetayPage({ params }: PageProps) {
           "Sınıfın cevaplarını bütün olarak değerlendirin."
         }
         actions={
-          <Badge variant="soft" className="gap-1.5 text-sm">
-            <Users className="h-3.5 w-3.5" />
-            {classroom}
-          </Badge>
+          <div className="flex flex-wrap items-center gap-2">
+            {detail.exam.subject ? (
+              <Badge variant="soft" className="gap-1.5 text-sm">
+                <BookMarked className="h-3.5 w-3.5" />
+                {detail.exam.subject}
+              </Badge>
+            ) : null}
+            <Badge variant="soft" className="gap-1.5 text-sm">
+              <Users className="h-3.5 w-3.5" />
+              {classroom}
+            </Badge>
+          </div>
         }
       />
 

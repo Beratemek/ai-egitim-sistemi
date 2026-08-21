@@ -175,3 +175,49 @@ export async function setUserClassroom(
   revalidateUserPaths();
   return { ok: true, data: { classroom: (data as string | null) ?? null } };
 }
+
+/**
+ * Bir egitmenin ders yetkilerini belirler.
+ *
+ * Yetkiyi SISTEM YONETICISI verir: egitmen kendi ders listesini
+ * duzenleyebilseydi biyoloji dersini kendine ekleyip Derslik-3'un biyoloji
+ * sinavini acabilirdi. Kural veritabaninda da var - `set_instructor_subjects`
+ * admin degilse 42501 ile reddeder; buradaki kontrol yalnizca kullaniciya
+ * anlamli bir mesaj gostermek icin.
+ */
+export async function setInstructorSubjects(
+  userId: string,
+  subjects: readonly string[],
+): Promise<ActionResult<{ subjects: string[] }>> {
+  if (!isSupabaseConfigured) return demoGuard();
+  if (!userId) return { ok: false, error: "Kullanıcı seçilmedi." };
+
+  const current = await getCurrentUser();
+  if (!current) return { ok: false, error: "Oturum açmanız gerekiyor." };
+
+  const cleaned = [
+    ...new Set(subjects.map((subject) => subject.trim()).filter(Boolean)),
+  ];
+
+  const supabase = await createServerSupabaseClient();
+  const { data, error } = await supabase.rpc("set_instructor_subjects", {
+    target_user: userId,
+    subjects: cleaned,
+  });
+
+  if (error) {
+    if (error.code === "42501") {
+      return {
+        ok: false,
+        error: "Ders yetkisi vermek için sistem yöneticisi olmanız gerekiyor.",
+      };
+    }
+    return { ok: false, error: error.message };
+  }
+
+  revalidateUserPaths();
+  revalidatePath("/dashboard/egitmen", "layout");
+  revalidatePath("/dashboard/profil");
+
+  return { ok: true, data: { subjects: (data as string[] | null) ?? cleaned } };
+}

@@ -12,7 +12,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { getClassrooms, getRoleRequests, getUsers } from "@/lib/queries";
+import {
+  getClassrooms,
+  getInstructorSubjectMap,
+  getRoleRequests,
+  getSubjectOptions,
+  getUsers,
+} from "@/lib/queries";
 import { getCurrentUser } from "@/lib/supabase-server";
 
 export const metadata: Metadata = { title: "Sistem Yönetimi" };
@@ -25,11 +31,20 @@ export const metadata: Metadata = { title: "Sistem Yönetimi" };
  * rol onayları bu ekrana taşındı.
  */
 export default async function SistemPage() {
-  const [users, roleRequests, classrooms, current] = await Promise.all([
+  const [
+    users,
+    roleRequests,
+    classrooms,
+    current,
+    subjectOptions,
+    subjectsByUser,
+  ] = await Promise.all([
     getUsers(),
     getRoleRequests(),
     getClassrooms(),
     getCurrentUser(),
+    getSubjectOptions(),
+    getInstructorSubjectMap(),
   ]);
 
   const students = users.filter((user) => user.role === "ogrenci");
@@ -100,7 +115,12 @@ export default async function SistemPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <UserAdminTable users={users} currentUserId={current?.user.id ?? ""} />
+          <UserAdminTable
+            users={users}
+            currentUserId={current?.user.id ?? ""}
+            subjectOptions={subjectOptions}
+            subjectsByUser={subjectsByUser}
+          />
         </CardContent>
       </Card>
     </>

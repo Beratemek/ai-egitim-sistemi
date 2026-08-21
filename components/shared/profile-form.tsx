@@ -2,11 +2,19 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Check, GraduationCap, Loader2, Mail, ShieldCheck } from "lucide-react";
+import {
+  BookMarked,
+  Check,
+  GraduationCap,
+  Loader2,
+  Mail,
+  ShieldCheck,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { updateProfile } from "@/app/actions/profile";
 import { RoleBadge } from "@/components/shared/status-badge";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -43,9 +51,16 @@ export interface ProfileFormProps {
    * bulundugu baglami gostermek dogru olan.
    */
   activeRole: UserRole;
+  /** Egitmenin yetkili oldugu dersler; sistem yoneticisi atar. */
+  subjects?: readonly string[];
 }
 
-export function ProfileForm({ profile, roles, activeRole }: ProfileFormProps) {
+export function ProfileForm({
+  profile,
+  roles,
+  activeRole,
+  subjects = [],
+}: ProfileFormProps) {
   const router = useRouter();
   const [fullName, setFullName] = React.useState(profile.full_name ?? "");
   const [pending, setPending] = React.useState(false);
@@ -53,6 +68,7 @@ export function ProfileForm({ profile, roles, activeRole }: ProfileFormProps) {
   const dirty = fullName.trim() !== (profile.full_name ?? "").trim();
   // Sinif yalnizca OGRENCI panelinde anlamli - egitmen profilinde degil.
   const isStudentPanel = activeRole === "ogrenci";
+  const isInstructorPanel = activeRole === "egitmen";
   const activeDefinition = ROLE_DEFINITIONS[activeRole];
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -144,6 +160,31 @@ export function ProfileForm({ profile, roles, activeRole }: ProfileFormProps) {
               </div>
             ) : null}
           </div>
+
+          {isInstructorPanel ? (
+            <div className="space-y-2">
+              <Label>Ders yetkileriniz</Label>
+              {subjects.length === 0 ? (
+                <p className="rounded-lg border border-dashed px-3 py-2.5 text-sm text-muted-foreground">
+                  Henüz ders atanmamış. Yalnızca kendi oluşturduğunuz sınavları
+                  görebilirsiniz.
+                </p>
+              ) : (
+                <div className="flex flex-wrap gap-1.5">
+                  {subjects.map((subject) => (
+                    <Badge key={subject} variant="soft" className="gap-1.5">
+                      <BookMarked className="h-3 w-3" />
+                      {subject}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Yalnızca bu derslerdeki sınavları ve öğrenci cevaplarını
+                görürsünüz. Ders yetkisini sistem yöneticisi verir.
+              </p>
+            </div>
+          ) : null}
 
           <div className="space-y-2">
             <Label>Rolleriniz</Label>
