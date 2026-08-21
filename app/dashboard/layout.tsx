@@ -46,6 +46,11 @@ export default async function DashboardLayout({
     <DashboardShell
       role={activeRole}
       navRole={current.profile.role}
+      grantedRoles={
+        current.profile.roles && current.profile.roles.length > 0
+          ? current.profile.roles
+          : [current.profile.role]
+      }
       fullName={current.profile.full_name || current.user.email || "Kullanici"}
       devSwitch={
         isDevRoleSwitchEnabled && current.actualRole === "admin"
