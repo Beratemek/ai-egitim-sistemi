@@ -38,8 +38,7 @@ export default async function DashboardLayout({
   const isAdmin = current.profile.role === "admin";
   const requestHeaders = await headers();
   const activeRole: UserRole = isAdmin
-    ? (roleForPath(requestHeaders.get("x-pathname") ?? "/dashboard") ??
-      "egitim_yoneticisi")
+    ? (roleForPath(requestHeaders.get("x-pathname") ?? "/dashboard") ?? "admin")
     : current.profile.role;
 
   return (
