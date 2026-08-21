@@ -91,7 +91,7 @@ export default async function OgrenciSonuclariPage() {
                     Aciklanma: {formatDateTime(attempt.completed_at)}
                   </span>
                   <Link
-                    href={`/dashboard/öğrenci/sınav/${exam.id}`}
+                    href={`/dashboard/ogrenci/sinav/${exam.id}`}
                     className="flex items-center gap-1 font-medium text-primary"
                   >
                     Cevap ve geri bildirimler

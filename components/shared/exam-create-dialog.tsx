@@ -77,7 +77,7 @@ export function ExamCreateDialog({ canPersist = true }: ExamCreateDialogProps) {
     setDescription("");
     setStartsAt("");
     setEndsAt("");
-    router.push(`/dashboard/eğitmen/sınavlar/${result.data.id}`);
+    router.push(`/dashboard/egitmen/sinavlar/${result.data.id}`);
   }
 
   return (

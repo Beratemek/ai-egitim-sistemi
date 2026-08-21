@@ -56,7 +56,7 @@ export default async function SinavlarPage() {
           {exams.map((exam) => (
             <Link
               key={exam.id}
-              href={`/dashboard/eğitmen/sınavlar/${exam.id}`}
+              href={`/dashboard/egitmen/sinavlar/${exam.id}`}
               className="group"
             >
               <Card className="h-full transition-all group-hover:border-primary/50 group-hover:shadow-md">
