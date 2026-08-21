@@ -7,6 +7,7 @@
  */
 
 import { isSupabaseConfigured } from "@/lib/env";
+import { subjectKey } from "@/lib/subjects";
 import {
   MOCK_EXAMS,
   MOCK_OUTCOMES,
@@ -920,6 +921,16 @@ export interface ClassroomExamReview {
  * Kutucuklar ATAMALARDAN turetilir: bir sinav bir sinifa atanmamissa o
  * sinif icin kutu hic olusmaz. Boylece "ici bos derslik" gorunmez.
  */
+/**
+ * Sinifi atanmamis ogrencilerin toplandigi kutu.
+ *
+ * Bu kutu olmasaydi sinifsiz ogrencinin cevaplari kontrol ekranindan HIC
+ * erisilemezdi: kutular sinif adindan turedigi icin null sinif satiri
+ * sessizce dusurulurdu. Soru havuzundaki "Ders atanmamis" kutusuyla ayni
+ * mantik - veri gorunmez olmaktansa adlandirilmis bir kutuda dursun.
+ */
+export const UNASSIGNED_CLASSROOM = "Sınıf atanmamış";
+
 /** Bilesik Map anahtarlarinda kullanilan ayirac; ders/sinif adlarinda gecmez. */
 const KEY_SEPARATOR = "\u0000";
 
@@ -968,10 +979,12 @@ export async function getClassroomExamReviews(): Promise<ClassroomExamReview[]> 
   >();
 
   function bucketFor(examId: string, studentId: string) {
-    const classroom = classroomOf.get(studentId);
     const exam = examById.get(examId);
-    // Sinifi atanmamis ogrenci veya gorulemeyen sinav kutu olusturmaz.
-    if (!classroom || !exam) return null;
+    // Gorulemeyen sinav kutu olusturmaz; sinifi olmayan ogrenci ise
+    // "Sinif atanmamis" kutusuna duser - bkz. UNASSIGNED_CLASSROOM.
+    if (!exam) return null;
+
+    const classroom = classroomOf.get(studentId) || UNASSIGNED_CLASSROOM;
 
     const key = examId + KEY_SEPARATOR + classroom;
     let bucket = buckets.get(key);
@@ -1081,7 +1094,11 @@ export async function getClassroomExamDetail(
   const [detail, users] = await Promise.all([getExamDetail(examId), getUsers()]);
   if (!detail) return null;
 
-  const inClassroom = users.filter((user) => user.classroom === classroom);
+  const inClassroom =
+    classroom === UNASSIGNED_CLASSROOM
+      ? users.filter((user) => !user.classroom)
+      : users.filter((user) => user.classroom === classroom);
+
   if (inClassroom.length === 0) return null;
 
   const studentIds = inClassroom.map((user) => user.id);
@@ -1197,15 +1214,15 @@ export async function getSubjectOptions(): Promise<string[]> {
   for (const question of questions) {
     const subject = question.subject?.trim();
     if (!subject) continue;
-    // Ayni dersin farkli yazimlarini tek kayda indir ("Matematik"/"matematik").
-    seen.set(subject.toLocaleLowerCase("tr"), subject);
+    // Tekillestirme kurali VERITABANIYLA ayni olmali; bkz. lib/subjects.ts.
+    seen.set(subjectKey(subject), subject);
   }
 
   const exams = await getExams();
   for (const exam of exams) {
     const subject = exam.subject?.trim();
     if (!subject) continue;
-    seen.set(subject.toLocaleLowerCase("tr"), subject);
+    seen.set(subjectKey(subject), subject);
   }
 
   return [...seen.values()].sort((a, b) => a.localeCompare(b, "tr"));

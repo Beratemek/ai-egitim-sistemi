@@ -12,7 +12,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { getClassroomExamReviews } from "@/lib/queries";
+import { getClassroomExamReviews, UNASSIGNED_CLASSROOM } from "@/lib/queries";
 
 export const metadata: Metadata = { title: "Sınav Kontrolü" };
 
@@ -79,7 +79,14 @@ export default async function KontrolPage() {
                 <Card className="h-full transition-colors group-hover:border-primary/50 group-hover:bg-accent/30">
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between gap-2">
-                      <Badge variant="soft" className="gap-1.5">
+                      <Badge
+                        variant={
+                          review.classroom === UNASSIGNED_CLASSROOM
+                            ? "warning"
+                            : "soft"
+                        }
+                        className="gap-1.5"
+                      >
                         <Users className="h-3 w-3" />
                         {review.classroom}
                       </Badge>

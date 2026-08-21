@@ -77,9 +77,27 @@ export function ClassroomExamReview({
       const result = await approveSubmissions({ submissionIds: ids });
       if (!result.ok) throw new Error(result.error);
 
-      toast.success(`${result.data.approved} cevap onaylandı`, {
-        description: label,
-      });
+      const { approved, skipped, unfinished } = result.data;
+
+      // Kismi sonuclari sessizce yutma: atlanan ya da sonuclanamayan varsa
+      // egitmen bunu bilmeli, yoksa "hepsi bitti" sanip ekrandan cikar.
+      const notes: string[] = [label];
+      if (skipped > 0) {
+        notes.push(`${skipped} cevabın AI ön puanı yok, elle puanlayın.`);
+      }
+      if (unfinished > 0) {
+        notes.push(`${unfinished} öğrencinin sonucu hesaplanamadı.`);
+      }
+
+      const partial = skipped > 0 || unfinished > 0;
+      const message = `${approved} cevap onaylandı`;
+
+      if (partial) {
+        toast.warning(message, { description: notes.join(" ") });
+      } else {
+        toast.success(message, { description: label });
+      }
+
       router.refresh();
     } catch (caught) {
       toast.error("Onaylanamadı", {

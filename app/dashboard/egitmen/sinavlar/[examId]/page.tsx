@@ -5,6 +5,7 @@ import { ArrowLeft } from "lucide-react";
 
 import { ExamBuilder } from "@/components/shared/exam-builder";
 import { ExamClassroomAssign } from "@/components/shared/exam-classroom-assign";
+import { ExamSubjectField } from "@/components/shared/exam-subject-field";
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
 import { isSupabaseConfigured } from "@/lib/env";
@@ -12,6 +13,7 @@ import {
   getExamAssignedStudentIds,
   getExamDetail,
   getQuestions,
+  getSubjectOptions,
   getSubmissions,
   getUsers,
 } from "@/lib/queries";
@@ -29,13 +31,15 @@ export default async function SinavDetayPage({
 }) {
   const { examId } = await params;
 
-  const [detail, pool, submissions, users, assignedIds] = await Promise.all([
-    getExamDetail(examId),
-    getQuestions({ status: "onayli" }),
-    getSubmissions({ examId }),
-    getUsers(),
-    getExamAssignedStudentIds(examId),
-  ]);
+  const [detail, pool, submissions, users, assignedIds, subjectOptions] =
+    await Promise.all([
+      getExamDetail(examId),
+      getQuestions({ status: "onayli" }),
+      getSubmissions({ examId }),
+      getUsers(),
+      getExamAssignedStudentIds(examId),
+      getSubjectOptions(),
+    ]);
 
   if (!detail) notFound();
 
@@ -83,6 +87,13 @@ export default async function SinavDetayPage({
             <Badge variant="warning">Demo — değişiklikler kaydedilmez</Badge>
           )
         }
+      />
+
+      <ExamSubjectField
+        examId={examId}
+        subject={detail.exam.subject}
+        subjectOptions={subjectOptions}
+        canPersist={isSupabaseConfigured}
       />
 
       <ExamClassroomAssign

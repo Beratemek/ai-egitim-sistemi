@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 
 import { demoGuard, type ActionResult } from "@/app/actions/shared";
 import { isSupabaseConfigured } from "@/lib/env";
+import { getSubjectOptions } from "@/lib/queries";
+import { canonicalizeSubject } from "@/lib/subjects";
 import { createServerSupabaseClient, getCurrentUser } from "@/lib/supabase-server";
 
 /** Sinav degisikliklerinden etkilenen sayfalari tazeler. */
@@ -52,6 +54,15 @@ export async function createExam(
   const current = await getCurrentUser();
   if (!current) return { ok: false, error: "Oturum acmaniz gerekiyor." };
 
+  /**
+   * Elle yazilan ders adi bilinen bir dersin farkli yazimiysa KANONIK
+   * yazima oturtulur. Aksi halde "biyoloji" yazan egitmenin sinavi,
+   * yoneticinin "Biyoloji" olarak verdigi yetkiyle eslesmeyebilirdi.
+   */
+  const subject = input.subject
+    ? canonicalizeSubject(input.subject, await getSubjectOptions())
+    : "";
+
   const supabase = await createServerSupabaseClient();
 
   const { data, error } = await supabase
@@ -59,7 +70,7 @@ export async function createExam(
     .insert({
       title,
       description: input.description?.trim() ?? "",
-      subject: input.subject?.trim() || null,
+      subject: subject || null,
       instructor_id: current.user.id,
       starts_at: input.startsAt ?? null,
       ends_at: input.endsAt ?? null,
@@ -258,4 +269,46 @@ export async function unassignExamFromClassroom(
 
   revalidateExamPaths(examId);
   return { ok: true, data: { removed: Number(data ?? 0) } };
+}
+
+/**
+ * Sinavin dersini degistirir.
+ *
+ * Ders yetkisinin dayanagi budur ve olusturma aninda atlanmis olabilir.
+ * Duzeltilemeseydi dersi bos birakilan bir sinav KALICI olarak tum
+ * egitmenlere acik kalirdi - yanlislikla acilmis bir kapi kapatilamazdi.
+ */
+export async function setExamSubject(
+  examId: string,
+  subject: string,
+): Promise<ActionResult<{ subject: string | null }>> {
+  if (!isSupabaseConfigured) return demoGuard();
+  if (!examId) return { ok: false, error: "Sinav secilmedi." };
+
+  const canonical = subject.trim()
+    ? canonicalizeSubject(subject, await getSubjectOptions())
+    : "";
+
+  const supabase = await createServerSupabaseClient();
+
+  // `.select()` sart: RLS eslesmezse PostgREST hata dondurmez, sessizce
+  // 0 satir gunceller ve egitmen "kaydedildi" sanir.
+  const { data: updated, error } = await supabase
+    .from("exams")
+    .update({ subject: canonical || null })
+    .eq("id", examId)
+    .select("id, subject");
+
+  if (error) return { ok: false, error: error.message };
+
+  if (!updated || updated.length === 0) {
+    return {
+      ok: false,
+      error:
+        "Ders kaydedilemedi: bu sinav uzerinde yetkiniz yok ya da sinav artik mevcut degil.",
+    };
+  }
+
+  revalidateExamPaths(examId);
+  return { ok: true, data: { subject: updated[0]?.subject ?? null } };
 }

@@ -77,6 +77,41 @@ export function UserAdminTable({
   const [pendingId, setPendingId] = React.useState<string | null>(null);
   const [openId, setOpenId] = React.useState<string | null>(null);
 
+  /**
+   * Sunucudan gelen veriyi bekleyen yerel degisiklikler.
+   *
+   * Bir secim kaydedildikten sonra `router.refresh()` tamamlanana kadar
+   * prop'lar ESKI degeri tasir. Bir sonraki tik o eski degerden hesaplasaydi
+   * bir onceki secimi geri alirdi (iki dersi pes pese isaretlemek imkansiz
+   * olurdu). Bu yuzden okuma once taslaga bakar.
+   *
+   * Taze prop geldiginde taslak sifirlanir: `users` her sunucu render'inda
+   * yeni bir dizi oldugu icin effect o an tetiklenir.
+   */
+  const [roleDraft, setRoleDraft] = React.useState<Record<string, UserRole[]>>({});
+  const [subjectDraft, setSubjectDraft] = React.useState<Record<string, string[]>>(
+    {},
+  );
+
+  React.useEffect(() => {
+    setRoleDraft({});
+  }, [users]);
+
+  React.useEffect(() => {
+    setSubjectDraft({});
+  }, [subjectsByUser]);
+
+  const rolesOf = React.useCallback(
+    (user: UserProfile): UserRole[] => roleDraft[user.id] ?? grantedRoles(user),
+    [roleDraft],
+  );
+
+  const subjectsOf = React.useCallback(
+    (user: UserProfile): string[] =>
+      subjectDraft[user.id] ?? subjectsByUser[user.id] ?? [],
+    [subjectDraft, subjectsByUser],
+  );
+
   const visible = React.useMemo(() => {
     const needle = search.trim().toLocaleLowerCase("tr");
     if (!needle) return users;
@@ -90,7 +125,7 @@ export function UserAdminTable({
 
   /** Bir rolu kumeye ekler ya da kumeden cikarir. */
   async function toggleRole(user: UserProfile, role: UserRole) {
-    const current = grantedRoles(user);
+    const current = rolesOf(user);
     const next = current.includes(role)
       ? current.filter((item) => item !== role)
       : [...current, role];
@@ -103,9 +138,13 @@ export function UserAdminTable({
     }
 
     setPendingId(user.id);
+    setRoleDraft((draft) => ({ ...draft, [user.id]: next }));
+
     try {
       const result = await setUserRoles(user.id, next);
       if (!result.ok) throw new Error(result.error);
+
+      setRoleDraft((draft) => ({ ...draft, [user.id]: result.data.roles }));
 
       toast.success("Roller güncellendi", {
         description: `${user.full_name || user.email}: ${result.data.roles
@@ -114,6 +153,12 @@ export function UserAdminTable({
       });
       router.refresh();
     } catch (caught) {
+      // Basarisiz yazma taslakta kalmamali; ekran sunucu gercegine donsun.
+      setRoleDraft((draft) => {
+        const next = { ...draft };
+        delete next[user.id];
+        return next;
+      });
       toast.error("Roller değiştirilemedi", {
         description:
           caught instanceof Error ? caught.message : "Lütfen tekrar deneyin.",
@@ -124,15 +169,19 @@ export function UserAdminTable({
   }
 
   async function toggleSubject(user: UserProfile, subject: string) {
-    const current = subjectsByUser[user.id] ?? [];
+    const current = subjectsOf(user);
     const next = current.includes(subject)
       ? current.filter((item) => item !== subject)
       : [...current, subject];
 
     setPendingId(user.id);
+    setSubjectDraft((draft) => ({ ...draft, [user.id]: next }));
+
     try {
       const result = await setInstructorSubjects(user.id, next);
       if (!result.ok) throw new Error(result.error);
+
+      setSubjectDraft((draft) => ({ ...draft, [user.id]: result.data.subjects }));
 
       toast.success(
         result.data.subjects.length === 0
@@ -142,6 +191,11 @@ export function UserAdminTable({
       );
       router.refresh();
     } catch (caught) {
+      setSubjectDraft((draft) => {
+        const next = { ...draft };
+        delete next[user.id];
+        return next;
+      });
       toast.error("Ders yetkisi güncellenemedi", {
         description:
           caught instanceof Error ? caught.message : "Lütfen tekrar deneyin.",
@@ -207,8 +261,8 @@ export function UserAdminTable({
               const busy = pendingId === user.id;
               const open = openId === user.id;
 
-              const roles = grantedRoles(user);
-              const subjects = subjectsByUser[user.id] ?? [];
+              const roles = rolesOf(user);
+              const subjects = subjectsOf(user);
               const isStudent = roles.includes("ogrenci");
               const isInstructor = roles.includes("egitmen");
 
