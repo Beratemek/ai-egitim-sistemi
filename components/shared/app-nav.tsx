@@ -39,7 +39,7 @@ export const ROLE_NAV: Record<UserRole, readonly NavItem[]> = {
       href: "/dashboard/egitmen",
       label: "Genel Bakis",
       icon: LayoutDashboard,
-      description: "Onay bekleyen isler",
+      description: "Sinavlar ve puan onaylari",
     },
     {
       href: "/dashboard/egitmen/soru-havuzu",
