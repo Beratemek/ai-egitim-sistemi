@@ -60,6 +60,13 @@ export const SUBMISSION_STATUSES = [
 ] as const;
 export type SubmissionStatus = (typeof SUBMISSION_STATUSES)[number];
 
+export const EXAM_ATTEMPT_STATUSES = [
+  "devam_ediyor",
+  "degerlendiriliyor",
+  "sonuclandi",
+] as const;
+export type ExamAttemptStatus = (typeof EXAM_ATTEMPT_STATUSES)[number];
+
 /* -------------------------------------------------------------------------- */
 /*  Tablo modelleri                                                           */
 /* -------------------------------------------------------------------------- */
@@ -138,6 +145,30 @@ export type ExamQuestion = {
   points: number;
 };
 
+export type ExamAssignment = {
+  id: string;
+  exam_id: string;
+  student_id: string;
+  assigned_by: string | null;
+  assigned_at: string;
+  due_at: string | null;
+};
+
+export type ExamAttempt = {
+  id: string;
+  exam_id: string;
+  student_id: string;
+  status: ExamAttemptStatus;
+  started_at: string;
+  submitted_at: string | null;
+  completed_at: string | null;
+  earned_points: number | null;
+  total_points: number | null;
+  final_score: number | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type Submission = {
   id: string;
   exam_id: string;
@@ -146,6 +177,8 @@ export type Submission = {
   answer_text: string;
   ai_score: number | null;
   ai_feedback: string | null;
+  /** AI on degerlendirmesinin rubrik maddesi bazindaki kirilimi. */
+  ai_criteria_json: GradingResult["criteria"];
   instructor_approved_score: number | null;
   instructor_note: string | null;
   status: SubmissionStatus;
@@ -314,6 +347,26 @@ export interface Database {
         ExamQuestion,
         Insertable<ExamQuestion, "position" | "points">
       >;
+      exam_assignments: TableDefinition<
+        ExamAssignment,
+        Insertable<ExamAssignment, "id" | "assigned_at" | "assigned_by" | "due_at">
+      >;
+      exam_attempts: TableDefinition<
+        ExamAttempt,
+        Insertable<
+          ExamAttempt,
+          | "id"
+          | "status"
+          | "started_at"
+          | "submitted_at"
+          | "completed_at"
+          | "earned_points"
+          | "total_points"
+          | "final_score"
+          | "created_at"
+          | "updated_at"
+        >
+      >;
       submissions: TableDefinition<
         Submission,
         Insertable<
@@ -325,6 +378,7 @@ export interface Database {
           | "answer_text"
           | "ai_score"
           | "ai_feedback"
+          | "ai_criteria_json"
           | "instructor_approved_score"
           | "instructor_note"
           | "status"
@@ -370,6 +424,36 @@ export interface Database {
         Args: { target_user: string; approve: boolean };
         Returns: RoleStatus;
       };
+      start_exam_attempt: {
+        Args: { target_exam: string };
+        Returns: string;
+      };
+      submit_exam_attempt: {
+        Args: { target_exam: string };
+        Returns: string;
+      };
+      recalculate_exam_attempt_result: {
+        Args: { target_exam: string; target_student: string };
+        Returns: boolean;
+      };
+      get_student_exam_questions: {
+        Args: { target_exam: string };
+        Returns: Array<{
+          id: string;
+          subject: string;
+          topic: string;
+          text: string;
+          type: QuestionType;
+          options_json: QuestionOption[] | null;
+          outcome_id: string | null;
+          position: number;
+          points: number;
+        }>;
+      };
+      get_my_submissions: {
+        Args: { target_exam?: string | null };
+        Returns: Submission[];
+      };
     };
     Enums: {
       deneyap_category: DeneyapCategory;
@@ -378,6 +462,7 @@ export interface Database {
       question_type: QuestionType;
       question_status: QuestionStatus;
       submission_status: SubmissionStatus;
+      exam_attempt_status: ExamAttemptStatus;
       preference_verdict: PreferenceVerdict;
     };
   };

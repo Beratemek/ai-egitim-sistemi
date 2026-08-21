@@ -17,9 +17,15 @@ import {
   MOCK_USERS,
   type ScoreTrendPoint,
 } from "@/lib/mock-data";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
+import {
+  createServerSupabaseClient,
+  getCurrentUser,
+  type TypedServerClient,
+} from "@/lib/supabase-server";
 import type {
   Exam,
+  ExamAssignment,
+  ExamAttempt,
   ExamStatistics,
   LearningOutcome,
   Question,
@@ -30,6 +36,41 @@ import type {
   Submission,
   UserProfile,
 } from "@/lib/types";
+
+/**
+ * Ogrencinin cevaplarini sonuc gorunurluk kurallarindan geciren RPC'den okur.
+ *
+ * Guvenlik migration'i ortak veritabanina uygulanana kadar eski sorguya
+ * yalnizca "fonksiyon bulunamadi" hatasinda geri doner. Migration sonrasi
+ * `submissions` tablosunun ogrenci SELECT yetkisi kapatilacagi icin tum okumalar
+ * otomatik olarak guvenli RPC uzerinden devam eder.
+ */
+async function getOwnSubmissions(
+  supabase: TypedServerClient,
+  examId: string | null = null,
+): Promise<Submission[]> {
+  const rpcResult = await supabase.rpc("get_my_submissions", {
+    target_exam: examId,
+  });
+
+  if (!rpcResult.error) return rpcResult.data ?? [];
+
+  const rpcIsUnavailable =
+    ["PGRST202", "42883"].includes(rpcResult.error.code ?? "") ||
+    /get_my_submissions.*(not find|does not exist|schema cache)/i.test(
+      rpcResult.error.message ?? "",
+    );
+  if (!rpcIsUnavailable) return [];
+
+  let legacyQuery = supabase
+    .from("submissions")
+    .select("*")
+    .order("created_at", { ascending: false });
+  if (examId) legacyQuery = legacyQuery.eq("exam_id", examId);
+
+  const legacyResult = await legacyQuery;
+  return legacyResult.data ?? [];
+}
 
 /* -------------------------------------------------------------------------- */
 /*  Kazanimlar                                                                */
@@ -210,6 +251,12 @@ export async function getExamSummaries(): Promise<ExamSummary[]> {
 export interface StudentExamCard extends Exam {
   questionCount: number;
   answeredCount: number;
+  /** AI degerlendirmesine gonderilmis (veya egitmen onayli) cevap sayisi. */
+  evaluatedCount: number;
+  /** Egitmen tarafindan nihai puani onaylanan cevap sayisi. */
+  approvedCount: number;
+  assignment: ExamAssignment | null;
+  attempt: ExamAttempt | null;
 }
 
 /**
@@ -226,17 +273,40 @@ export async function getStudentExams(): Promise<StudentExamCard[]> {
       ...exam,
       questionCount: approved,
       answeredCount: MOCK_SUBMISSIONS.filter((s) => s.exam_id === exam.id).length,
+      evaluatedCount: MOCK_SUBMISSIONS.filter(
+        (s) => s.exam_id === exam.id && s.status !== "gonderildi",
+      ).length,
+      approvedCount: MOCK_SUBMISSIONS.filter(
+        (s) => s.exam_id === exam.id && s.status === "egitmen_onayli",
+      ).length,
+      assignment: null,
+      attempt: null,
     }));
   }
 
   if (exams.length === 0) return [];
 
   const supabase = await createServerSupabaseClient();
-  const examIds = exams.map((exam) => exam.id);
+  const assignmentResult = await supabase
+    .from("exam_assignments")
+    .select("*");
+  // Migration henuz uzak projeye uygulanmadiysa eski "tum yayinlananlar"
+  // davranisina geri don; uygulandiginda yalnizca atanmis sinavlar gorunur.
+  const assignments = assignmentResult.error ? null : (assignmentResult.data ?? []);
+  const assignmentByExam = new Map(
+    (assignments ?? []).map((assignment) => [assignment.exam_id, assignment]),
+  );
+  const visibleExams = assignments
+    ? exams.filter((exam) => assignmentByExam.has(exam.id))
+    : exams;
 
-  const [links, submissions] = await Promise.all([
+  if (visibleExams.length === 0) return [];
+  const examIds = visibleExams.map((exam) => exam.id);
+
+  const [links, submissions, attemptsResult] = await Promise.all([
     supabase.from("exam_questions").select("exam_id").in("exam_id", examIds),
-    supabase.from("submissions").select("exam_id").in("exam_id", examIds),
+    getOwnSubmissions(supabase),
+    supabase.from("exam_attempts").select("*").in("exam_id", examIds),
   ]);
 
   const countBy = (rows: { exam_id: string }[] | null): Map<string, number> => {
@@ -248,12 +318,26 @@ export async function getStudentExams(): Promise<StudentExamCard[]> {
   };
 
   const questionCounts = countBy(links.data);
-  const answered = countBy(submissions.data);
+  const answered = countBy(submissions);
+  const evaluated = countBy(
+    submissions.filter((row) => row.status !== "gonderildi"),
+  );
+  const approved = countBy(
+    submissions.filter((row) => row.status === "egitmen_onayli"),
+  );
+  const attemptByExam = new Map(
+    (attemptsResult.data ?? []).map((attempt) => [attempt.exam_id, attempt]),
+  );
 
-  return exams.map((exam) => ({
+  return visibleExams.map((exam) => ({
     ...exam,
+    ends_at: assignmentByExam.get(exam.id)?.due_at ?? exam.ends_at,
     questionCount: questionCounts.get(exam.id) ?? 0,
     answeredCount: answered.get(exam.id) ?? 0,
+    evaluatedCount: evaluated.get(exam.id) ?? 0,
+    approvedCount: approved.get(exam.id) ?? 0,
+    assignment: assignmentByExam.get(exam.id) ?? null,
+    attempt: attemptByExam.get(exam.id) ?? null,
   }));
 }
 
@@ -282,8 +366,12 @@ export interface StudentQuestion {
 export interface StudentExamDetail {
   exam: Exam;
   questions: StudentQuestion[];
+  questionCount: number;
+  totalPoints: number;
   /** Ogrencinin bu sinavda daha once verdigi cevaplar. */
   submissions: Submission[];
+  assignment: ExamAssignment | null;
+  attempt: ExamAttempt | null;
 }
 
 export async function getStudentExamDetail(
@@ -307,10 +395,25 @@ export async function getStudentExamDetail(
         }),
       ),
       submissions: MOCK_SUBMISSIONS.filter((s) => s.exam_id === examId),
+      questionCount: MOCK_QUESTIONS.filter((q) => q.status === "onayli").length,
+      totalPoints: MOCK_QUESTIONS.filter((q) => q.status === "onayli").length * 10,
+      assignment: null,
+      attempt: null,
     };
   }
 
   const supabase = await createServerSupabaseClient();
+
+  const [assignmentResult, attemptResult] = await Promise.all([
+    supabase
+      .from("exam_assignments")
+      .select("*")
+      .eq("exam_id", examId)
+      .maybeSingle(),
+    supabase.from("exam_attempts").select("*").eq("exam_id", examId).maybeSingle(),
+  ]);
+
+  if (!assignmentResult.error && !assignmentResult.data) return null;
 
   const { data: exam } = await supabase
     .from("exams")
@@ -319,27 +422,48 @@ export async function getStudentExamDetail(
     .maybeSingle();
 
   if (!exam) return null;
+  const effectiveExam = {
+    ...exam,
+    ends_at: assignmentResult.data?.due_at ?? exam.ends_at,
+  };
 
-  const [{ data: links }, { data: submissions }] = await Promise.all([
+  const [{ data: links }, submissions] = await Promise.all([
     supabase
       .from("exam_questions")
       .select("question_id, position, points")
       .eq("exam_id", examId)
       .order("position", { ascending: true }),
-    supabase.from("submissions").select("*").eq("exam_id", examId),
+    getOwnSubmissions(supabase, examId),
   ]);
 
   const questionIds = (links ?? []).map((link) => link.question_id);
+  const totalPoints = (links ?? []).reduce((total, link) => total + link.points, 0);
   if (questionIds.length === 0) {
-    return { exam, questions: [], submissions: submissions ?? [] };
+    return {
+      exam: effectiveExam,
+      questions: [],
+      submissions,
+      questionCount: 0,
+      totalPoints: 0,
+      assignment: assignmentResult.data ?? null,
+      attempt: attemptResult.data ?? null,
+    };
   }
 
-  const { data: questions } = await supabase
-    .from("questions")
-    .select("id, topic, text, type, options_json")
-    .in("id", questionIds);
+  const safeQuestionsResult = await supabase.rpc("get_student_exam_questions", {
+    target_exam: examId,
+  });
+  const legacyQuestionsResult = safeQuestionsResult.error
+    ? await supabase
+        .from("questions")
+        .select("id, topic, text, type, options_json")
+        .in("id", questionIds)
+    : null;
+  const questions = safeQuestionsResult.error
+    ? (legacyQuestionsResult?.data ?? [])
+    : (safeQuestionsResult.data ?? []);
 
-  const byId = new Map((questions ?? []).map((question) => [question.id, question]));
+  const byId = new Map(questions.map((question) => [question.id, question]));
 
   const ordered = (links ?? [])
     .map((link): StudentQuestion | null => {
@@ -357,7 +481,15 @@ export async function getStudentExamDetail(
     })
     .filter((item): item is StudentQuestion => item !== null);
 
-  return { exam, questions: ordered, submissions: submissions ?? [] };
+  return {
+    exam: effectiveExam,
+    questions: ordered,
+    submissions,
+    questionCount: questionIds.length,
+    totalPoints,
+    assignment: assignmentResult.data ?? null,
+    attempt: attemptResult.data ?? null,
+  };
 }
 
 /* -------------------------------------------------------------------------- */
@@ -382,7 +514,20 @@ export async function getSubmissions(
     );
   }
 
-  const supabase = await createServerSupabaseClient();
+  const [supabase, current] = await Promise.all([
+    createServerSupabaseClient(),
+    getCurrentUser(),
+  ]);
+
+  if (current?.actualRole === "ogrenci") {
+    const data = await getOwnSubmissions(supabase, filters.examId ?? null);
+    return data.filter(
+      (submission) =>
+        (!filters.studentId || submission.student_id === filters.studentId) &&
+        (!filters.pendingApprovalOnly || submission.status === "ai_degerlendirildi"),
+    );
+  }
+
   let query = supabase
     .from("submissions")
     .select("*")
@@ -394,6 +539,158 @@ export async function getSubmissions(
 
   const { data } = await query;
   return data ?? [];
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Ogrenci sonuclari ve gelisimi                                             */
+/* -------------------------------------------------------------------------- */
+
+export interface StudentResultSummary {
+  exam: Exam;
+  attempt: ExamAttempt;
+}
+
+/** Yalnizca egitmen onayi tamamlanmis sinav sonuclarini dondurur. */
+export async function getStudentResults(): Promise<StudentResultSummary[]> {
+  if (!isSupabaseConfigured) return [];
+
+  const supabase = await createServerSupabaseClient();
+  const { data: attempts, error } = await supabase
+    .from("exam_attempts")
+    .select("*")
+    .eq("status", "sonuclandi")
+    .order("completed_at", { ascending: false });
+
+  if (error || !attempts || attempts.length === 0) return [];
+
+  const examIds = [...new Set(attempts.map((attempt) => attempt.exam_id))];
+  const { data: exams } = await supabase.from("exams").select("*").in("id", examIds);
+  const examById = new Map((exams ?? []).map((exam) => [exam.id, exam]));
+
+  return attempts
+    .map((attempt) => {
+      const exam = examById.get(attempt.exam_id);
+      return exam ? { exam, attempt } : null;
+    })
+    .filter((item): item is StudentResultSummary => item !== null);
+}
+
+export interface StudentGrowthTopic {
+  topic: string;
+  subject: string;
+  outcomeId: string | null;
+  outcomeText: string | null;
+  averageScore: number;
+  approvedAnswerCount: number;
+}
+
+/** Egitmen onayli cevaplardan kazanim (yoksa konu) bazli gelisimi hesaplar. */
+export async function getStudentGrowth(): Promise<StudentGrowthTopic[]> {
+  if (!isSupabaseConfigured) return [];
+  const current = await getCurrentUser();
+  if (!current) return [];
+
+  const supabase = await createServerSupabaseClient();
+  const { data: completedAttempts, error: attemptError } = await supabase
+    .from("exam_attempts")
+    .select("exam_id")
+    .eq("student_id", current.user.id)
+    .eq("status", "sonuclandi");
+  if (attemptError || !completedAttempts?.length) return [];
+
+  const completedExamIds = completedAttempts.map((attempt) => attempt.exam_id);
+  const ownSubmissions = await getOwnSubmissions(supabase);
+
+  const completedExamSet = new Set(completedExamIds);
+  const approved = ownSubmissions.filter(
+    (submission) =>
+      completedExamSet.has(submission.exam_id) &&
+      submission.status === "egitmen_onayli" &&
+      submission.question_id !== null &&
+      submission.instructor_approved_score !== null,
+  );
+  if (approved.length === 0) return [];
+
+  const questionIds = approved.map((submission) => submission.question_id as string);
+  const examIds = [...new Set(approved.map((submission) => submission.exam_id))];
+  const safeResults = await Promise.all(
+    examIds.map((examId) =>
+      supabase.rpc("get_student_exam_questions", { target_exam: examId }),
+    ),
+  );
+  const safeQuestions = safeResults.flatMap((result) => result.data ?? []);
+  const questions =
+    safeQuestions.length > 0
+      ? safeQuestions
+      : (
+          await supabase
+            .from("questions")
+            .select("id, topic, subject, outcome_id")
+            .in("id", questionIds)
+        ).data ?? [];
+  const questionById = new Map(questions.map((question) => [question.id, question]));
+  const outcomeIds = [
+    ...new Set(
+      questions
+        .map((question) => question.outcome_id)
+        .filter((id): id is string => id !== null),
+    ),
+  ];
+  const { data: outcomes } = outcomeIds.length
+    ? await supabase
+        .from("learning_outcomes")
+        .select("id, outcome_text")
+        .in("id", outcomeIds)
+    : { data: [] };
+  const outcomeById = new Map(
+    (outcomes ?? []).map((outcome) => [outcome.id, outcome.outcome_text]),
+  );
+  const buckets = new Map<
+    string,
+    {
+      topic: string;
+      subject: string;
+      outcomeId: string | null;
+      outcomeText: string | null;
+      scores: number[];
+    }
+  >();
+
+  for (const submission of approved) {
+    const question = submission.question_id
+      ? questionById.get(submission.question_id)
+      : null;
+    if (!question || submission.instructor_approved_score === null) continue;
+    const outcomeText = question.outcome_id
+      ? outcomeById.get(question.outcome_id) ?? null
+      : null;
+    const key = question.outcome_id ?? `${question.subject}\u0000${question.topic}`;
+    const bucket = buckets.get(key) ?? {
+      topic: question.topic,
+      subject: question.subject,
+      outcomeId: question.outcome_id,
+      outcomeText,
+      scores: [],
+    };
+    bucket.scores.push(submission.instructor_approved_score);
+    buckets.set(key, bucket);
+  }
+
+  return [...buckets.values()]
+    .map((bucket) => ({
+      topic: bucket.topic,
+      subject: bucket.subject,
+      outcomeId: bucket.outcomeId,
+      outcomeText: bucket.outcomeText,
+      averageScore:
+        Math.round(
+          (bucket.scores.reduce((total, score) => total + score, 0) /
+            bucket.scores.length) *
+            10,
+        ) / 10,
+      approvedAnswerCount: bucket.scores.length,
+    }))
+    .sort((a, b) => b.averageScore - a.averageScore);
 }
 
 /* -------------------------------------------------------------------------- */

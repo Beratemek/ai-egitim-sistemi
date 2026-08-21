@@ -45,7 +45,7 @@ const SUBMISSION_STATUS_META: Record<
   SubmissionStatus,
   { label: string; variant: BadgeVariant; icon: LucideIcon }
 > = {
-  gonderildi: { label: "Gonderildi", variant: "soft", icon: FileText },
+  gonderildi: { label: "Kaydedildi", variant: "soft", icon: FileText },
   ai_degerlendirildi: {
     label: "AI degerlendirdi",
     variant: "warning",

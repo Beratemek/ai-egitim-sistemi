@@ -2,7 +2,14 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Lock, Send, Sparkles, TriangleAlert } from "lucide-react";
+import {
+  CheckCircle2,
+  Loader2,
+  Lock,
+  Save,
+  Sparkles,
+  TriangleAlert,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { submitAnswer, type SubmitAnswerResult } from "@/app/actions/submissions";
@@ -18,16 +25,22 @@ import type { QuestionOption, QuestionType, Submission } from "@/lib/types";
 export interface AnswerFormProps {
   examId: string;
   questionId: string;
+  studentId: string;
   type: QuestionType;
   /** Coktan secmeli sorunun siklari. */
   options?: readonly QuestionOption[] | null;
   maxScore?: number;
-  /** Daha once verilmis cevap. Varsa form kilitlenir, sonuc gosterilir. */
+  /** `gonderildi` durumundaysa duzenlenebilir; sonraki durumlarda kilitlenir. */
   existing?: Submission | null;
+  /** Sinav zaman penceresi disindaysa form acilmaz ve bu aciklama gosterilir. */
+  disabledReason?: string | null;
+  /** Puan ve AI geri bildirimi ancak tum sinav sonuclandiginda acilir. */
+  revealResults?: boolean;
 }
 
 /**
- * Ogrencinin bir soruya cevabini alir, kaydeder ve AI on degerlendirmesini gosterir.
+ * Ogrencinin cevabini taslak olarak kaydeder ve sinav teslim edilene kadar
+ * duzenlemesine izin verir.
  *
  * Rubrik ve dogru cevap ISTEMCIYE HIC GELMEZ; puanlama sunucuda,
  * veritabanindan okunan degerlerle yapilir (bkz. app/actions/submissions.ts).
@@ -36,20 +49,61 @@ export interface AnswerFormProps {
 export function AnswerForm({
   examId,
   questionId,
+  studentId,
   type,
   options,
   maxScore = 100,
   existing = null,
+  disabledReason = null,
+  revealResults = false,
 }: AnswerFormProps) {
   const router = useRouter();
 
-  const [answer, setAnswer] = React.useState("");
+  const isDraft = existing?.status === "gonderildi";
+  const persistedAnswer = isDraft ? existing.answer_text : "";
+  const [answer, setAnswer] = React.useState(persistedAnswer);
+  const [savedAnswer, setSavedAnswer] = React.useState(persistedAnswer);
+  const [draftReady, setDraftReady] = React.useState(false);
+  const [restoredDraft, setRestoredDraft] = React.useState(false);
   const [pending, setPending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [result, setResult] = React.useState<SubmitAnswerResult | null>(null);
 
   const wordCount = answer.trim() ? answer.trim().split(/\s+/).length : 0;
-  const canSubmit = answer.trim().length > 0 && !pending;
+  const hasChanged = answer.trim() !== savedAnswer.trim();
+  const meetsMinimum = type !== "acik_uclu" || answer.trim().length >= 10;
+  const canSubmit = answer.trim().length > 0 && meetsMinimum && hasChanged && !pending;
+  const draftKey = `student-exam-draft:${studentId}:${examId}:${questionId}`;
+
+  React.useEffect(() => {
+    if (existing && !isDraft) return;
+    const stored = window.sessionStorage.getItem(draftKey);
+    if (stored !== null && stored !== persistedAnswer) {
+      setAnswer(stored);
+      setRestoredDraft(true);
+    }
+    setDraftReady(true);
+  }, [draftKey, existing, isDraft, persistedAnswer]);
+
+  React.useEffect(() => {
+    if (!draftReady || (existing && !isDraft)) return;
+    if (answer.trim() && answer !== savedAnswer) {
+      window.sessionStorage.setItem(draftKey, answer);
+    } else {
+      window.sessionStorage.removeItem(draftKey);
+      setRestoredDraft(false);
+    }
+  }, [answer, draftKey, draftReady, existing, isDraft, savedAnswer]);
+
+  React.useEffect(() => {
+    if (!hasChanged || !answer.trim()) return;
+    const warnBeforeLeave = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warnBeforeLeave);
+    return () => window.removeEventListener("beforeunload", warnBeforeLeave);
+  }, [answer, hasChanged]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -62,17 +116,24 @@ export function AnswerForm({
 
     if (!response.ok) {
       setError(response.error);
-      toast.error("Cevap gonderilemedi", { description: response.error });
+      toast.error("Cevap kaydedilemedi", { description: response.error });
       return;
     }
 
-    setResult(response.data);
+    // Kalici kayitta AI puani ogrenciye aciklanmaz; egitmen onayi beklenir.
+    setResult(response.data.persisted ? null : response.data);
+
+    if (response.data.persisted) {
+      setSavedAnswer(answer);
+      setRestoredDraft(false);
+      window.sessionStorage.removeItem(draftKey);
+    }
 
     toast.success(
       response.data.persisted ? "Cevabiniz kaydedildi" : "Cevabiniz degerlendirildi",
       {
         description: response.data.persisted
-          ? "Nihai puan egitmen onayindan sonra kesinlesir."
+          ? "Sinavi bitirene kadar cevabinizi degistirebilirsiniz."
           : "Demo modu: sonuc gosterildi ama veritabanina yazilmadi.",
       },
     );
@@ -81,14 +142,63 @@ export function AnswerForm({
     if (response.data.persisted) router.refresh();
   }
 
-  // Daha once cevaplanmis soru: kayitli sonucu goster, formu acma.
-  if (existing) {
-    return <AnsweredView submission={existing} maxScore={maxScore} options={options} />;
+  // AI'a gonderilmis cevap artik degistirilemez.
+  if (existing && !isDraft) {
+    return (
+      <AnsweredView
+        submission={existing}
+        maxScore={maxScore}
+        options={options}
+        revealResults={revealResults}
+      />
+    );
+  }
+
+  if (disabledReason) {
+    const chosen = options?.find((option) => option.key === existing?.answer_text);
+    return (
+      <div className="space-y-3 rounded-xl border bg-muted/40 p-4 text-sm text-muted-foreground">
+        <div className="flex items-start gap-2">
+          <Lock className="mt-0.5 h-4 w-4 shrink-0" />
+          <p>{disabledReason}</p>
+        </div>
+        {existing ? (
+          <p className="whitespace-pre-wrap rounded-lg bg-background px-3 py-2 text-foreground">
+            {chosen
+              ? `${chosen.key}) ${chosen.text}`
+              : existing.answer_text}
+          </p>
+        ) : null}
+      </div>
+    );
   }
 
   return (
     <div className="space-y-4">
       <form onSubmit={handleSubmit} className="space-y-3">
+        {hasChanged && answer.trim() ? (
+          <div className="flex items-start gap-2 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning">
+            <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span>
+              {restoredDraft
+                ? "Kaydedilmemis taslaginiz bu sekmede geri yuklendi. Veritabanina kaydetmek icin Cevabi kaydet'e basin."
+                : "Kaydedilmemis degisiklikleriniz var."}
+            </span>
+          </div>
+        ) : savedAnswer ? (
+          <div className="flex items-center gap-2 rounded-lg bg-success/10 px-3 py-2 text-xs text-success">
+            <CheckCircle2 className="h-3.5 w-3.5" />
+            Bu sorunun son degisiklikleri kaydedildi.
+          </div>
+        ) : null}
+
+        {isDraft ? (
+          <div className="flex items-center justify-between rounded-lg bg-primary/5 px-3 py-2 text-xs text-primary">
+            <span>Cevabiniz kaydedildi; sinavi bitirene kadar duzenleyebilirsiniz.</span>
+            <SubmissionStatusBadge status="gonderildi" />
+          </div>
+        ) : null}
+
         {type === "test" ? (
           <fieldset className="space-y-2">
             <legend className="mb-2 text-sm font-medium">Dogru sikki secin</legend>
@@ -132,11 +242,15 @@ export function AnswerForm({
             <Textarea
               id={`answer-${questionId}`}
               rows={7}
+              minLength={10}
               value={answer}
               onChange={(event) => setAnswer(event.target.value)}
               placeholder="Cevabinizi buraya yazin..."
               className="resize-y"
             />
+            <p className="text-xs text-muted-foreground">
+              En az 10 karakter yazin.
+            </p>
           </div>
         )}
 
@@ -158,14 +272,14 @@ export function AnswerForm({
             </>
           ) : (
             <>
-              <Send className="h-4 w-4" />
-              Cevabi gonder
+              <Save className="h-4 w-4" />
+              {isDraft ? "Degisiklikleri kaydet" : "Cevabi kaydet"}
             </>
           )}
         </Button>
 
         <p className="text-xs text-muted-foreground">
-          Cevabinizi bir kez gonderebilirsiniz.
+          Cevaplariniz, sinavi bitirme adimina kadar taslak olarak saklanir.
         </p>
       </form>
 
@@ -190,13 +304,15 @@ function AnsweredView({
   submission,
   maxScore,
   options,
+  revealResults,
 }: {
   submission: Submission;
   maxScore: number;
   options?: readonly QuestionOption[] | null;
+  revealResults: boolean;
 }) {
-  const isApproved = submission.status === "egitmen_onayli";
-  const finalScore = submission.instructor_approved_score ?? submission.ai_score;
+  const isApproved =
+    revealResults && submission.status === "egitmen_onayli";
 
   // Coktan secmelide cevap sik anahtaridir; okunabilir hale getirilir.
   const chosen = options?.find((option) => option.key === submission.answer_text);
@@ -209,7 +325,13 @@ function AnsweredView({
             <Lock className="h-3.5 w-3.5" />
             Cevabiniz
           </span>
-          <SubmissionStatusBadge status={submission.status} />
+          {revealResults ? (
+            <SubmissionStatusBadge status={submission.status} />
+          ) : (
+            <span className="rounded-full bg-warning/10 px-2 py-1 text-xs font-medium text-warning">
+              Degerlendirmede
+            </span>
+          )}
         </div>
 
         <p className="whitespace-pre-wrap text-sm leading-relaxed">
@@ -217,15 +339,22 @@ function AnsweredView({
         </p>
       </div>
 
-      <GradePanel
-        score={finalScore}
-        feedback={submission.ai_feedback}
-        criteria={[]}
-        maxScore={maxScore}
-        persisted
-        isApproved={isApproved}
-        instructorNote={submission.instructor_note}
-      />
+      {isApproved ? (
+        <GradePanel
+          score={submission.instructor_approved_score}
+          feedback={submission.ai_feedback}
+          criteria={submission.ai_criteria_json ?? []}
+          maxScore={maxScore}
+          persisted
+          isApproved
+          instructorNote={submission.instructor_note}
+        />
+      ) : (
+        <p className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2.5 text-sm text-warning">
+          Puan ve geri bildirim, sinavin tum sorulari egitmen tarafindan
+          onaylandiktan sonra aciklanacak.
+        </p>
+      )}
     </div>
   );
 }

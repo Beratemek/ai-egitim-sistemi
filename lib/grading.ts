@@ -5,8 +5,7 @@
  * acik uclu sorular rubrige gore AI ile puanlanir. Her iki yolda da uretilen
  * puan bir ON DEGERLENDIRMEdir; nihai puani her zaman egitmen onaylar.
  *
- * Hem `POST /api/submissions` hem `submitAnswer` server action'i buradan gecer,
- * boylece iki yol ayni puani uretir.
+ * Sinav teslim aksiyonu tum kayitli cevaplari buradan gecirir.
  */
 
 import { gradeAnswer } from "@/lib/ai";
