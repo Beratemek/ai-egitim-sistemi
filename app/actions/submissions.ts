@@ -534,7 +534,10 @@ export async function approveSubmission(
 
   if (!submission) return { ok: false, error: "Cevap bulunamadi." };
 
-  const { error } = await supabase
+  // `.select()` sart: RLS bir satirla eslesmezse PostgREST HATA DONDURMEZ,
+  // sessizce 0 satir gunceller. Yalnizca `error` kontrol edilirse egitmen
+  // "onaylandi" yazisini gorur ama puan hicbir yere yazilmaz.
+  const { data: updated, error } = await supabase
     .from("submissions")
     .update({
       instructor_approved_score: Math.round(input.score * 100) / 100,
@@ -542,9 +545,18 @@ export async function approveSubmission(
       status: "egitmen_onayli",
       reviewed_by: current.user.id,
     })
-    .eq("id", input.submissionId);
+    .eq("id", input.submissionId)
+    .select("id");
 
   if (error) return { ok: false, error: error.message };
+
+  if (!updated || updated.length === 0) {
+    return {
+      ok: false,
+      error:
+        "Puan kaydedilemedi: bu cevabi onaylama yetkiniz yok ya da cevap artik mevcut degil.",
+    };
+  }
 
   const { error: attemptError } = await supabase.rpc(
     "recalculate_exam_attempt_result",

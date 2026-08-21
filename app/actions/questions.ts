@@ -161,12 +161,23 @@ export async function updateQuestionStatus(
 
   const supabase = await createServerSupabaseClient();
 
-  const { error } = await supabase
+  // RLS bir satirla eslesmezse PostgREST hata dondurmez, sessizce 0 satir
+  // gunceller. `.select()` olmadan onay/red basarili sanilir ama kaydedilmez.
+  const { data: updated, error } = await supabase
     .from("questions")
     .update({ status, reviewed_by: current.user.id })
-    .eq("id", questionId);
+    .eq("id", questionId)
+    .select("id");
 
   if (error) return { ok: false, error: error.message };
+
+  if (!updated || updated.length === 0) {
+    return {
+      ok: false,
+      error:
+        "Soru guncellenemedi: bu soruyu onaylama yetkiniz yok ya da soru artik mevcut degil.",
+    };
+  }
 
   revalidatePath("/dashboard/icerik-uzmani");
   revalidatePath("/dashboard/egitmen/soru-havuzu");
