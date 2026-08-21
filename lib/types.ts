@@ -85,8 +85,16 @@ export type QuestionOption = {
 
 export type UserProfile = {
   id: string;
-  /** Etkin rol. Onay bekleyen kullanicida 'ogrenci' kalir. */
+  /**
+   * Su an AKTIF olan rol. Yalnizca hangi panele dusulecegini ve basliklarda
+   * ne yazacagini belirler - YETKI KAYNAGI DEGILDIR.
+   */
   role: UserRole;
+  /**
+   * Kullaniciya VERILMIS roller. Yetki bu kumeye gore belirlenir; bir hesaba
+   * birden fazla rol atanabilir (or. hem egitmen hem icerik uzmani).
+   */
+  roles: UserRole[];
   role_status: RoleStatus;
   /** Kullanicinin talep ettigi rol; onaylaninca `role` olur. */
   requested_role: UserRole | null;
@@ -449,6 +457,14 @@ export interface Database {
       };
       set_user_role: {
         Args: { target_user: string; new_role: UserRole };
+        Returns: UserRole;
+      };
+      set_user_roles: {
+        Args: { target_user: string; new_roles: UserRole[] };
+        Returns: UserRole[];
+      };
+      set_active_role: {
+        Args: { target: UserRole };
         Returns: UserRole;
       };
       set_user_classroom: {

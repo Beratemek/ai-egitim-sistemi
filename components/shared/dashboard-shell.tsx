@@ -4,6 +4,7 @@ import * as React from "react";
 import { LogOut, Menu } from "lucide-react";
 
 import { NavLinks, RoleCard } from "@/components/shared/app-nav";
+import { ActiveRoleSwitcher } from "@/components/shared/active-role-switcher";
 import { DevRoleSwitcher } from "@/components/shared/dev-role-switcher";
 import { BrandMark } from "@/components/shared/brand-mark";
 import { ROLE_ICONS } from "@/components/shared/role-icons";
@@ -42,6 +43,8 @@ export interface DashboardShellProps {
    * degisir - egitmen sayfasindaysa baslikta "Egitmen Paneli" yazar.
    */
   navRole?: UserRole;
+  /** Kullaniciya verilmis roller; birden fazlaysa rol degistirici cikar. */
+  grantedRoles?: readonly UserRole[];
   fullName: string;
   /** Supabase yapilandirilmadiginda demo rozeti gösterilir. */
   demoMode?: boolean;
@@ -57,6 +60,7 @@ export interface DashboardShellProps {
 export function DashboardShell({
   role,
   navRole,
+  grantedRoles = [],
   fullName,
   demoMode = false,
   devSwitch = false,
@@ -152,6 +156,8 @@ export function DashboardShell({
                 Demo modu
               </Badge>
             ) : null}
+
+            <ActiveRoleSwitcher activeRole={role} roles={grantedRoles} />
 
             {devSwitch ? (
               <DevRoleSwitcher

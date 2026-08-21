@@ -2,22 +2,23 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Check, Loader2, Search, ShieldAlert } from "lucide-react";
+import { ChevronDown, Check, Loader2, Search, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 
-import { setUserClassroom, setUserRole } from "@/app/actions/admin";
+import { setUserClassroom, setUserRoles } from "@/app/actions/admin";
 import { RoleBadge } from "@/components/shared/status-badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Table,
   TableBody,
@@ -26,8 +27,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ROLE_LIST } from "@/lib/roles";
-import { isUserRole, type UserProfile, type UserRole } from "@/lib/types";
+import { ROLE_DEFINITIONS, ROLE_LIST } from "@/lib/roles";
+import type { UserProfile, UserRole } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 /**
@@ -63,20 +64,33 @@ export function UserAdminTable({ users, currentUserId }: UserAdminTableProps) {
     );
   }, [users, search]);
 
-  async function changeRole(user: UserProfile, role: UserRole) {
-    if (role === user.role) return;
+  /** Bir rolu kumeye ekler ya da kumeden cikarir. */
+  async function toggleRole(user: UserProfile, role: UserRole) {
+    const mevcut = grantedRoles(user);
+    const next = mevcut.includes(role)
+      ? mevcut.filter((item) => item !== role)
+      : [...mevcut, role];
+
+    if (next.length === 0) {
+      toast.error("En az bir rol kalmalı", {
+        description: "Kullanıcının tüm rollerini kaldıramazsınız.",
+      });
+      return;
+    }
 
     setPendingId(user.id);
     try {
-      const result = await setUserRole(user.id, role);
+      const result = await setUserRoles(user.id, next);
       if (!result.ok) throw new Error(result.error);
 
-      toast.success("Rol güncellendi", {
-        description: user.full_name || user.email || undefined,
+      toast.success("Roller güncellendi", {
+        description: `${user.full_name || user.email}: ${result.data.roles
+          .map((item) => ROLE_DEFINITIONS[item].label)
+          .join(", ")}`,
       });
       router.refresh();
     } catch (caught) {
-      toast.error("Rol değiştirilemedi", {
+      toast.error("Roller değiştirilemedi", {
         description:
           caught instanceof Error ? caught.message : "Lütfen tekrar deneyin.",
       });
@@ -167,7 +181,9 @@ export function UserAdminTable({ users, currentUserId }: UserAdminTableProps) {
 
                   <TableCell>
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <RoleBadge role={user.role} />
+                      {grantedRoles(user).map((role) => (
+                        <RoleBadge key={role} role={role} />
+                      ))}
                       {user.role_status === "beklemede" ? (
                         <Badge variant="warning" className="font-normal">
                           talep bekliyor
@@ -183,28 +199,45 @@ export function UserAdminTable({ users, currentUserId }: UserAdminTableProps) {
                         Kendi rolünüzü değiştiremezsiniz
                       </span>
                     ) : (
-                      <Select
-                        value={user.role}
-                        disabled={busy}
-                        onValueChange={(value) => {
-                          if (isUserRole(value)) void changeRole(user, value);
-                        }}
-                      >
-                        <SelectTrigger aria-label="Rol seç">
-                          {busy ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <SelectValue />
-                          )}
-                        </SelectTrigger>
-                        <SelectContent>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className="w-full justify-between gap-2 font-normal"
+                            disabled={busy}
+                          >
+                            {busy ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <span className="truncate">
+                                {grantedRoles(user).length} rol seçili
+                              </span>
+                            )}
+                            <ChevronDown className="h-4 w-4 shrink-0 opacity-60" />
+                          </Button>
+                        </DropdownMenuTrigger>
+
+                        <DropdownMenuContent align="start" className="w-56">
+                          <DropdownMenuLabel>
+                            Roller (birden fazla seçilebilir)
+                          </DropdownMenuLabel>
+                          <DropdownMenuSeparator />
                           {ROLE_LIST.map((definition) => (
-                            <SelectItem key={definition.role} value={definition.role}>
+                            <DropdownMenuCheckboxItem
+                              key={definition.role}
+                              checked={grantedRoles(user).includes(definition.role)}
+                              onSelect={(event) => {
+                                // Menu her tikta kapanmasin; birden fazla rol
+                                // secmek tek tek acip kapamayi gerektirmesin.
+                                event.preventDefault();
+                                void toggleRole(user, definition.role);
+                              }}
+                            >
                               {definition.label}
-                            </SelectItem>
+                            </DropdownMenuCheckboxItem>
                           ))}
-                        </SelectContent>
-                      </Select>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     )}
                   </TableCell>
 
@@ -291,6 +324,16 @@ function ClassroomField({
       </Button>
     </div>
   );
+}
+
+/**
+ * Kullaniciya verilmis roller.
+ *
+ * `roles` kolonu eklenmeden once olusmus kayitlarda kume bos olabilir; o
+ * durumda aktif rol tek eleman olarak kabul edilir ki tablo bos gorunmesin.
+ */
+function grantedRoles(user: UserProfile): UserRole[] {
+  return user.roles && user.roles.length > 0 ? user.roles : [user.role];
 }
 
 function initials(name: string): string {

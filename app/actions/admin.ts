@@ -1,6 +1,9 @@
 "use server";
 
+import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
+
+import { ROLE_CACHE_COOKIE } from "@/lib/auth-cookies";
 
 import { demoGuard, type ActionResult } from "@/app/actions/shared";
 import { isSupabaseConfigured } from "@/lib/env";
@@ -47,30 +50,66 @@ export async function reviewRoleRequest(
   return { ok: true, data: { status: data } };
 }
 
-/** Bir kullanicinin rolunu dogrudan degistirir (talep beklemeden). */
-export async function setUserRole(
+/**
+ * Bir kullanicinin ROL KUMESINI belirler (talep beklemeden).
+ *
+ * Tek rol degil kume: bir hesap hem egitmen hem icerik uzmani olabilir.
+ * Aktif rol kumede kalmiyorsa veritabani onu kumenin ilk elemanina duşurur.
+ */
+export async function setUserRoles(
   userId: string,
-  role: UserRole,
-): Promise<ActionResult<{ role: UserRole }>> {
+  roles: readonly UserRole[],
+): Promise<ActionResult<{ roles: UserRole[] }>> {
   if (!isSupabaseConfigured) return demoGuard();
   if (!userId) return { ok: false, error: "Kullanıcı seçilmedi." };
+  if (roles.length === 0) {
+    return { ok: false, error: "En az bir rol seçmelisiniz." };
+  }
 
   const current = await getCurrentUser();
   if (!current) return { ok: false, error: "Oturum açmanız gerekiyor." };
 
   const supabase = await createServerSupabaseClient();
-  const { data, error } = await supabase.rpc("set_user_role", {
+  const { data, error } = await supabase.rpc("set_user_roles", {
     target_user: userId,
-    new_role: role,
+    new_roles: [...roles],
   });
 
   if (error) return { ok: false, error: error.message };
-  if (typeof data !== "string") {
-    return { ok: false, error: "Rol güncellenemedi." };
-  }
 
   revalidateUserPaths();
-  return { ok: true, data: { role: data as UserRole } };
+  return { ok: true, data: { roles: (data as UserRole[]) ?? [...roles] } };
+}
+
+/**
+ * Kullanicinin kendi AKTIF rolunu secmesi.
+ *
+ * Yalnizca kendisine verilmis roller arasindan secilebilir; yetki
+ * genisletmez, hangi panelde calisilacagini belirler.
+ */
+export async function setActiveRole(
+  role: UserRole,
+): Promise<ActionResult<{ role: UserRole }>> {
+  if (!isSupabaseConfigured) return demoGuard();
+
+  const current = await getCurrentUser();
+  if (!current) return { ok: false, error: "Oturum açmanız gerekiyor." };
+
+  const supabase = await createServerSupabaseClient();
+  const { data, error } = await supabase.rpc("set_active_role", { target: role });
+
+  if (error) return { ok: false, error: error.message };
+
+  // Middleware rolu kisa sureli cerezde onbellekliyor; temizlenmezse
+  // kullanici 5 dakika eski rolunun paneline yonlendirilir.
+  try {
+    (await cookies()).delete(ROLE_CACHE_COOKIE);
+  } catch {
+    // Server Action disinda cerez yazilamaz; onbellek suresi dolunca duzelir.
+  }
+
+  revalidatePath("/", "layout");
+  return { ok: true, data: { role: (data as UserRole) ?? role } };
 }
 
 /** Bir ogrencinin sinifini belirler. Bos deger sinifi kaldirir. */

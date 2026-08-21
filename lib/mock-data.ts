@@ -22,6 +22,7 @@ export const MOCK_USERS: readonly UserProfile[] = [
   {
     id: "00000000-0000-4000-8000-000000000001",
     role: "icerik_uzmani",
+    roles: ["icerik_uzmani"],
     role_status: "onayli",
     requested_role: null,
     role_reviewed_by: null,
@@ -35,6 +36,7 @@ export const MOCK_USERS: readonly UserProfile[] = [
   {
     id: INSTRUCTOR_ID,
     role: "egitmen",
+    roles: ["egitmen"],
     role_status: "onayli",
     requested_role: null,
     role_reviewed_by: null,
@@ -48,6 +50,7 @@ export const MOCK_USERS: readonly UserProfile[] = [
   {
     id: STUDENT_ID,
     role: "ogrenci",
+    roles: ["ogrenci"],
     role_status: "onayli",
     requested_role: null,
     role_reviewed_by: null,
@@ -61,6 +64,7 @@ export const MOCK_USERS: readonly UserProfile[] = [
   {
     id: "00000000-0000-4000-8000-000000000004",
     role: "egitim_yoneticisi",
+    roles: ["egitim_yoneticisi"],
     role_status: "onayli",
     requested_role: null,
     role_reviewed_by: null,
