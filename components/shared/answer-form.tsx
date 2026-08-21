@@ -30,7 +30,7 @@ export interface AnswerFormProps {
   /** Çoktan seçmeli sorunun siklari. */
   options?: readonly QuestionOption[] | null;
   maxScore?: number;
-  /** `gönderildi` durumundaysa duzenlenebilir; sonraki durumlarda kilitlenir. */
+  /** `gonderildi` durumundaysa duzenlenebilir; sonraki durumlarda kilitlenir. */
   existing?: Submission | null;
   /** Sınav zaman penceresi disindaysa form acilmaz ve bu açıklama gösterilir. */
   disabledReason?: string | null;

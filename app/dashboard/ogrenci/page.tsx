@@ -251,7 +251,7 @@ function ExamHistoryCard({
             {latest ? formatDateTime(latest) : "-"}
           </span>
           <Link
-            href={`/dashboard/öğrenci/sınav/${exam.id}`}
+            href={`/dashboard/ogrenci/sinav/${exam.id}`}
             className="flex items-center gap-1 font-medium text-primary"
           >
             {score === null ? meta.cta : `${score} / 100`}
@@ -313,7 +313,7 @@ function StudentExamCardView({
 
   return (
     <Link
-      href={`/dashboard/öğrenci/sınav/${exam.id}`}
+      href={`/dashboard/ogrenci/sinav/${exam.id}`}
       className="group block"
     >
       <Card className="transition-all group-hover:border-primary/50 group-hover:shadow-md">
