@@ -21,8 +21,14 @@ const PENDING_PATH = "/onay-bekleniyor";
  * cerezde tutulur; sure dolunca yeniden sorgulanir. Bu cerez YETKI KAYNAGI
  * DEGILDIR - veri erisimini her zaman veritabanindaki RLS politikalari belirler,
  * cerez yalnizca hangi panele yonlendirilecegini soyler.
+ *
+ * Sure KISA tutuluyor: yonetici bir rolu geri aldiginda kullanicinin cerezi
+ * sunucudan silinemez (baska bir tarayicinin cerezine dokunulamaz), yani rol
+ * kaldirildiktan sonra o panelin KABUGU bu sure kadar acilmaya devam eder.
+ * Icerik yine bos gelir - sorgular RLS'e tabidir - ama kafa karistirmamasi
+ * icin pencere dar olmali.
  */
-const ROLE_CACHE_MAX_AGE = 300; // 5 dakika
+const ROLE_CACHE_MAX_AGE = 60; // 1 dakika
 
 /**
  * Middleware uc is yapar:
