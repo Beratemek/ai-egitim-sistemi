@@ -176,9 +176,8 @@ export function LoginForm({ callbackError = null }: LoginFormProps) {
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              {role === "ogrenci"
-                ? "Öğrenci hesabı doğrudan açılır."
-                : "Bu rol yetki taşır: talebiniz eğitim yöneticisine iletilir, onaylanana kadar bekleme ekranında kalırsınız."}
+              Seçtiğiniz rol sistem yöneticisinin onayına düşer. Onaylandığında
+              e-posta adresinize doğrulama bağlantısı gönderilir.
             </p>
           </div>
         </>

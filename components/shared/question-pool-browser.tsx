@@ -8,7 +8,7 @@ import {
   ArrowRight,
   BookOpen,
   ChevronRight,
-  Eye,
+  ChevronDown,
   FileText,
   GraduationCap,
   Layers,
@@ -23,7 +23,7 @@ import {
 import { toast } from "sonner";
 
 import { addExamQuestions } from "@/app/actions/exams";
-import { QuestionPreviewDialog } from "@/components/shared/question-preview-dialog";
+import { QuestionPreviewPanel } from "@/components/shared/question-preview-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -98,8 +98,8 @@ export function QuestionPoolBrowser({
   const [targetCount, setTargetCount] = React.useState("20");
   const [examId, setExamId] = React.useState<string>(exams[0]?.id ?? "");
   const [pending, setPending] = React.useState(false);
-  /** Onizlemesi acik soru; kapaliyken null. */
-  const [preview, setPreview] = React.useState<Question | null>(null);
+  /** Onizlemesi acik olan sorunun kimligi; kapaliyken null. */
+  const [openQuestionId, setOpenQuestionId] = React.useState<string | null>(null);
 
   /** Havuzun tamami: dal -> ders -> konu -> soru. Filtreden etkilenmez. */
   const allCategories = React.useMemo(() => groupByCategory(questions), [questions]);
@@ -388,19 +388,15 @@ export function QuestionPoolBrowser({
               selectedIds={selectedIds}
               onToggleAll={() => toggleMany(idsOfTopic(openTopic))}
               onToggleQuestion={toggleQuestion}
-              onPreview={setPreview}
+              openQuestionId={openQuestionId}
+              onTogglePreview={(id) =>
+                setOpenQuestionId((current) => (current === id ? null : id))
+              }
             />
           </>
         )}
       </div>
 
-      <QuestionPreviewDialog
-        question={preview}
-        open={preview !== null}
-        onOpenChange={(next) => {
-          if (!next) setPreview(null);
-        }}
-      />
     </div>
   );
 }
@@ -674,13 +670,15 @@ function QuestionList({
   selectedIds,
   onToggleAll,
   onToggleQuestion,
-  onPreview,
+  openQuestionId,
+  onTogglePreview,
 }: {
   group: TopicGroup;
   selectedIds: ReadonlySet<string>;
   onToggleAll: () => void;
   onToggleQuestion: (id: string) => void;
-  onPreview: (question: Question) => void;
+  openQuestionId: string | null;
+  onTogglePreview: (id: string) => void;
 }) {
   const selectedCount = countSelected(idsOfTopic(group), selectedIds);
   const allSelected = selectedCount === group.questions.length;
@@ -709,7 +707,8 @@ function QuestionList({
             question={question}
             checked={selectedIds.has(question.id)}
             onToggle={() => onToggleQuestion(question.id)}
-            onPreview={() => onPreview(question)}
+            expanded={openQuestionId === question.id}
+            onTogglePreview={() => onTogglePreview(question.id)}
           />
         ))}
       </CardContent>
@@ -721,59 +720,78 @@ function QuestionRow({
   question,
   checked,
   onToggle,
-  onPreview,
+  expanded,
+  onTogglePreview,
 }: {
   question: Question;
   checked: boolean;
   onToggle: () => void;
-  onPreview: () => void;
+  expanded: boolean;
+  onTogglePreview: () => void;
 }) {
   const Icon = question.type === "test" ? ListChecks : FileText;
 
   return (
     <div
       className={cn(
-        "group/row flex items-start gap-3 rounded-lg border p-3 transition-colors",
-        "hover:bg-accent/50 focus-within:border-primary/50",
-        checked && "border-primary/50 bg-primary/5",
+        "overflow-hidden rounded-lg border transition-colors",
+        "focus-within:border-primary/50",
+        checked && "border-primary/50",
+        expanded && "border-primary/40",
       )}
     >
-      <label className="shrink-0 cursor-pointer p-0.5" title="Sinava eklemek icin sec">
-        <Checkbox
-          checked={checked}
-          onChange={onToggle}
-          aria-label="Soruyu sec"
-        />
-      </label>
-
-      <button
-        type="button"
-        onClick={onPreview}
-        className="min-w-0 flex-1 text-left focus-visible:outline-none"
+      <div
+        className={cn(
+          "flex items-start gap-3 p-3 transition-colors",
+          "hover:bg-accent/50",
+          checked && "bg-primary/5",
+        )}
       >
-        <span className="flex items-start gap-2">
-          <span className="block text-sm leading-relaxed">{question.text}</span>
-          <Eye className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover/row:opacity-100" />
-        </span>
+        <label className="shrink-0 cursor-pointer p-0.5" title="Sınava eklemek için seç">
+          <Checkbox
+            checked={checked}
+            onChange={onToggle}
+            aria-label="Soruyu seç"
+          />
+        </label>
 
-        <span className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-          <span className="inline-flex items-center gap-1.5 rounded border px-1.5 py-0.5">
-            <Icon className="h-3 w-3" />
-            {question.type === "test" ? "Çoktan seçmeli" : "Açık uçlu"}
+        <button
+          type="button"
+          onClick={onTogglePreview}
+          aria-expanded={expanded}
+          className="min-w-0 flex-1 text-left focus-visible:outline-none"
+        >
+          <span className="flex items-start gap-2">
+            <span className="block text-sm leading-relaxed">{question.text}</span>
+            <ChevronDown
+              className={cn(
+                "mt-0.5 h-4 w-4 shrink-0 text-muted-foreground transition-transform",
+                expanded && "rotate-180",
+              )}
+            />
           </span>
 
-          {question.type === "test" ? (
-            <span>
-              Doğru cevap:{" "}
-              <span className="font-semibold text-foreground">
-                {question.correct_answer ?? "-"}
-              </span>
+          <span className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+            <span className="inline-flex items-center gap-1.5 rounded border px-1.5 py-0.5">
+              <Icon className="h-3 w-3" />
+              {question.type === "test" ? "Çoktan seçmeli" : "Açık uçlu"}
             </span>
-          ) : (
-            <span>{question.rubric ? "Rubrik hazır" : "Rubrik tanımsız"}</span>
-          )}
-        </span>
-      </button>
+
+            {question.type === "test" ? (
+              <span>
+                Doğru cevap:{" "}
+                <span className="font-semibold text-foreground">
+                  {question.correct_answer ?? "-"}
+                </span>
+              </span>
+            ) : (
+              <span>{question.rubric ? "Rubrik hazır" : "Rubrik tanımsız"}</span>
+            )}
+          </span>
+        </button>
+      </div>
+
+      {expanded ? <QuestionPreviewPanel question={question} /> : null}
     </div>
   );
 }
