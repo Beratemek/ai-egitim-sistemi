@@ -888,3 +888,284 @@ export async function getPreferenceStats(): Promise<{
 
   return { liked: liked.count ?? 0, disliked: disliked.count ?? 0 };
 }
+
+/* -------------------------------------------------------------------------- */
+/*  Sinif bazli sinav kontrolu                                                */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Egitmenin kontrol ekranindaki bir kutucuk: "Derslik-3 - Biyoloji Sinavi".
+ *
+ * Egitmen tek tek cevap onaylamak yerine ONCE bir sinif+sinav kutusuna girer,
+ * sonra o sinavi butun olarak degerlendirir. Bu tip o kutunun ozetidir.
+ */
+export interface ClassroomExamReview {
+  classroom: string;
+  exam: Exam;
+  /** Sinavin atandigi, bu sinifta bulunan ogrenci sayisi. */
+  assignedCount: number;
+  /** Sinavi teslim etmis ogrenci sayisi. */
+  submittedCount: number;
+  /** Egitmen onayi bekleyen cevap sayisi. */
+  pendingCount: number;
+  /** Onaylanmis cevap sayisi. */
+  approvedCount: number;
+  /** Sonuclanmis denemelerin puan ortalamasi; henuz yoksa null. */
+  averageScore: number | null;
+}
+
+/**
+ * Egitmenin gorebildigi her (sinif, sinav) ciftini ozetler.
+ *
+ * Kutucuklar ATAMALARDAN turetilir: bir sinav bir sinifa atanmamissa o
+ * sinif icin kutu hic olusmaz. Boylece "ici bos derslik" gorunmez.
+ */
+export async function getClassroomExamReviews(): Promise<ClassroomExamReview[]> {
+  if (!isSupabaseConfigured) return [];
+
+  const supabase = await createServerSupabaseClient();
+
+  const [exams, users] = await Promise.all([getExams(), getUsers()]);
+  if (exams.length === 0) return [];
+
+  const examById = new Map(exams.map((exam) => [exam.id, exam]));
+  const classroomOf = new Map(users.map((user) => [user.id, user.classroom]));
+
+  const examIds = exams.map((exam) => exam.id);
+
+  const [assignmentRows, attemptRows, submissionRows] = await Promise.all([
+    supabase.from("exam_assignments").select("exam_id, student_id").in("exam_id", examIds),
+    supabase
+      .from("exam_attempts")
+      .select("exam_id, student_id, status, final_score")
+      .in("exam_id", examIds),
+    supabase
+      .from("submissions")
+      .select("exam_id, student_id, status")
+      .in("exam_id", examIds),
+  ]);
+
+  /** "<examId> <sinif>" -> birikmis sayaclar. */
+  const buckets = new Map<
+    string,
+    {
+      classroom: string;
+      exam: Exam;
+      students: Set<string>;
+      submitted: Set<string>;
+      pending: number;
+      approved: number;
+      scores: number[];
+    }
+  >();
+
+  function bucketFor(examId: string, studentId: string) {
+    const classroom = classroomOf.get(studentId);
+    const exam = examById.get(examId);
+    // Sinifi atanmamis ogrenci veya gorulemeyen sinav kutu olusturmaz.
+    if (!classroom || !exam) return null;
+
+    const key = `${examId} ${classroom}`;
+    let bucket = buckets.get(key);
+    if (!bucket) {
+      bucket = {
+        classroom,
+        exam,
+        students: new Set(),
+        submitted: new Set(),
+        pending: 0,
+        approved: 0,
+        scores: [],
+      };
+      buckets.set(key, bucket);
+    }
+    return bucket;
+  }
+
+  for (const row of assignmentRows.data ?? []) {
+    bucketFor(row.exam_id, row.student_id)?.students.add(row.student_id);
+  }
+
+  for (const row of attemptRows.data ?? []) {
+    const bucket = bucketFor(row.exam_id, row.student_id);
+    if (!bucket) continue;
+
+    // Atama silinmis ama deneme duruyorsa ogrenci yine de sayilmali.
+    bucket.students.add(row.student_id);
+
+    if (row.status !== "devam_ediyor") bucket.submitted.add(row.student_id);
+    if (row.status === "sonuclandi" && row.final_score !== null) {
+      bucket.scores.push(row.final_score);
+    }
+  }
+
+  for (const row of submissionRows.data ?? []) {
+    const bucket = bucketFor(row.exam_id, row.student_id);
+    if (!bucket) continue;
+
+    if (row.status === "ai_degerlendirildi") bucket.pending += 1;
+    if (row.status === "egitmen_onayli") bucket.approved += 1;
+  }
+
+  return [...buckets.values()]
+    .map((bucket) => ({
+      classroom: bucket.classroom,
+      exam: bucket.exam,
+      assignedCount: bucket.students.size,
+      submittedCount: bucket.submitted.size,
+      pendingCount: bucket.pending,
+      approvedCount: bucket.approved,
+      averageScore:
+        bucket.scores.length > 0
+          ? Math.round(
+              (bucket.scores.reduce((sum, score) => sum + score, 0) /
+                bucket.scores.length) *
+                10,
+            ) / 10
+          : null,
+    }))
+    // Once onay bekleyenler; esitse sinif adina gore.
+    .sort(
+      (a, b) =>
+        b.pendingCount - a.pendingCount ||
+        a.classroom.localeCompare(b.classroom, "tr") ||
+        a.exam.title.localeCompare(b.exam.title, "tr"),
+    );
+}
+
+/** Kontrol ekraninda tek bir ogrencinin sinav butunu. */
+export interface StudentExamReview {
+  studentId: string;
+  studentName: string;
+  attempt: ExamAttempt | null;
+  /** Ogrencinin bu sinavdaki cevaplari, soru sirasina gore. */
+  submissions: Submission[];
+  pendingCount: number;
+  /** AI on puan ortalamasi (0-100). */
+  aiAverage: number | null;
+  /** Egitmen onayli puan ortalamasi (0-100); hic onay yoksa null. */
+  approvedAverage: number | null;
+}
+
+export interface ClassroomExamDetail {
+  classroom: string;
+  exam: Exam;
+  questions: (Question & { points: number; position: number })[];
+  students: StudentExamReview[];
+  /** Sinif genelinde onay bekleyen cevap sayisi. */
+  pendingCount: number;
+}
+
+/**
+ * Bir sinifin bir sinavdaki tum cevaplarini tek seferde getirir.
+ *
+ * Egitmen "Derslik-3 / Biyoloji" kutusuna girdiginde ekranin butun verisi
+ * budur: sinavin sorulari, sinifin ogrencileri ve her ogrencinin cevaplari.
+ */
+export async function getClassroomExamDetail(
+  classroom: string,
+  examId: string,
+): Promise<ClassroomExamDetail | null> {
+  if (!isSupabaseConfigured) return null;
+
+  const supabase = await createServerSupabaseClient();
+
+  const [detail, users] = await Promise.all([getExamDetail(examId), getUsers()]);
+  if (!detail) return null;
+
+  const inClassroom = users.filter((user) => user.classroom === classroom);
+  if (inClassroom.length === 0) return null;
+
+  const studentIds = inClassroom.map((user) => user.id);
+
+  const [assignmentRows, attemptRows, submissionRows] = await Promise.all([
+    supabase
+      .from("exam_assignments")
+      .select("student_id")
+      .eq("exam_id", examId)
+      .in("student_id", studentIds),
+    supabase
+      .from("exam_attempts")
+      .select("*")
+      .eq("exam_id", examId)
+      .in("student_id", studentIds),
+    supabase
+      .from("submissions")
+      .select("*")
+      .eq("exam_id", examId)
+      .in("student_id", studentIds),
+  ]);
+
+  const attemptOf = new Map(
+    (attemptRows.data ?? []).map((attempt) => [attempt.student_id, attempt]),
+  );
+
+  const submissionsOf = new Map<string, Submission[]>();
+  for (const submission of submissionRows.data ?? []) {
+    const list = submissionsOf.get(submission.student_id) ?? [];
+    list.push(submission);
+    submissionsOf.set(submission.student_id, list);
+  }
+
+  // Sinav sirasi soru sirasidir; cevaplar buna gore dizilir ki her ogrenci
+  // satirinda 1., 2., 3. soru ayni yerde olsun.
+  const orderOf = new Map(detail.questions.map((q, index) => [q.id, index]));
+
+  // Sinavi alan herkes listelenir: atanmis olanlar + atama silinmis olsa da
+  // cevabi/denemesi bulunanlar.
+  const relevant = new Set([
+    ...(assignmentRows.data ?? []).map((row) => row.student_id),
+    ...attemptOf.keys(),
+    ...submissionsOf.keys(),
+  ]);
+
+  const students: StudentExamReview[] = inClassroom
+    .filter((user) => relevant.has(user.id))
+    .map((user) => {
+      const submissions = (submissionsOf.get(user.id) ?? []).sort(
+        (a, b) =>
+          (orderOf.get(a.question_id ?? "") ?? Number.MAX_SAFE_INTEGER) -
+          (orderOf.get(b.question_id ?? "") ?? Number.MAX_SAFE_INTEGER),
+      );
+
+      const aiScores = submissions
+        .map((submission) => submission.ai_score)
+        .filter((score): score is number => score !== null);
+
+      const approvedScores = submissions
+        .map((submission) => submission.instructor_approved_score)
+        .filter((score): score is number => score !== null);
+
+      return {
+        studentId: user.id,
+        studentName: user.full_name || user.email || "Bilinmiyor",
+        attempt: attemptOf.get(user.id) ?? null,
+        submissions,
+        pendingCount: submissions.filter(
+          (submission) => submission.status === "ai_degerlendirildi",
+        ).length,
+        aiAverage: average(aiScores),
+        approvedAverage: average(approvedScores),
+      };
+    })
+    .sort(
+      (a, b) =>
+        b.pendingCount - a.pendingCount ||
+        a.studentName.localeCompare(b.studentName, "tr"),
+    );
+
+  return {
+    classroom,
+    exam: detail.exam,
+    questions: detail.questions,
+    students,
+    pendingCount: students.reduce((sum, student) => sum + student.pendingCount, 0),
+  };
+}
+
+/** Bos diziyi 0 yerine null sayar - "hic puan yok" ile "0 puan" ayri seyler. */
+function average(values: readonly number[]): number | null {
+  if (values.length === 0) return null;
+  const total = values.reduce((sum, value) => sum + value, 0);
+  return Math.round((total / values.length) * 10) / 10;
+}

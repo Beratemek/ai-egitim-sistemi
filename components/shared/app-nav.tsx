@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   BarChart3,
   BookOpen,
+  ClipboardCheck,
   ClipboardList,
   GraduationCap,
   LayoutDashboard,
@@ -49,6 +50,12 @@ const BASE_NAV = {
       label: "Soru Havuzu",
       icon: Library,
       description: "Dal bazlı havuz, sınava soru ekle",
+    },
+    {
+      href: "/dashboard/egitmen/kontrol",
+      label: "Sınav Kontrolü",
+      icon: ClipboardCheck,
+      description: "Sınıf bazlı bütün değerlendirme",
     },
     {
       href: "/dashboard/egitmen/sinavlar",
