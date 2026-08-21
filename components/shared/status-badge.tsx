@@ -25,7 +25,7 @@ const QUESTION_STATUS_META: Record<
   { label: string; variant: BadgeVariant; icon: LucideIcon }
 > = {
   taslak: { label: "Taslak", variant: "warning", icon: CircleDashed },
-  onayli: { label: "Onayli", variant: "success", icon: CheckCircle2 },
+  onayli: { label: "Onaylı", variant: "success", icon: CheckCircle2 },
   reddedildi: { label: "Reddedildi", variant: "danger", icon: XCircle },
 };
 
@@ -47,12 +47,12 @@ const SUBMISSION_STATUS_META: Record<
 > = {
   gonderildi: { label: "Kaydedildi", variant: "soft", icon: FileText },
   ai_degerlendirildi: {
-    label: "AI degerlendirdi",
+    label: "AI değerlendirdi",
     variant: "warning",
     icon: Sparkles,
   },
   egitmen_onayli: {
-    label: "Egitmen onayladi",
+    label: "Eğitmen onayladı",
     variant: "success",
     icon: ClipboardCheck,
   },
@@ -76,7 +76,7 @@ export function QuestionTypeBadge({ type }: { type: QuestionType }) {
   return (
     <Badge variant="outline" className="gap-1.5 font-medium text-muted-foreground">
       <Icon className="h-3.5 w-3.5" />
-      {type === "test" ? "Coktan secmeli" : "Acik uclu"}
+      {type === "test" ? "Çoktan seçmeli" : "Açık uçlu"}
     </Badge>
   );
 }

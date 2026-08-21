@@ -1,7 +1,7 @@
 /**
  * Cevap on degerlendirme katmani.
  *
- * Coktan secmeli sorular deterministik olarak (dogru sik karsilastirmasi),
+ * Coktan secmeli sorular deterministik olarak (dogru secenek karsilastirmasi),
  * acik uclu sorular rubrige gore AI ile puanlanir. Her iki yolda da uretilen
  * puan bir ON DEGERLENDIRMEdir; nihai puani her zaman egitmen onaylar.
  *
@@ -28,7 +28,7 @@ export interface AutoGradeResult {
 
 /**
  * Sik anahtarini karsilastirmaya hazirlar: "b", "B)", "b) Tilakoit zar" -> "B".
- * Turkce'ye ozel buyuk harf donusumu KULLANILMAZ; sik anahtarlari A-D'dir ve
+ * Turkce'ye ozel buyuk harf donusumu KULLANILMAZ; secenek anahtarlari A-D'dir ve
  * `toLocaleUpperCase("tr")` "i" harfini "I" yerine "İ" yapardi.
  */
 function normalizeOptionKey(value: string): string {
@@ -41,7 +41,7 @@ function normalizeOptionKey(value: string): string {
  * Ogrenci cevabina on puan uretir.
  *
  * @param question   Puanlanacak soru (rubrik/dogru cevap veritabanindan okunmali).
- * @param answerText Coktan secmelide sik anahtari, acik ucluda serbest metin.
+ * @param answerText Coktan secmelide secenek anahtari, acik ucluda serbest metin.
  */
 export async function autoGrade(
   question: GradableQuestion,
@@ -54,8 +54,8 @@ export async function autoGrade(
     return {
       score: isCorrect ? 100 : 0,
       feedback: isCorrect
-        ? "Dogru cevap."
-        : `Yanlis cevap. Dogru sik: ${correctKey}.`,
+        ? "Doğru cevap."
+        : `Yanlış cevap. Doğru şık: ${correctKey}.`,
       criteria: [],
       status: "ai_degerlendirildi",
     };

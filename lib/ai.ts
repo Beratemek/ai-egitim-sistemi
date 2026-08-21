@@ -74,7 +74,7 @@ const generatedQuestionSchema = z.object({
   options: z
     .array(questionOptionSchema)
     .nullable()
-    .describe('type="test" ise 4 sik; type="acik_uclu" ise null.'),
+    .describe('type="test" ise 4 şık; type="acik_uclu" ise null.'),
   correct_answer: z
     .string()
     .nullable()
@@ -132,7 +132,7 @@ export interface GenerateQuestionsOptions {
 /**
  * Tercih kayitlarini modele verilecek metne cevirir.
  *
- * Ornekler kisaltilir (soru koku + varsa uzmanin notu) - tam rubrik/sik listesi
+ * Ornekler kisaltilir (soru koku + varsa uzmanin notu) - tam rubrik/secenek listesi
  * baglami sisirir ve tarz bilgisi zaten soru kokunde ve notta.
  */
 function buildStyleGuidePrompt(styleGuide: StyleGuide | undefined): string {
@@ -259,7 +259,7 @@ export async function generateQuestions(
     type === "karisik"
       ? "Sorularin yaklasik yarisi coktan secmeli (test), yarisi acik uclu olsun."
       : type === "test"
-        ? "Tum sorular coktan secmeli (test) olsun; her birinde 4 sik bulunsun."
+        ? "Tüm sorular çoktan seçmeli (test) olsun; her birinde 4 şık bulunsun."
         : "Tum sorular acik uclu olsun; her biri icin ayrintili rubrik yaz.";
 
   /*
@@ -283,7 +283,7 @@ export async function generateQuestions(
       "Kurum tanitimi, program suresi, ucret, basvuru tarihi, sehir, kontenjan gibi IDARI bilgileri sorma; konunun kendisini sor (kavram, tanim, sebep-sonuc, islem, uygulama).",
       "Ezber yerine kavrama ve uygulama olc: neden olur, ne ise yarar, hangi durumda kullanilir gibi kurgular tercih et.",
       "Metinde kazanimla ilgili bilgi yoksa bilgi UYDURMA; metnin kazanima en yakin kismindan soru kur.",
-      "Coktan secmeli sorularda 4 sik olur, celdiriciler makul ve yakin olur, tek bir dogru cevap bulunur.",
+      "Çoktan seçmeli sorularda 4 şık olur, çeldiriciler makul ve yakın olur, tek bir doğru cevap bulunur.",
       "Acik uclu sorularda rubrik madde madde yazilir ve maddelerin puan toplami 100 olur.",
       "Istekte TARZ REHBERI varsa, uzmanin begendigi kurguya yaklas ve reddettigi kaliplardan uzak dur.",
     ].join(" "),
@@ -320,7 +320,7 @@ export async function generateQuestions(
       "Sinav sorusu; kitap, mufredat, tablo, hafta sirasi, program suresi, ucret gibi",
       "seylere ATIFTA BULUNAMAZ. Ogrenci yalnizca soruyu gorur.",
       "Konunun kendisini sor: kavram, tanim, sebep-sonuc, islem adimi, uygulama.",
-      "Coktan secmeli sorularda 4 sik olur, tek dogru cevap bulunur.",
+      "Çoktan seçmeli sorularda 4 şık olur, tek doğru cevap bulunur.",
       "Acik uclu sorularda rubrik madde madde yazilir, puan toplami 100 olur.",
     ].join(" "),
     prompt: [
@@ -360,7 +360,7 @@ function collectUsable(
     try {
       usable.push(normalizeGeneratedQuestion(question, fallbackTopic));
     } catch {
-      // Eksik uretilmis soru (sik veya rubrik yok) sessizce atlanir;
+      // Eksik uretilmis soru (secenek veya rubrik yok) sessizce atlanir;
       // cagiran katman eksik adedi tekrar isteyerek telafi eder.
     }
   }
@@ -556,7 +556,7 @@ export async function gradeAnswer(
 
 /**
  * Model ciktisini veritabani kisitlariyla uyumlu hale getirir:
- * test sorusunda sik/dogru cevap, acik ucluda rubrik garanti edilir.
+ * test sorusunda secenek/dogru cevap, acik ucluda rubrik garanti edilir.
  */
 function normalizeGeneratedQuestion(
   question: z.infer<typeof generatedQuestionSchema>,
@@ -572,7 +572,7 @@ function normalizeGeneratedQuestion(
     // cagiran katman bu taslagi eleyebilir.
     if (!options || !question.correct_answer) {
       throw new Error(
-        `[ai] Test sorusu eksik uretildi (sik veya dogru cevap yok): "${question.text}"`,
+        `[ai] Test sorusu eksik uretildi (secenek veya dogru cevap yok): "${question.text}"`,
       );
     }
 

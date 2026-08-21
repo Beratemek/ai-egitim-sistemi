@@ -37,15 +37,15 @@ export function isDeneyapCategory(value: unknown): value is DeneyapCategory {
  * (bkz. lib/roles.ts). Modele gonderilirken de bu ad kullanilir.
  */
 export const DENEYAP_CATEGORY_LABELS: Record<DeneyapCategory, string> = {
-  yazilim_teknolojileri: "Yazilim Teknolojileri",
-  siber_guvenlik: "Siber Guvenlik",
-  ileri_robotik: "Ileri Robotik",
+  yazilim_teknolojileri: "Yazılım Teknolojileri",
+  siber_guvenlik: "Siber Güvenlik",
+  ileri_robotik: "İleri Robotik",
   enerji_teknolojileri: "Enerji Teknolojileri",
-  tasarim_ve_uretim: "Tasarim ve Uretim",
+  tasarim_ve_uretim: "Tasarım ve Üretim",
   mobil_uygulama: "Mobil Uygulama",
-  elektronik_programlama_ve_iot: "Elektronik Programlama ve Nesnelerin Interneti",
-  yapay_zeka: "Yapay Zeka",
-  havacilik_ve_uzay: "Havacilik ve Uzay Teknolojileri",
+  elektronik_programlama_ve_iot: "Elektronik Programlama ve Nesnelerin İnterneti",
+  yapay_zeka: "Yapay Zekâ",
+  havacilik_ve_uzay: "Havacılık ve Uzay Teknolojileri",
   robotik_ve_kodlama: "Robotik ve Kodlama",
   nanoteknoloji_ve_malzeme: "Nanoteknoloji ve Malzeme Bilimi",
 };

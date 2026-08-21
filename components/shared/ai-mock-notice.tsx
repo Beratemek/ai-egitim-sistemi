@@ -12,7 +12,7 @@ export interface AiMockNoticeProps {
 
 const MESSAGE: Record<AiMockNoticeProps["capability"], string> = {
   uretim:
-    "Uretilen sorular gercek degil: metin sablondan geliyor, siklar her seferinde ayni.",
+    "Uretilen sorular gercek degil: metin sablondan geliyor, şıklar her seferinde aynı.",
   puanlama:
     "Verilen puan gercek degil: cevabin icerigine bakilmadan kelime sayisindan hesaplaniyor.",
 };

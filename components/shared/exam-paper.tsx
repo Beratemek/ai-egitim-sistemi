@@ -132,7 +132,7 @@ function PaperHead({
             </p>
           ) : null}
           <h1 className="text-[14pt] font-bold leading-tight">
-            {meta.title || "Sinav"}
+            {meta.title || "Sınav"}
           </h1>
           {meta.lesson ? (
             <p className="mt-[0.5mm] text-[10pt] text-slate-600">{meta.lesson}</p>
@@ -142,7 +142,7 @@ function PaperHead({
         <dl className="shrink-0 space-y-[1.5mm] text-right text-[9pt] leading-none">
           <HeadFact label="Tarih" value={formatPaperDate(meta.date)} />
           <HeadFact
-            label="Sure"
+            label="Süre"
             value={meta.duration ? `${meta.duration} dakika` : "-"}
           />
           <HeadFact label="Soru" value={`${count} soru / ${totalPoints} puan`} />
@@ -151,7 +151,7 @@ function PaperHead({
 
       <div className="mt-[5mm] flex items-end gap-[5mm]">
         <BlankField label="Ad Soyad" className="flex-[2]" />
-        <BlankField label="Sinif" className="flex-1" value={meta.grade} />
+        <BlankField label="Sınıf" className="flex-1" value={meta.grade} />
         <BlankField label="Numara" className="flex-1" />
 
         <div className="w-[24mm] shrink-0 rounded-sm border-2 border-slate-900 text-center">
@@ -164,7 +164,7 @@ function PaperHead({
 
       {meta.instructions ? (
         <p className="mt-[4mm] rounded-sm bg-slate-100 px-[3mm] py-[2mm] text-[8.5pt] leading-[1.4] text-slate-700 print:bg-transparent print:px-0 print:py-0">
-          <span className="font-semibold">Yonerge: </span>
+          <span className="font-semibold">Yönerge: </span>
           {meta.instructions}
         </p>
       ) : null}
@@ -175,7 +175,7 @@ function PaperHead({
 function ContinuationHead({ meta }: { meta: ExamPaperMeta }) {
   return (
     <header className="mb-[5mm] flex items-baseline justify-between border-b border-slate-400 pb-[2mm] text-[8.5pt] text-slate-500">
-      <span className="font-semibold text-slate-700">{meta.title || "Sinav"}</span>
+      <span className="font-semibold text-slate-700">{meta.title || "Sınav"}</span>
       <span>{meta.lesson}</span>
     </header>
   );
@@ -264,7 +264,7 @@ function PaperFoot({
   return (
     <footer className="mt-[6mm] flex items-baseline justify-between border-t border-slate-300 pt-[2mm] text-[8pt] text-slate-500">
       <span>
-        {isLastQuestionPage ? "Basarilar dilerim." : "Arka sayfada devam ediyor."}
+        {isLastQuestionPage ? "Başarılar dilerim." : "Arka sayfada devam ediyor."}
       </span>
       <span className="tabular">
         Sayfa {page} / {total}
@@ -295,16 +295,16 @@ function AnswerKeySheet({
     <Sheet>
       <header className="mb-[6mm] border-b-2 border-slate-900 pb-[3mm]">
         <p className="text-[8.5pt] font-semibold uppercase tracking-[0.08em] text-slate-500">
-          Cevap Anahtari
+          Cevap Anahtarı
         </p>
-        <h2 className="text-[13pt] font-bold leading-tight">{meta.title || "Sinav"}</h2>
+        <h2 className="text-[13pt] font-bold leading-tight">{meta.title || "Sınav"}</h2>
       </header>
 
       <div className="flex-1 space-y-[7mm]">
         {multipleChoice.length > 0 ? (
           <section>
             <h3 className="mb-[3mm] text-[9.5pt] font-semibold uppercase tracking-wide text-slate-600">
-              Coktan secmeli
+              Çoktan seçmeli
             </h3>
             <div className="grid grid-cols-5 gap-[2mm]">
               {multipleChoice.map((question) => (
@@ -323,7 +323,7 @@ function AnswerKeySheet({
         {openEnded.length > 0 ? (
           <section>
             <h3 className="mb-[3mm] text-[9.5pt] font-semibold uppercase tracking-wide text-slate-600">
-              Acik uclu - puanlama rubrigi
+              Açık uçlu - puanlama rubriği
             </h3>
             <ol className="space-y-[3mm]">
               {openEnded.map((question) => (
@@ -335,7 +335,7 @@ function AnswerKeySheet({
                     </span>
                   </p>
                   <p className="mt-[1mm] whitespace-pre-wrap text-[9pt] leading-[1.4] text-slate-600">
-                    {question.rubric ?? "Rubrik tanimlanmamis."}
+                    {question.rubric ?? "Rubrik tanımlanmamış."}
                   </p>
                 </li>
               ))}
@@ -345,7 +345,7 @@ function AnswerKeySheet({
       </div>
 
       <footer className="mt-[6mm] flex items-baseline justify-between border-t border-slate-300 pt-[2mm] text-[8pt] text-slate-500">
-        <span>Ogrenciye dagitilmaz.</span>
+        <span>Öğrenciye dağıtılmaz.</span>
         <span className="tabular">
           Sayfa {page} / {total}
         </span>

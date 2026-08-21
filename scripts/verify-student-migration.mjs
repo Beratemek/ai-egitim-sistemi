@@ -1,7 +1,19 @@
 import fs from "node:fs";
 import { createClient } from "@supabase/supabase-js";
 
-const raw = fs.readFileSync(".env.local", "utf8");
+/**
+ * Ortam degiskenleri once `.env.local`, yoksa `.env` dosyasindan okunur.
+ * Next.js ikisini de yukler; betik yalnizca birine bakarsa `.env` kullanan
+ * kurulumlarda ENOENT ile duser.
+ */
+const envFile = [".env.local", ".env"].find((file) => fs.existsSync(file));
+
+if (!envFile) {
+  console.error("Ortam dosyasi bulunamadi: .env.local veya .env olusturun.");
+  process.exit(1);
+}
+
+const raw = fs.readFileSync(envFile, "utf8");
 const env = {};
 
 for (const line of raw.split(/\r?\n/)) {

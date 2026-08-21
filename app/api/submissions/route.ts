@@ -35,7 +35,7 @@ export async function GET(request: Request) {
 interface CreateSubmissionBody {
   examId: string;
   questionId: string;
-  /** Coktan secmelide sik anahtari ("B"), acik ucluda serbest metin. */
+  /** Coktan secmelide secenek anahtari ("B"), acik ucluda serbest metin. */
   answerText: string;
 }
 
