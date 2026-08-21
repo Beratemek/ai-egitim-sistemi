@@ -97,7 +97,7 @@ export async function middleware(request: NextRequest) {
   // Tanitim sayfasi, /auth/* gibi yollarda sorgulamaya gerek yok.
   if (!isDashboard && !isLogin && !isOnboarding && !isPending) return response;
 
-  const { role: actualRole, status } = await resolveProfile(
+  const { role: actualRole, roles, status } = await resolveProfile(
     request,
     response,
     supabase,
@@ -137,9 +137,18 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
-  // Gelistirici rol degistiricisi: yalnizca yonlendirme kurallarini etkiler.
+  /**
+   * Gelistirici rol degistiricisi: yalnizca yonlendirme kurallarini etkiler.
+   *
+   * Taklit edilebilecek roller kullaniciya VERILMIS rollerle sinirli. Aksi
+   * halde bu cerez, rol atamasi olmadan baska bir panele girmenin yolu
+   * olurdu - yetkinin tek kaynagi verilmis roller kumesi olmali.
+   */
   const devRole = request.cookies.get(DEV_ROLE_COOKIE)?.value;
-  const role = isDevRoleSwitchEnabled && isUserRole(devRole) ? devRole : actualRole;
+  const role =
+    isDevRoleSwitchEnabled && isUserRole(devRole) && roles.includes(devRole)
+      ? devRole
+      : actualRole;
 
   // Oturum acikken /login'e gidilirse kendi paneline gonder.
   if (isLogin) {
@@ -154,14 +163,17 @@ export async function middleware(request: NextRequest) {
   }
 
   /**
-   * `admin` gizli sistem rolu: sitedeki her panele girebilir, kendi paneline
-   * geri gonderilmez. Rol degistirici ile baska bir rolu taklit ediyorsa o
-   * rolun kurallari uygulanir - taklidin anlami budur.
+   * Erisim yalnizca VERILMIS rollerden gelir.
+   *
+   * `admin` icin gizli bir "her seye erisim" kapisi YOKTUR: sistem yoneticisi
+   * de tipki digerleri gibi yalnizca kendisine atanmis rollerin panellerine
+   * girer. Bir yoneticinin her panele girmesi isteniyorsa cozum ona o rolleri
+   * ATAMAKTIR - coklu rol tam olarak bunun icin var.
+   *
+   * Verilmis rollerden herhangi birinin alani acilabilir; ust cubuktaki rol
+   * degistirici yalnizca varsayilan paneli secer, bir kapi degildir.
    */
-  if (role === "admin") return response;
-
-  // Baska bir rolun alanina girilmisse kendi paneline geri gonder.
-  if (requiredRole && requiredRole !== role) {
+  if (requiredRole && !roles.includes(requiredRole)) {
     return NextResponse.redirect(new URL(dashboardPathFor(role), request.url));
   }
 
@@ -184,38 +196,48 @@ async function resolveProfile(
   response: NextResponse,
   supabase: ReturnType<typeof createServerClient<Database>>,
   userId: string,
-): Promise<{ role: UserRole; status: RoleStatus }> {
+): Promise<{ role: UserRole; roles: UserRole[]; status: RoleStatus }> {
   const cached = request.cookies.get(ROLE_CACHE_COOKIE)?.value;
 
   if (cached) {
-    const separator = cached.indexOf(":");
-    const cachedUserId = cached.slice(0, separator);
-    const cachedRole = cached.slice(separator + 1);
+    // Bicim: "<userId>:<etkinRol>:<rol1,rol2,...>"
+    const [cachedUserId, cachedRole, cachedRoles] = cached.split(":");
 
-    if (cachedUserId === userId && isUserRole(cachedRole)) {
-      return { role: cachedRole, status: "onayli" };
+    if (cachedUserId === userId && isUserRole(cachedRole) && cachedRoles) {
+      const roles = cachedRoles.split(",").filter(isUserRole);
+      // Bos kume eski bicimli cerezi isaret eder; o zaman yeniden sorgula.
+      if (roles.length > 0) return { role: cachedRole, roles, status: "onayli" };
     }
   }
 
   const { data: profile } = await supabase
     .from("users")
-    .select("role, role_status")
+    .select("role, roles, role_status")
     .eq("id", userId)
     .maybeSingle();
 
   const role = isUserRole(profile?.role) ? profile.role : "ogrenci";
   const status = isRoleStatus(profile?.role_status) ? profile.role_status : "onayli";
 
+  // `roles` kolonu eklenmeden once olusmus kayitlarda kume bos olabilir;
+  // o durumda etkin rol tek eleman olarak kabul edilir.
+  const granted = (profile?.roles ?? []).filter(isUserRole);
+  const roles = granted.length > 0 ? granted : [role];
+
   if (status === "onayli") {
-    response.cookies.set(ROLE_CACHE_COOKIE, `${userId}:${role}`, {
-      httpOnly: true,
-      sameSite: "lax",
-      path: "/",
-      maxAge: ROLE_CACHE_MAX_AGE,
-    });
+    response.cookies.set(
+      ROLE_CACHE_COOKIE,
+      `${userId}:${role}:${roles.join(",")}`,
+      {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        maxAge: ROLE_CACHE_MAX_AGE,
+      },
+    );
   }
 
-  return { role, status };
+  return { role, roles, status };
 }
 
 export const config = {

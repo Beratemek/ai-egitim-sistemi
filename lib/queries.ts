@@ -920,6 +920,9 @@ export interface ClassroomExamReview {
  * Kutucuklar ATAMALARDAN turetilir: bir sinav bir sinifa atanmamissa o
  * sinif icin kutu hic olusmaz. Boylece "ici bos derslik" gorunmez.
  */
+/** Bilesik Map anahtarlarinda kullanilan ayirac; ders/sinif adlarinda gecmez. */
+const KEY_SEPARATOR = "\u0000";
+
 export async function getClassroomExamReviews(): Promise<ClassroomExamReview[]> {
   if (!isSupabaseConfigured) return [];
 
@@ -945,7 +948,12 @@ export async function getClassroomExamReviews(): Promise<ClassroomExamReview[]> 
       .in("exam_id", examIds),
   ]);
 
-  /** "<examId> <sinif>" -> birikmis sayaclar. */
+  /**
+   * "<examId><AYIRAC><sinif>" -> birikmis sayaclar.
+   *
+   * Ayirac olarak bosluk KULLANILAMAZ: sinif adi bosluk icerebilir
+   * ("Derslik 3") ve "a b|c" ile "a|b c" ayni anahtara duserdi.
+   */
   const buckets = new Map<
     string,
     {
@@ -965,7 +973,7 @@ export async function getClassroomExamReviews(): Promise<ClassroomExamReview[]> 
     // Sinifi atanmamis ogrenci veya gorulemeyen sinav kutu olusturmaz.
     if (!classroom || !exam) return null;
 
-    const key = `${examId} ${classroom}`;
+    const key = examId + KEY_SEPARATOR + classroom;
     let bucket = buckets.get(key);
     if (!bucket) {
       bucket = {
