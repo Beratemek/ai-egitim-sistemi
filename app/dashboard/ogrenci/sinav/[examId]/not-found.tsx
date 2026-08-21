@@ -11,12 +11,12 @@ export default function StudentExamNotFound() {
         <FileQuestion className="h-10 w-10 text-muted-foreground/50" />
         <h1 className="mt-5 text-xl font-semibold">Sinav bulunamadi</h1>
         <p className="mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
-          Bu sinav size atanmamis, yayindan kaldirilmis veya baglanti gecersiz olabilir.
+          Bu sınav size atanmamış, yayından kaldirilmis veya baglanti gecersiz olabilir.
         </p>
         <Button asChild variant="outline" className="mt-6 gap-2">
           <Link href="/dashboard/ogrenci">
             <ArrowLeft className="h-4 w-4" />
-            Sinavlarima don
+            Sınavlarıma don
           </Link>
         </Button>
       </CardContent>

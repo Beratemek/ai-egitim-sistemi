@@ -20,20 +20,20 @@ import { numberExamQuestions, toFileName } from "@/lib/exam-paper";
 import type { Exam, Question } from "@/lib/types";
 
 /**
- * Sinavin basilabilir A4 kagidi ve PDF ciktisi.
+ * Sınavın basilabilir A4 kâğıdı ve PDF ciktisi.
  *
- * Cikti icin ayri bir kutuphane kullanilmaz: tarayicinin kendi yazdirma
+ * Çıktı için ayrı bir kutuphane kullanilmaz: tarayicinin kendi yazdırma
  * akisi cagirilir ve hedef olarak "PDF olarak kaydet" secilir. Boylece metin
  * vektorel kalir; html2canvas benzeri cozumler sayfayi goruntuye cevirip
  * kaliteyi dusururdu.
  *
  * Yazdirmada panel kabugu ve bu karttaki denetimler `print:hidden` ile
- * ciktidan cikar; geriye yalnizca kagit kalir (bkz. app/globals.css).
+ * ciktidan çıkar; geriye yalnızca kâğıt kalir (bkz. app/globals.css).
  */
 
 export interface ExamPaperExportProps {
   exam: Exam;
-  /** Sinavdaki sorular, `position` sirasinda; puanlari exam_questions'tan. */
+  /** Sınavdaki sorular, `position` sırasında; puanları exam_questions'tan. */
   questions: readonly (Question & { points: number })[];
 }
 
@@ -72,7 +72,7 @@ export function ExamPaperExport({ exam, questions }: ExamPaperExportProps) {
 
   function handleDownload() {
     // Tarayicinin "PDF olarak kaydet" hedefinde dosya adi sekme basligindan
-    // gelir; yazdirma bittiginde eski baslik geri konur.
+    // gelir; yazdırma bittiginde eski baslik geri konur.
     const originalTitle = document.title;
     document.title = toFileName(meta.title);
 
@@ -92,7 +92,7 @@ export function ExamPaperExport({ exam, questions }: ExamPaperExportProps) {
           <FileText className="h-8 w-8 text-muted-foreground/50" />
           <p className="font-medium">Kagit icin once soru ekleyin</p>
           <p className="max-w-sm text-sm text-muted-foreground">
-            Sinava soru ekledikce basilabilir kagit burada olusur ve PDF olarak
+            Sınava soru ekledikce basilabilir kâğıt burada oluşur ve PDF olarak
             indirilebilir.
           </p>
         </CardContent>
@@ -105,10 +105,10 @@ export function ExamPaperExport({ exam, questions }: ExamPaperExportProps) {
       <CardHeader className="print:hidden">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <CardTitle>Sinav kagidi</CardTitle>
+            <CardTitle>Sınav kâğıdı</CardTitle>
             <CardDescription>
               {questions.length} soru · {totalPoints} puan · yaprak basina iki
-              sutun, sutun basina bes soru.
+              sütun, sütun basina bes soru.
             </CardDescription>
           </div>
 
@@ -130,12 +130,12 @@ export function ExamPaperExport({ exam, questions }: ExamPaperExportProps) {
             />
           </Field>
 
-          <Field id="paper-lesson" label="Ders / atolye">
+          <Field id="paper-lesson" label="Ders / atölye">
             <Input
               id="paper-lesson"
               value={meta.lesson}
               onChange={field("lesson")}
-              placeholder="Ileri Robotik"
+              placeholder="İleri Robotik"
             />
           </Field>
 
@@ -148,7 +148,7 @@ export function ExamPaperExport({ exam, questions }: ExamPaperExportProps) {
             />
           </Field>
 
-          <Field id="paper-duration" label="Sure (dk)">
+          <Field id="paper-duration" label="Süre (dk)">
             <Input
               id="paper-duration"
               type="number"
@@ -186,17 +186,17 @@ export function ExamPaperExport({ exam, questions }: ExamPaperExportProps) {
             checked={showAnswerKey}
             onChange={(event) => setShowAnswerKey(event.target.checked)}
           />
-          Cevap anahtarini ayri yaprak olarak ekle
+          Cevap anahtarini ayrı yaprak olarak ekle
         </label>
 
         <p className="flex items-start gap-2 rounded-lg border bg-muted/40 px-3 py-2.5 text-xs leading-relaxed text-muted-foreground print:hidden">
           <Printer className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <span>
             <strong className="font-medium text-foreground">PDF olarak indir</strong>{" "}
-            tarayicinin yazdirma penceresini acar; hedef olarak{" "}
-            <em>&quot;PDF olarak kaydet&quot;</em> secin. Kagit boyu A4, kenar
+            tarayicinin yazdırma penceresini acar; hedef olarak{" "}
+            <em>&quot;PDF olarak kaydet&quot;</em> seçin. Kâğıt boyu A4, kenar
             bosluklari ve sayfa bolme otomatik ayarlidir - olcegi <em>%100</em>{" "}
-            birakin.
+            bırakın.
           </span>
         </p>
 
@@ -227,7 +227,7 @@ function Field({
   );
 }
 
-/** Baslangic ve bitis verilmisse sinav suresini dakika olarak dondurur. */
+/** Başlangıç ve bitiş verilmisse sınav suresini dakika olarak döndürür. */
 function durationMinutes(startsAt: string | null, endsAt: string | null): string {
   if (!startsAt || !endsAt) return "40";
 

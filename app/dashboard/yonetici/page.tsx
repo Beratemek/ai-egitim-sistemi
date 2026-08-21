@@ -35,7 +35,7 @@ import {
 } from "@/lib/queries";
 import { formatScore } from "@/lib/utils";
 
-export const metadata: Metadata = { title: "Egitim Yoneticisi" };
+export const metadata: Metadata = { title: "Eğitim Yöneticisi" };
 
 export default async function YoneticiPage() {
   const [statistics, questions, users, scoreTrend, roleRequests] =
@@ -76,50 +76,50 @@ export default async function YoneticiPage() {
     <>
       <PageHeader
         title="Istatistikler"
-        description="Sinav bazli katilim, ortalama puan ve egitmen onay oranlari."
+        description="Sınav bazlı katılım, ortalama puan ve eğitmen onay oranları."
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
-          label="Ogrenci"
+          label="Öğrenci"
           value={totalStudents}
           icon={GraduationCap}
           accent="primary"
         />
         <StatCard label="Cevap" value={totalSubmissions} icon={FileText} />
         <StatCard
-          label="Rol onayi bekleyen"
+          label="Rol onayı bekleyen"
           value={roleRequests.length}
-          hint="Yeni kullanici talebi"
+          hint="Yeni kullanıcı talebi"
           icon={UserCog}
           accent={roleRequests.length > 0 ? "warning" : undefined}
         />
         <StatCard
           label="Genel ortalama"
           value={overallAverage === null ? "-" : Math.round(overallAverage * 10) / 10}
-          hint="100 uzerinden"
+          hint="100 üzerinden"
           icon={Target}
           accent="success"
         />
         <StatCard
-          label="Onay orani"
+          label="Onay oranı"
           value={`%${approvalRate}`}
-          hint={`${totalApproved} / ${totalSubmissions} cevap onaylandi`}
+          hint={`${totalApproved} / ${totalSubmissions} cevap onaylandı`}
           icon={CheckCheck}
           accent="warning"
         />
       </div>
 
-      {/* ---------- Rol onaylari ---------- */}
+      {/* ---------- Rol onayları ---------- */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <UserCog className="h-4.5 w-4.5 text-primary" />
-            Rol onaylari
+            Rol onayları
           </CardTitle>
           <CardDescription>
-            Ogrenci disinda bir rol talep eden kullanicilar onayinizi bekler.
-            Onaylanana kadar yalnizca ogrenci yetkisiyle dolasabilirler.
+            Öğrenci disinda bir rol talep eden kullanicilar onayınızı bekler.
+            Onaylanana kadar yalnızca öğrenci yetkisiyle dolasabilirler.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -134,20 +134,20 @@ export default async function YoneticiPage() {
         <QuestionStatusChart questions={questions} />
       </div>
 
-      {/* Grafiklerin tablo karsiligi - ekran okuyucu ve yazdirma icin */}
+      {/* Grafiklerin tablo karsiligi - ekran okuyucu ve yazdırma için */}
       <Card>
         <CardHeader>
-          <CardTitle>Sinav bazli ozet</CardTitle>
+          <CardTitle>Sınav bazlı özet</CardTitle>
           <CardDescription>
             Kaynak: <code className="font-mono text-xs">public.exam_statistics</code>{" "}
-            gorunumu. Yukaridaki grafiklerin sayisal karsiligi.
+            gorunumu. Yukaridaki grafiklerin sayısal karsiligi.
           </CardDescription>
         </CardHeader>
         <CardContent className="px-0 sm:px-6">
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead>Sinav</TableHead>
+                <TableHead>Sınav</TableHead>
                 <TableHead className="text-right">Ogrenci</TableHead>
                 <TableHead className="text-right">Cevap</TableHead>
                 <TableHead className="text-right">Onaylanan</TableHead>

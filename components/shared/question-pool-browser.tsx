@@ -53,28 +53,28 @@ import type { Exam, Question, QuestionType } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 /**
- * Egitmenin soru havuzu.
+ * Eğitmenin soru havuzu.
  *
  * Havuz dort kademe halinde, her kademede kutucuklarla gezilir:
- *   Atolye dali  ->  Ders  ->  Konu  ->  Soru listesi (isaretlenebilir)
+ *   Atölye dalı  ->  Ders  ->  Konu  ->  Soru listesi (isaretlenebilir)
  *
  * Kutucuklar sorulardan turetilir; altinda sorusu olmayan dal, ders veya konu
- * kutucugu hic olusmaz. Icerik uzmani yeni bir derse soru onayladigi anda o
+ * kutucugu hic olusmaz. İçerik uzmanı yeni bir derse soru onayladigi anda o
  * dersin kutucugu kendiliginden belirir.
  *
- * Onay / red BURADA YOKTUR - o icerik uzmaninin isidir. Egitmen yalnizca
- * onaylanmis sorulari gorur, secer ve bir sinava ekler. Sinavin kendisi
+ * Onay / red BURADA YOKTUR - o içerik uzmaninin isidir. Eğitmen yalnızca
+ * onaylanmış soruları gorur, secer ve bir sınava ekler. Sınavın kendisi
  * "Sinavlar" ekranindan yonetilir.
  */
 
 type TypeFilter = QuestionType | "hepsi";
 
 export interface QuestionPoolBrowserProps {
-  /** Havuzdaki onayli sorular. */
+  /** Havuzdaki onaylı sorular. */
   questions: readonly Question[];
-  /** Egitmenin sinavlari; secilen sorular bunlardan birine eklenir. */
+  /** Eğitmenin sınavları; seçilen sorular bunlardan birine eklenir. */
   exams: readonly Exam[];
-  /** Supabase yoksa ekleme adimi hata dondurur. */
+  /** Supabase yoksa ekleme adimi hata döndürür. */
   canPersist?: boolean;
 }
 
@@ -100,7 +100,7 @@ export function QuestionPoolBrowser({
   /** Havuzun tamami: dal -> ders -> konu -> soru. Filtreden etkilenmez. */
   const allCategories = React.useMemo(() => groupByCategory(questions), [questions]);
 
-  /** Arama / tip filtresinden gecmis hali. */
+  /** Arama / tip filtresinden geçmiş hali. */
   const visibleCategories = React.useMemo(
     () => filterCategories(allCategories, search, typeFilter),
     [allCategories, search, typeFilter],
@@ -144,7 +144,7 @@ export function QuestionPoolBrowser({
     setActiveTopic(null);
   }
 
-  /* ------------------------------ secim ---------------------------------- */
+  /* ------------------------------ seçim ---------------------------------- */
 
   function toggleQuestion(id: string) {
     setSelectedIds((current) => {
@@ -155,7 +155,7 @@ export function QuestionPoolBrowser({
     });
   }
 
-  /** Verilen kumeyi topluca secer; hepsi seciliyse secimi kaldirir. */
+  /** Verilen kumeyi topluca secer; hepsi seciliyse seçimi kaldirir. */
   function toggleMany(ids: readonly string[]) {
     const allSelected = ids.every((id) => selectedIds.has(id));
 
@@ -170,9 +170,9 @@ export function QuestionPoolBrowser({
   }
 
   /**
-   * Konular arasinda sirayla gezerek istenen sayida soru secer.
+   * Konular arasında sirayla gezerek istenen sayida soru secer.
    * Kapsam bulundugun kademedir: konudayken o konudan, derste o dersin
-   * konularindan, dalda o dalin tum derslerinden, en ustte gorunen her seyden.
+   * konularindan, dalda o dalin tüm derslerinden, en ustte görünen her seyden.
    */
   function autoSelect() {
     const source = openTopic
@@ -187,7 +187,7 @@ export function QuestionPoolBrowser({
     const requested = Number.parseInt(targetCount, 10);
 
     if (!Number.isFinite(requested) || requested < 1) {
-      toast.error("Gecerli bir soru sayisi girin.");
+      toast.error("Geçerli bir soru sayısı girin.");
       return;
     }
 
@@ -196,7 +196,7 @@ export function QuestionPoolBrowser({
 
     if (picked.length < requested) {
       toast.warning(`Bu kapsamda ${picked.length} uygun soru var`, {
-        description: "Ust kademeye cikin, filtreyi genisletin veya daha az soru isteyin.",
+        description: "Üst kademeye çıkın, filtreyi genişletin veya daha az soru isteyin.",
       });
     } else {
       toast.success(`${picked.length} soru secildi`, {
@@ -207,7 +207,7 @@ export function QuestionPoolBrowser({
 
   async function handleAddToExam() {
     if (!examId) {
-      toast.error("Once bir sinav secin.");
+      toast.error("Önce bir sınav seçin.");
       return;
     }
 
@@ -254,8 +254,8 @@ export function QuestionPoolBrowser({
             : openSubject
               ? `${openSubject.subject} dersinin konularindan`
               : openCategory
-                ? `${openCategory.label} dalinin tum derslerinden`
-                : "gorunen tum dallardan"
+                ? `${openCategory.label} dalinin tüm derslerinden`
+                : "görünen tüm dallardan"
         }
         canPersist={canPersist}
         pending={pending}
@@ -285,15 +285,15 @@ export function QuestionPoolBrowser({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="hepsi">Tum soru tipleri</SelectItem>
-              <SelectItem value="test">Coktan secmeli</SelectItem>
-              <SelectItem value="acik_uclu">Acik uclu</SelectItem>
+              <SelectItem value="hepsi">Tüm soru tipleri</SelectItem>
+              <SelectItem value="test">Çoktan seçmeli</SelectItem>
+              <SelectItem value="acik_uclu">Açık uçlu</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
         {openCategory === null ? (
-          /* ------------- 1. kademe: atolye dali kutucuklari -------------- */
+          /* ------------- 1. kademe: atölye dalı kutucuklari -------------- */
           visibleCategories.length === 0 ? (
             <NoMatch />
           ) : (
@@ -325,7 +325,7 @@ export function QuestionPoolBrowser({
           /* ------------- 2. kademe: ders kutucuklari --------------------- */
           <>
             <Breadcrumb
-              trail={[{ label: "Atolye dallari", onClick: backToCategories }]}
+              trail={[{ label: "Atölye dalları", onClick: backToCategories }]}
               current={openCategory.label}
               meta={`${openCategory.subjects.length} ders · ${openCategory.questionCount} soru`}
             />
@@ -347,7 +347,7 @@ export function QuestionPoolBrowser({
           <>
             <Breadcrumb
               trail={[
-                { label: "Atolye dallari", onClick: backToCategories },
+                { label: "Atölye dalları", onClick: backToCategories },
                 { label: openCategory.label, onClick: backToSubjects },
               ]}
               current={openSubject.subject}
@@ -371,7 +371,7 @@ export function QuestionPoolBrowser({
           <>
             <Breadcrumb
               trail={[
-                { label: "Atolye dallari", onClick: backToCategories },
+                { label: "Atölye dalları", onClick: backToCategories },
                 { label: openCategory.label, onClick: backToSubjects },
                 { label: openSubject.subject, onClick: () => setActiveTopic(null) },
               ]}
@@ -393,7 +393,7 @@ export function QuestionPoolBrowser({
 }
 
 /* -------------------------------------------------------------------------- */
-/*  1. kademe - atolye dali kutucugu                                          */
+/*  1. kademe - atölye dalı kutucugu                                          */
 /* -------------------------------------------------------------------------- */
 
 function CategoryCard({
@@ -426,7 +426,7 @@ function CategoryCard({
         </span>
 
         {selectedCount > 0 ? (
-          <Badge variant="success">{selectedCount} secili</Badge>
+          <Badge variant="success">{selectedCount} seçili</Badge>
         ) : null}
       </div>
 
@@ -474,12 +474,12 @@ function SubjectCard({
       selectedCount={selectedCount}
       allSelected={selectedCount === ids.length}
       onToggleAll={onToggleAll}
-      toggleLabel={`${group.subject} dersindeki tum sorulari sec`}
+      toggleLabel={`${group.subject} dersindeki tüm soruları seç`}
       onOpen={onOpen}
       icon={<GraduationCap className="h-4 w-4 shrink-0 text-primary" />}
       title={group.subject}
       subtitle={`${group.topics.length} konu · ${group.questionCount} soru`}
-      action="Konulari ac"
+      action="Konuları ac"
     >
       <ChipRow
         items={preview.map((topic) => topic.topic)}
@@ -518,24 +518,24 @@ function TopicCard({
       selectedCount={selectedCount}
       allSelected={selectedCount === ids.length}
       onToggleAll={onToggleAll}
-      toggleLabel={`${group.topic} konusundaki tum sorulari sec`}
+      toggleLabel={`${group.topic} konusundaki tüm soruları seç`}
       onOpen={onOpen}
       icon={<Layers className="h-4 w-4 shrink-0 text-primary" />}
       title={group.topic}
       subtitle={`${group.questions.length} soru`}
-      action="Sorulari ac"
+      action="Soruları ac"
     >
       <div className="flex flex-wrap gap-1.5">
         {multipleChoice > 0 ? (
           <span className="inline-flex items-center gap-1.5 rounded border px-1.5 py-0.5 text-xs text-muted-foreground">
             <ListChecks className="h-3 w-3" />
-            {multipleChoice} coktan secmeli
+            {multipleChoice} çoktan seçmeli
           </span>
         ) : null}
         {openEnded > 0 ? (
           <span className="inline-flex items-center gap-1.5 rounded border px-1.5 py-0.5 text-xs text-muted-foreground">
             <FileText className="h-3 w-3" />
-            {openEnded} acik uclu
+            {openEnded} açık uçlu
           </span>
         ) : null}
       </div>
@@ -547,8 +547,8 @@ function TopicCard({
  * Hem ders hem konu kutucugunun ortak govdesi.
  *
  * Kartin govdesi bir alt kademeye girer, sol ustteki kutucuk ise o kademedeki
- * tum sorulari tek hamlede secer. Ikisi ic ice degil kardes ogedir - buton
- * icinde buton gecerli HTML degildir.
+ * tüm soruları tek hamlede secer. Ikisi ic ice değil kardes ogedir - buton
+ * içinde buton geçerli HTML degildir.
  */
 function SelectableCard({
   selectedCount,
@@ -598,7 +598,7 @@ function SelectableCard({
         <div className="flex items-start justify-between gap-2">
           {icon}
           {selectedCount > 0 ? (
-            <Badge variant="success">{selectedCount} secili</Badge>
+            <Badge variant="success">{selectedCount} seçili</Badge>
           ) : null}
         </div>
 
@@ -679,11 +679,11 @@ function QuestionList({
             indeterminate={selectedCount > 0 && !allSelected}
             onChange={onToggleAll}
           />
-          Tumunu sec
+          Tümünü seç
         </label>
 
         <span className="ml-auto text-sm text-muted-foreground">
-          {selectedCount} / {group.questions.length} secili
+          {selectedCount} / {group.questions.length} seçili
         </span>
       </CardHeader>
 
@@ -727,18 +727,18 @@ function QuestionRow({
         <span className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
           <span className="inline-flex items-center gap-1.5 rounded border px-1.5 py-0.5">
             <Icon className="h-3 w-3" />
-            {question.type === "test" ? "Coktan secmeli" : "Acik uclu"}
+            {question.type === "test" ? "Çoktan seçmeli" : "Açık uçlu"}
           </span>
 
           {question.type === "test" ? (
             <span>
-              Dogru cevap:{" "}
+              Doğru cevap:{" "}
               <span className="font-semibold text-foreground">
                 {question.correct_answer ?? "-"}
               </span>
             </span>
           ) : (
-            <span>{question.rubric ? "Rubrik hazir" : "Rubrik tanimsiz"}</span>
+            <span>{question.rubric ? "Rubrik hazır" : "Rubrik tanımsız"}</span>
           )}
         </span>
       </span>
@@ -755,7 +755,7 @@ function Breadcrumb({
   current,
   meta,
 }: {
-  /** Ustteki kademeler; ilki geri butonu olarak gosterilir. */
+  /** Ustteki kademeler; ilki geri butonu olarak gösterilir. */
   trail: readonly { label: string; onClick: () => void }[];
   current: string;
   meta: string;
@@ -833,30 +833,30 @@ function SelectionPanel({
       <CardHeader className="pb-3">
         <CardTitle className="text-base">Secilenleri sinava ekle</CardTitle>
         <CardDescription>
-          Sinavin kendisi Sinavlar ekranindan yonetilir; buradan yalnizca soru
+          Sınavın kendisi Sınavlar ekranindan yonetilir; buradan yalnızca soru
           eklenir.
         </CardDescription>
       </CardHeader>
 
       <CardContent className="space-y-4">
         <div className="space-y-1.5">
-          <Label htmlFor="pool-exam">Hedef sinav</Label>
+          <Label htmlFor="pool-exam">Hedef sınav</Label>
 
           {exams.length === 0 ? (
             <div className="rounded-lg border border-dashed p-3 text-xs leading-relaxed text-muted-foreground">
-              Henuz sinaviniz yok. Once{" "}
+              Henüz sınavınız yok. Önce{" "}
               <Link
                 href="/dashboard/egitmen/sinavlar"
                 className="font-medium text-primary underline-offset-4 hover:underline"
               >
-                Sinavlar
+                Sınavlar
               </Link>{" "}
-              ekranindan bir sinav olusturun, sonra buradan soru ekleyin.
+              ekranindan bir sınav oluşturun, sonra buradan soru ekleyin.
             </div>
           ) : (
             <Select value={examId} onValueChange={onExamChange}>
               <SelectTrigger id="pool-exam">
-                <SelectValue placeholder="Sinav secin" />
+                <SelectValue placeholder="Sınav seçin" />
               </SelectTrigger>
               <SelectContent>
                 {exams.map((exam) => (
@@ -872,7 +872,7 @@ function SelectionPanel({
         <Separator />
 
         <div className="space-y-2">
-          <Label htmlFor="pool-target">Otomatik secim</Label>
+          <Label htmlFor="pool-target">Otomatik seçim</Label>
           <div className="flex gap-2">
             <Input
               id="pool-target"
@@ -884,7 +884,7 @@ function SelectionPanel({
             />
             <Button variant="outline" className="flex-1" onClick={onAutoSelect}>
               <Wand2 />
-              Dengeli sec
+              Dengeli seç
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
@@ -908,14 +908,14 @@ function SelectionPanel({
             onClick={onAdd}
           >
             {pending ? <Loader2 className="animate-spin" /> : <Plus />}
-            Sinava ekle
+            Sınava ekle
           </Button>
           <Button
             variant="ghost"
             size="icon"
             disabled={selectedCount === 0}
             onClick={onClear}
-            aria-label="Secimi temizle"
+            aria-label="Seçimi temizle"
           >
             <RotateCcw />
           </Button>
@@ -932,7 +932,7 @@ function SelectionPanel({
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Bos durumlar                                                              */
+/*  Boş durumlar                                                              */
 /* -------------------------------------------------------------------------- */
 
 function EmptyPool() {
@@ -942,8 +942,8 @@ function EmptyPool() {
         <Library className="h-8 w-8 text-muted-foreground/50" />
         <p className="font-medium">Havuzda onaylanmis soru yok</p>
         <p className="max-w-sm text-sm text-muted-foreground">
-          Icerik uzmani uretilen taslaklari onayladikca sorular burada atolye
-          dali, ders ve konu basliklari altinda birikir.
+          İçerik uzmanı üretilen taslakları onayladikca sorular burada atölye
+          dalı, ders ve konu basliklari altinda birikir.
         </p>
       </CardContent>
     </Card>
@@ -968,7 +968,7 @@ function NoMatch() {
 /*  Yardimcilar                                                               */
 /* -------------------------------------------------------------------------- */
 
-/** Dali atanmamis grubun da kararli bir anahtari olmali. */
+/** Dalı atanmamış grubun da kararli bir anahtarı olmali. */
 function keyOf(group: CategoryGroup): string {
   return group.category ?? "__kategorisiz__";
 }
@@ -995,8 +995,8 @@ function countSelected(ids: readonly string[], selected: ReadonlySet<string>): n
 
 /**
  * Arama ve tip filtresini dal -> ders -> konu -> soru agacina uygular.
- * Ust kademenin adi aramayla eslesiyorsa altindakiler kirpilmaz; boylece
- * "Ileri Robotik" yazinca dalin tamami gorulebilir.
+ * Üst kademenin adi aramayla eslesiyorsa altindakiler kirpilmaz; boylece
+ * "İleri Robotik" yazinca dalin tamami gorulebilir.
  */
 function filterCategories(
   categories: readonly CategoryGroup[],

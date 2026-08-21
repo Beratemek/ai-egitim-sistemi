@@ -27,7 +27,7 @@ export interface StudentExamQuestionsProps {
   revealResults: boolean;
 }
 
-/** Uzun soru listesini tek-soru odakli, onceki/sonraki gezintisine cevirir. */
+/** Uzun soru listesini tek-soru odakli, önceki/sonraki gezintisine cevirir. */
 export function StudentExamQuestions({
   examId,
   studentId,
@@ -83,7 +83,7 @@ export function StudentExamQuestions({
                   key={item.id}
                   type="button"
                   onClick={() => setActiveIndex(index)}
-                  aria-label={`${index + 1}. soruya git${isAnswered ? ", cevaplandi" : ""}`}
+                  aria-label={`${index + 1}. soruya git${isAnswered ? ", cevaplandı" : ""}`}
                   aria-current={isActive ? "step" : undefined}
                   className={cn(
                     "flex h-9 min-w-9 items-center justify-center gap-1 rounded-lg border px-2 text-xs font-semibold transition-colors",
@@ -103,8 +103,8 @@ export function StudentExamQuestions({
             })}
           </div>
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-            <span>Daire: cevaplanmadi</span>
-            <span>Tik: kaydedildi</span>
+            <span>Daire: cevaplanmadı</span>
+            <span>Tık: kaydedildi</span>
           </div>
         </CardContent>
       </Card>
@@ -123,8 +123,8 @@ export function StudentExamQuestions({
           <CardTitle className="mt-2 leading-snug">{question.text}</CardTitle>
           <CardDescription>
             {question.type === "test"
-              ? "Bir secenek belirleyip cevabinizi kaydedin."
-              : "Cevabinizi kaydedin; sinavi bitirene kadar duzenleyebilirsiniz."}
+              ? "Bir seçenek belirleyip cevabınızı kaydedin."
+              : "Cevabınızı kaydedin; sınavı bitirene kadar düzenleyebilirsiniz."}
           </CardDescription>
         </CardHeader>
 
@@ -151,7 +151,7 @@ export function StudentExamQuestions({
           disabled={activeIndex === 0}
         >
           <ArrowLeft className="h-4 w-4" />
-          Onceki soru
+          Önceki soru
         </Button>
         <Button
           type="button"

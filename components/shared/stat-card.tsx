@@ -8,7 +8,7 @@ export interface StatCardProps {
   value: string | number;
   hint?: string;
   icon?: LucideIcon;
-  /** Vurgulanmasi gereken kart (ornegin bekleyen is sayisi). */
+  /** Vurgulanmasi gereken kart (ornegin bekleyen is sayısı). */
   accent?: "default" | "primary" | "warning" | "success";
   className?: string;
 }

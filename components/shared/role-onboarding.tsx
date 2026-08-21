@@ -14,17 +14,17 @@ import type { UserRole } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 /**
- * Ilk giriste "kim oldugunuzu" soran ekran.
+ * Ilk giriste "kim olduğunuzu" soran ekran.
  *
- * Ogrenci secimi dogrudan onaylanir. Diger roller yetki tasidigi icin egitim
- * yoneticisi onayina duser; onaya kadar kullanicinin etkin rolu 'ogrenci'
+ * Öğrenci seçimi doğrudan onaylanir. Diger roller yetki tasidigi için eğitim
+ * yöneticisi onayina düşer; onaya kadar kullanicinin etkin rolu 'ogrenci'
  * kalir, yani bekleme ekranindayken yetkili alanlara zaten erisemez.
  */
 
 export interface RoleOnboardingProps {
   /** Karsilama metninde kullanilir. */
   fullName: string;
-  /** Daha once reddedilmis bir talebin ardindan yeniden seciyorsa. */
+  /** Daha önce reddedilmis bir talebin ardından yeniden seciyorsa. */
   previousRole?: UserRole | null;
   rejected?: boolean;
 }
@@ -51,11 +51,11 @@ export function RoleOnboarding({
       if (!result.ok) throw new Error(result.error);
 
       if (result.data.status === "onayli") {
-        toast.success("Hos geldiniz!");
+        toast.success("Hoş geldiniz!");
         router.replace("/dashboard");
       } else {
         toast.success("Talebiniz iletildi", {
-          description: "Egitim yoneticisi onayladiginda panele girebilirsiniz.",
+          description: "Eğitim yöneticisi onayladiginda panele girebilirsiniz.",
         });
         router.replace("/onay-bekleniyor");
       }
@@ -74,12 +74,12 @@ export function RoleOnboarding({
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-          {rejected ? "Baska bir rol secin" : `Hos geldiniz${firstName(fullName)}`}
+          {rejected ? "Başka bir rol seçin" : `Hoş geldiniz${firstName(fullName)}`}
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
           {rejected
-            ? "Onceki talebiniz onaylanmadi. Dilerseniz farkli bir rol icin yeniden basvurabilirsiniz."
-            : "Sistemde ne yapacaksiniz? Rolunuze gore farkli bir panel acilir."}
+            ? "Önceki talebiniz onaylanmadı. Dilerseniz farklı bir rol için yeniden başvurabilirsiniz."
+            : "Sistemde ne yapacaksınız? Rolünüze göre farklı bir panel açılır."}
         </p>
       </div>
 
@@ -125,7 +125,7 @@ export function RoleOnboarding({
                   {instant ? (
                     <>
                       <Zap className="h-3 w-3" />
-                      Dogrudan giris
+                      Doğrudan giriş
                     </>
                   ) : (
                     <>
@@ -151,8 +151,8 @@ export function RoleOnboarding({
         <p className="flex items-start gap-2 rounded-lg border bg-muted/40 px-3 py-2.5 text-xs leading-relaxed text-muted-foreground">
           <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <span>
-            Bu rol yetki tasidigi icin talebiniz egitim yoneticisine iletilir.
-            Onaylanana kadar bekleme ekraninda kalirsiniz.
+            Bu rol yetki tasidigi için talebiniz eğitim yöneticisine iletilir.
+            Onaylanana kadar bekleme ekranında kalırsınız.
           </span>
         </p>
       ) : null}
@@ -164,14 +164,14 @@ export function RoleOnboarding({
         onClick={() => void handleSubmit()}
       >
         {pending ? <Loader2 className="animate-spin" /> : null}
-        {needsApproval ? "Onaya gonder" : "Devam et"}
+        {needsApproval ? "Onaya gönder" : "Devam et"}
         {pending ? null : <ArrowRight />}
       </Button>
     </div>
   );
 }
 
-/** "Hos geldiniz, Berat" - ad yoksa sade selamlama. */
+/** "Hoş geldiniz, Berat" - ad yoksa sade selamlama. */
 function firstName(fullName: string): string {
   const first = fullName.trim().split(/\s+/)[0];
   return first ? `, ${first}` : "";

@@ -2,17 +2,17 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export interface PageSkeletonProps {
-  /** Ust siradaki istatistik karti sayisi. */
+  /** Üst siradaki istatistik karti sayısı. */
   stats?: number;
-  /** Govdedeki icerik blogu sayisi. */
+  /** Govdedeki içerik blogu sayısı. */
   blocks?: number;
 }
 
 /**
  * Sayfa yuklenirken gosterilen iskelet.
  *
- * Amaci algilanan hizi artirmak: sunucu bileseni verisini beklerken kullanici
- * bos ekrana degil, gelecek duzenin taslagina bakar.
+ * Amaci algilanan hizi artirmak: sunucu bileseni verisini beklerken kullanıcı
+ * boş ekrana değil, gelecek duzenin taslagina bakar.
  */
 export function PageSkeleton({ stats = 4, blocks = 2 }: PageSkeletonProps) {
   return (

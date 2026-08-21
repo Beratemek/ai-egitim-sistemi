@@ -23,7 +23,7 @@ export interface ExamFinalizePanelProps {
   questionCount: number;
 }
 
-/** Tum cevaplar kaydedildiginde sinavi geri donulemez sekilde teslim eder. */
+/** Tüm cevaplar kaydedildiginde sınavı geri donulemez sekilde teslim eder. */
 export function ExamFinalizePanel({
   examId,
   answeredCount,
@@ -45,13 +45,13 @@ export function ExamFinalizePanel({
 
     if (!response.ok) {
       setError(response.error);
-      toast.error("Sinav teslim edilemedi", { description: response.error });
+      toast.error("Sınav teslim edilemedi", { description: response.error });
       return;
     }
 
     setOpen(false);
-    toast.success("Sinaviniz teslim edildi", {
-      description: "Sonuclar egitmen onayindan sonra aciklanacak.",
+    toast.success("Sınavınız teslim edildi", {
+      description: "Sonuçlar eğitmen onayından sonra açıklanacak.",
     });
     router.refresh();
   }
@@ -72,7 +72,7 @@ export function ExamFinalizePanel({
         <div>
           <p className="text-sm font-semibold">Tum cevaplariniz kaydedildi</p>
           <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-            Cevaplarinizi kontrol edin. Teslim ettikten sonra degisiklik yapamazsiniz.
+            Cevaplarınızı kontrol edin. Teslim ettikten sonra degisiklik yapamazsiniz.
           </p>
         </div>
       </div>
@@ -81,15 +81,15 @@ export function ExamFinalizePanel({
         <DialogTrigger asChild>
           <Button className="shrink-0 gap-2">
             <Send className="h-4 w-4" />
-            Sinavi bitir
+            Sınavı bitir
           </Button>
         </DialogTrigger>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Sinavi teslim etmek istiyor musunuz?</DialogTitle>
+            <DialogTitle>Sınavı teslim etmek istiyor musunuz?</DialogTitle>
             <DialogDescription>
-              {questionCount} cevabiniz AI on degerlendirmesine gonderilecek. Bu
-              islemden sonra cevaplarinizi degistiremezsiniz.
+              {questionCount} cevabınız AI on degerlendirmesine gonderilecek. Bu
+              islemden sonra cevaplarınızı degistiremezsiniz.
             </DialogDescription>
           </DialogHeader>
 
@@ -111,7 +111,7 @@ export function ExamFinalizePanel({
               {pending ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Degerlendirme baslatiliyor...
+                  Değerlendirme başlatılıyor...
                 </>
               ) : (
                 <>

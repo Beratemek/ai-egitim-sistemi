@@ -19,7 +19,7 @@ export default function StudentDashboardError({
         </span>
         <h1 className="mt-5 text-xl font-semibold">Ogrenci bilgileri yuklenemedi</h1>
         <p className="mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
-          Baglanti gecici olarak kesilmis olabilir. Yazdiginiz kaydedilmemis cevaplar
+          Baglanti geçici olarak kesilmis olabilir. Yazdiginiz kaydedilmemiş cevaplar
           bu tarayici sekmesinde korunur.
         </p>
         <Button onClick={reset} className="mt-6 gap-2">

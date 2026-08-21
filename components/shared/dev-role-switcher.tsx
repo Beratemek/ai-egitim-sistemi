@@ -15,21 +15,21 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ROLE_LIST } from "@/lib/roles";
+import { SELECTABLE_ROLES } from "@/lib/roles";
 import type { UserRole } from "@/lib/types";
 
 export interface DevRoleSwitcherProps {
-  /** Su an arayuzde gecerli olan rol. */
+  /** Su an arayuzde geçerli olan rol. */
   currentRole: UserRole;
-  /** Veritabanindaki gercek rol. */
+  /** Veritabanındaki gerçek rol. */
   actualRole: UserRole;
   /** Taklit aktif mi? */
   impersonating: boolean;
 }
 
 /**
- * Yerel gelistirmede tek hesapla dort rolu de gezebilmek icin rol degistirici.
- * Yalnizca `isDevRoleSwitchEnabled` true iken render edilir (bkz. dashboard-shell).
+ * Yerel gelistirmede tek hesapla dort rolu de gezebilmek için rol değiştirici.
+ * Yalnızca `isDevRoleSwitchEnabled` true iken render edilir (bkz. dashboard-shell).
  */
 export function DevRoleSwitcher({
   currentRole,
@@ -46,7 +46,7 @@ export function DevRoleSwitcher({
           size="sm"
           className="gap-2"
           disabled={pending}
-          aria-label="Gelistirici rol degistirici"
+          aria-label="Geliştirici rol değiştirici"
         >
           <FlaskConical className="h-3.5 w-3.5" />
           <span className="hidden sm:inline">Rol</span>
@@ -65,13 +65,13 @@ export function DevRoleSwitcher({
         <DropdownMenuLabel>
           <p className="text-sm font-medium">Gelistirici rol degistirici</p>
           <p className="mt-0.5 text-xs font-normal text-muted-foreground">
-            Yalnizca arayuzu degistirir; veritabani yetkileri gercek hesabiniza
-            gore calismaya devam eder.
+            Yalnızca arayuzu degistirir; veritabani yetkileri gerçek hesabiniza
+            göre çalışmaya devam eder.
           </p>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
 
-        {ROLE_LIST.map((definition) => {
+        {SELECTABLE_ROLES.map((definition) => {
           const Icon = ROLE_ICONS[definition.role];
           const isCurrent = definition.role === currentRole;
 
@@ -91,7 +91,7 @@ export function DevRoleSwitcher({
               <span className="flex-1">{definition.label}</span>
               {definition.role === actualRole ? (
                 <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                  gercek
+                  gerçek
                 </span>
               ) : null}
               {isCurrent ? <Check className="h-4 w-4 text-primary" /> : null}

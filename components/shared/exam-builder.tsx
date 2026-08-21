@@ -36,24 +36,24 @@ import type { Exam, Question } from "@/lib/types";
 
 export interface ExamBuilderProps {
   exam: Exam;
-  /** Sinavda bulunan sorular, `position` sirasinda. */
+  /** Sınavda bulunan sorular, `position` sırasında. */
   examQuestions: readonly Question[];
-  /** Havuzdaki onayli sorular; bilesen sinavda olanlari kendisi ayiklar. */
+  /** Havuzdaki onaylı sorular; bilesen sınavda olanlari kendisi ayiklar. */
   pool: readonly Question[];
-  /** Sinava cevap verilmis mi? Verilmisse soru cikarma konusunda uyarilir. */
+  /** Sınava cevap verilmis mi? Verilmisse soru cikarma konusunda uyarilir. */
   hasSubmissions: boolean;
   /**
    * Supabase yapilandirilmis mi? Demo modunda butonlar tiklanabilir kalir ve
-   * gerekce hata mesajinda gosterilir - sessizce devre disi buton yerine.
+   * gerekçe hata mesajinda gösterilir - sessizce devre disi buton yerine.
    */
   canPersist?: boolean;
 }
 
 /**
- * Sinav kurma ekrani: havuzdan soru ekle/cikar ve sinavi yayina al.
+ * Sınav kurma ekrani: havuzdan soru ekle/çıkar ve sınavı yayına al.
  *
- * Yalnizca ONAYLI sorular eklenebilir; taslak veya reddedilmis soru sinava
- * girmemeli ("onaylanan sorular havuza alinir; secilerek sinav seti olusturulur").
+ * Yalnızca Onaylı sorular eklenebilir; taslak veya reddedilmis soru sınava
+ * girmemeli ("onaylanan sorular havuza alınır; seçilerek sınav seti oluşturulur").
  */
 export function ExamBuilder({
   exam,
@@ -105,7 +105,7 @@ export function ExamBuilder({
       return;
     }
 
-    toast.success(`${result.data.added} soru sinava eklendi`);
+    toast.success(`${result.data.added} soru sınava eklendi`);
     setSelected(new Set());
     router.refresh();
   }
@@ -116,12 +116,12 @@ export function ExamBuilder({
     setPendingAction(null);
 
     if (!result.ok) {
-      toast.error("Soru cikarilamadi", { description: result.error });
+      toast.error("Soru çıkarılamadı", { description: result.error });
       return;
     }
 
-    toast.success("Soru sinavdan cikarildi", {
-      description: "Havuzdaki soru silinmedi, yalnizca bu sinavdan kaldirildi.",
+    toast.success("Soru sınavdan çıkarıldı", {
+      description: "Havuzdaki soru silinmedi, yalnızca bu sınavdan kaldırıldı.",
     });
     router.refresh();
   }
@@ -132,23 +132,23 @@ export function ExamBuilder({
     setPendingAction(null);
 
     if (!result.ok) {
-      toast.error(next ? "Yayina alinamadi" : "Yayindan cikarilamadi", {
+      toast.error(next ? "Yayına alınamadı" : "Yayından çıkarılamadı", {
         description: result.error,
       });
       return;
     }
 
-    toast.success(next ? "Sinav yayinda" : "Sinav yayindan cikarildi", {
+    toast.success(next ? "Sınav yayında" : "Sınav yayından çıkarıldı", {
       description: next
-        ? "Ogrenciler artik bu sinava girebilir."
-        : "Ogrenciler bu sinavi artik gormeyecek.",
+        ? "Öğrenciler artık bu sınava girebilir."
+        : "Öğrenciler bu sınavı artık görmeyecek.",
     });
     router.refresh();
   }
 
   return (
     <div className="space-y-6">
-      {/* ---------- Yayin durumu ---------- */}
+      {/* ---------- Yayın durumu ---------- */}
       <Card>
         <CardContent className="flex flex-wrap items-center justify-between gap-4 p-5">
           <div className="space-y-1">
@@ -162,8 +162,8 @@ export function ExamBuilder({
             </div>
             <p className="text-sm text-muted-foreground">
               {exam.is_published
-                ? "Ogrenciler bu sinava girebiliyor."
-                : "Yayina almadan ogrenciler bu sinavi gormez."}
+                ? "Öğrenciler bu sınava girebiliyor."
+                : "Yayına almadan öğrenciler bu sınavı görmez."}
             </p>
           </div>
 
@@ -180,26 +180,26 @@ export function ExamBuilder({
             ) : (
               <Send className="h-4 w-4" />
             )}
-            {exam.is_published ? "Yayindan cikar" : "Yayina al"}
+            {exam.is_published ? "Yayından çıkar" : "Yayına al"}
           </Button>
         </CardContent>
       </Card>
 
-      {/* ---------- Sinavdaki sorular ---------- */}
+      {/* ---------- Sınavdaki sorular ---------- */}
       <Card>
         <CardHeader>
-          <CardTitle>Sinavdaki sorular</CardTitle>
+          <CardTitle>Sınavdaki sorular</CardTitle>
           <CardDescription>
             {examQuestions.length === 0
-              ? "Henuz soru eklenmedi. Asagidaki havuzdan secim yapin."
-              : `Ogrenciye bu sirayla gosterilir. Toplam ${examQuestions.length} soru.`}
+              ? "Henüz soru eklenmedi. Aşağıdaki havuzdan seçim yapın."
+              : `Öğrenciye bu sirayla gösterilir. Toplam ${examQuestions.length} soru.`}
           </CardDescription>
         </CardHeader>
 
         <CardContent className="space-y-3">
           {examQuestions.length === 0 ? (
             <p className="rounded-lg border border-dashed py-10 text-center text-sm text-muted-foreground">
-              Sinav bos.
+              Sınav boş.
             </p>
           ) : (
             examQuestions.map((question, index) => (
@@ -234,7 +234,7 @@ export function ExamBuilder({
                   ) : (
                     <Trash2 className="h-3.5 w-3.5" />
                   )}
-                  Cikar
+                  Çıkar
                 </Button>
               </div>
             ))
@@ -242,14 +242,14 @@ export function ExamBuilder({
 
           {canPersist ? null : (
             <p className="rounded-lg bg-warning/10 px-3 py-2 text-xs text-warning">
-              Demo modu: bu ekrandaki degisiklikler kaydedilmez. Supabase
+              Demo modu: bu ekrandaki değişiklikler kaydedilmez. Supabase
               baglantisini tanimladiktan sonra kalici hale gelir.
             </p>
           )}
 
           {hasSubmissions && examQuestions.length > 0 ? (
             <p className="rounded-lg bg-warning/10 px-3 py-2 text-xs text-warning">
-              Bu sinava cevap verilmis. Soru cikarmak verilen cevaplari silmez ama
+              Bu sınava cevap verilmis. Soru cikarmak verilen cevapları silmez ama
               istatistikleri degistirir.
             </p>
           ) : null}
@@ -261,7 +261,7 @@ export function ExamBuilder({
         <CardHeader>
           <CardTitle>Havuzdan soru ekle</CardTitle>
           <CardDescription>
-            Yalnizca egitmen onayindan gecmis sorular listelenir.
+            Yalnızca eğitmen onayından geçmiş sorular listelenir.
           </CardDescription>
         </CardHeader>
 
@@ -298,8 +298,8 @@ export function ExamBuilder({
           {available.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">
               {pool.length === 0
-                ? "Havuzda onayli soru yok. Once soru havuzundan taslaklari onaylayin."
-                : "Eklenebilecek baska soru kalmadi."}
+                ? "Havuzda onaylı soru yok. Önce soru havuzundan taslakları onaylayın."
+                : "Eklenebilecek başka soru kalmadı."}
             </p>
           ) : (
             <ul className="space-y-2">

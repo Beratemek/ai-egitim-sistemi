@@ -27,24 +27,24 @@ export interface AnswerFormProps {
   questionId: string;
   studentId: string;
   type: QuestionType;
-  /** Coktan secmeli sorunun siklari. */
+  /** Çoktan seçmeli sorunun siklari. */
   options?: readonly QuestionOption[] | null;
   maxScore?: number;
-  /** `gonderildi` durumundaysa duzenlenebilir; sonraki durumlarda kilitlenir. */
+  /** `gönderildi` durumundaysa duzenlenebilir; sonraki durumlarda kilitlenir. */
   existing?: Submission | null;
-  /** Sinav zaman penceresi disindaysa form acilmaz ve bu aciklama gosterilir. */
+  /** Sınav zaman penceresi disindaysa form acilmaz ve bu açıklama gösterilir. */
   disabledReason?: string | null;
-  /** Puan ve AI geri bildirimi ancak tum sinav sonuclandiginda acilir. */
+  /** Puan ve AI geri bildirimi ancak tüm sınav sonuclandiginda açılır. */
   revealResults?: boolean;
 }
 
 /**
- * Ogrencinin cevabini taslak olarak kaydeder ve sinav teslim edilene kadar
+ * Öğrencinin cevabini taslak olarak kaydeder ve sınav teslim edilene kadar
  * duzenlemesine izin verir.
  *
- * Rubrik ve dogru cevap ISTEMCIYE HIC GELMEZ; puanlama sunucuda,
+ * Rubrik ve doğru cevap ISTEMCIYE HIC GELMEZ; puanlama sunucuda,
  * veritabanindan okunan degerlerle yapilir (bkz. app/actions/submissions.ts).
- * Nihai puan her zaman egitmen onayindan sonra kesinlesir.
+ * Nihai puan her zaman eğitmen onayından sonra kesinleşir.
  */
 export function AnswerForm({
   examId,
@@ -120,7 +120,7 @@ export function AnswerForm({
       return;
     }
 
-    // Kalici kayitta AI puani ogrenciye aciklanmaz; egitmen onayi beklenir.
+    // Kalici kayitta AI puanı öğrenciye aciklanmaz; eğitmen onayı beklenir.
     setResult(response.data.persisted ? null : response.data);
 
     if (response.data.persisted) {
@@ -130,19 +130,19 @@ export function AnswerForm({
     }
 
     toast.success(
-      response.data.persisted ? "Cevabiniz kaydedildi" : "Cevabiniz degerlendirildi",
+      response.data.persisted ? "Cevabınız kaydedildi" : "Cevabınız değerlendirildi",
       {
         description: response.data.persisted
-          ? "Sinavi bitirene kadar cevabinizi degistirebilirsiniz."
-          : "Demo modu: sonuc gosterildi ama veritabanina yazilmadi.",
+          ? "Sınavı bitirene kadar cevabınızı değiştirebilirsiniz."
+          : "Demo modu: sonuç gösterildi ama veritabanına yazılmadı.",
       },
     );
 
-    // Kaydedildiyse sayfayi tazele: ilerleme ve gecmis cevaplar guncellenir.
+    // Kaydedildiyse sayfayi tazele: ilerleme ve geçmiş cevaplar guncellenir.
     if (response.data.persisted) router.refresh();
   }
 
-  // AI'a gonderilmis cevap artik degistirilemez.
+  // AI'a gonderilmis cevap artık degistirilemez.
   if (existing && !isDraft) {
     return (
       <AnsweredView
@@ -181,20 +181,20 @@ export function AnswerForm({
             <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             <span>
               {restoredDraft
-                ? "Kaydedilmemis taslaginiz bu sekmede geri yuklendi. Veritabanina kaydetmek icin Cevabi kaydet'e basin."
-                : "Kaydedilmemis degisiklikleriniz var."}
+                ? "Kaydedilmemiş taslağınız bu sekmede geri yüklendi. Veritabanına kaydetmek için Cevabı kaydet'e basın."
+                : "Kaydedilmemiş değişiklikleriniz var."}
             </span>
           </div>
         ) : savedAnswer ? (
           <div className="flex items-center gap-2 rounded-lg bg-success/10 px-3 py-2 text-xs text-success">
             <CheckCircle2 className="h-3.5 w-3.5" />
-            Bu sorunun son degisiklikleri kaydedildi.
+            Bu sorunun son değişiklikleri kaydedildi.
           </div>
         ) : null}
 
         {isDraft ? (
           <div className="flex items-center justify-between rounded-lg bg-primary/5 px-3 py-2 text-xs text-primary">
-            <span>Cevabiniz kaydedildi; sinavi bitirene kadar duzenleyebilirsiniz.</span>
+            <span>Cevabınız kaydedildi; sınavı bitirene kadar düzenleyebilirsiniz.</span>
             <SubmissionStatusBadge status="gonderildi" />
           </div>
         ) : null}
@@ -236,7 +236,7 @@ export function AnswerForm({
         ) : (
           <div className="space-y-2">
             <div className="flex items-baseline justify-between">
-              <Label htmlFor={`answer-${questionId}`}>Cevabiniz</Label>
+              <Label htmlFor={`answer-${questionId}`}>Cevabınız</Label>
               <span className="text-xs text-muted-foreground">{wordCount} kelime</span>
             </div>
             <Textarea
@@ -245,11 +245,11 @@ export function AnswerForm({
               minLength={10}
               value={answer}
               onChange={(event) => setAnswer(event.target.value)}
-              placeholder="Cevabinizi buraya yazin..."
+              placeholder="Cevabınızı buraya yazın..."
               className="resize-y"
             />
             <p className="text-xs text-muted-foreground">
-              En az 10 karakter yazin.
+              En az 10 karakter yazın.
             </p>
           </div>
         )}
@@ -273,13 +273,13 @@ export function AnswerForm({
           ) : (
             <>
               <Save className="h-4 w-4" />
-              {isDraft ? "Degisiklikleri kaydet" : "Cevabi kaydet"}
+              {isDraft ? "Değişiklikleri kaydet" : "Cevabı kaydet"}
             </>
           )}
         </Button>
 
         <p className="text-xs text-muted-foreground">
-          Cevaplariniz, sinavi bitirme adimina kadar taslak olarak saklanir.
+          Cevaplarınız, sınavı bitirme adimina kadar taslak olarak saklanir.
         </p>
       </form>
 
@@ -314,7 +314,7 @@ function AnsweredView({
   const isApproved =
     revealResults && submission.status === "egitmen_onayli";
 
-  // Coktan secmelide cevap secenek anahtaridir; okunabilir hale getirilir.
+  // Çoktan secmelide cevap seçenek anahtaridir; okunabilir hale getirilir.
   const chosen = options?.find((option) => option.key === submission.answer_text);
 
   return (
@@ -323,13 +323,13 @@ function AnsweredView({
         <div className="flex flex-wrap items-center justify-between gap-2">
           <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
             <Lock className="h-3.5 w-3.5" />
-            Cevabiniz
+            Cevabınız
           </span>
           {revealResults ? (
             <SubmissionStatusBadge status={submission.status} />
           ) : (
             <span className="rounded-full bg-warning/10 px-2 py-1 text-xs font-medium text-warning">
-              Degerlendirmede
+              Değerlendirmede
             </span>
           )}
         </div>
@@ -351,8 +351,8 @@ function AnsweredView({
         />
       ) : (
         <p className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2.5 text-sm text-warning">
-          Puan ve geri bildirim, sinavin tum sorulari egitmen tarafindan
-          onaylandiktan sonra aciklanacak.
+          Puan ve geri bildirim, sınavın tüm soruları eğitmen tarafından
+          onaylandiktan sonra açıklanacak.
         </p>
       )}
     </div>
@@ -383,7 +383,7 @@ function GradePanel({
   if (score === null) {
     return (
       <p className="rounded-lg border bg-muted px-3 py-2.5 text-sm text-muted-foreground">
-        Bu cevap dogrudan egitmen tarafindan puanlanacak.
+        Bu cevap doğrudan eğitmen tarafından puanlanacak.
       </p>
     );
   }
@@ -393,7 +393,7 @@ function GradePanel({
       <div className="flex items-center gap-2">
         <Sparkles className="h-4 w-4 text-primary" />
         <p className="text-sm font-semibold">
-          {isApproved ? "Egitmen onayli puan" : "AI on degerlendirmesi"}
+          {isApproved ? "Eğitmen onaylı puan" : "AI on değerlendirmesi"}
         </p>
       </div>
 
@@ -447,8 +447,8 @@ function GradePanel({
       {isApproved ? null : (
         <p className="rounded-lg bg-warning/10 px-3 py-2 text-xs text-warning">
           {persisted
-            ? "Bu puan gecicidir; egitmen onayindan sonra kesinlesir."
-            : "Demo modu: sonuc veritabanina yazilmadi."}
+            ? "Bu puan geçicidir; eğitmen onayından sonra kesinleşir."
+            : "Demo modu: sonuç veritabanına yazılmadı."}
         </p>
       )}
     </div>

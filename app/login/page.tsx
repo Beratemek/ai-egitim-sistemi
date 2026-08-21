@@ -7,14 +7,14 @@ import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { BrandMark } from "@/components/shared/brand-mark";
 
 export const metadata: Metadata = {
-  title: "Giris",
-  description: "AI Destekli Egitim Sistemi'ne giris yapin.",
+  title: "Giriş",
+  description: "AI Destekli Eğitim Sistemi'ne giriş yapın.",
 };
 
 const HIGHLIGHTS: readonly string[] = [
-  "Kazanimdan saniyeler icinde soru taslagi",
-  "Acik uclu cevaplara rubrik tabanli otomatik puan",
-  "Nihai karar her zaman egitmende",
+  "Kazanımdan saniyeler içinde soru taslağı",
+  "Açık uçlu cevaplara rubrik tabanlı otomatik puan",
+  "Nihai karar her zaman eğitmende",
 ];
 
 export default async function LoginPage({
@@ -26,7 +26,7 @@ export default async function LoginPage({
   const callbackError = params.error ?? null;
   return (
     <main className="grid min-h-screen lg:grid-cols-2">
-      {/* ---------- Sol: marka paneli (yalnizca genis ekran) ---------- */}
+      {/* ---------- Sol: marka paneli (yalnızca genis ekran) ---------- */}
       <aside className="relative hidden flex-col justify-between overflow-hidden bg-primary p-12 text-primary-foreground lg:flex">
         <div className="bg-grid absolute inset-0 opacity-[0.07]" aria-hidden />
         <div
@@ -40,14 +40,14 @@ export default async function LoginPage({
               <span className="text-lg font-semibold">A</span>
             </span>
             <span className="text-sm font-semibold tracking-tight">
-              AI Destekli Egitim Sistemi
+              AI Destekli Eğitim Sistemi
             </span>
           </Link>
         </div>
 
         <div className="relative space-y-8">
           <h1 className="max-w-md text-4xl font-semibold leading-tight tracking-tight">
-            Degerlendirmenin yorucu kismini yapay zekaya birakin.
+            Degerlendirmenin yorucu kismini yapay zekaya bırakın.
           </h1>
 
           <ul className="space-y-3">
@@ -86,10 +86,10 @@ export default async function LoginPage({
 
             <div>
               <h2 className="text-2xl font-semibold tracking-tight">
-                Hesabiniza giris yapin
+                Hesabiniza giriş yapın
               </h2>
               <p className="mt-1.5 text-sm text-muted-foreground">
-                Rolunuze uygun panel otomatik olarak acilir.
+                Rolünüze uygun panel otomatik olarak açılır.
               </p>
             </div>
 

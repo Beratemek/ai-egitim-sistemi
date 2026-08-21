@@ -16,7 +16,7 @@ export const metadata: Metadata = { title: "Onay Bekleniyor" };
  * Rol talebi karara baglanana kadar gosterilen ekran.
  *
  * Kullanicinin etkin rolu bu asamada 'ogrenci'dir; yani burada beklerken
- * yetkili alanlara zaten erisemez. Ekran yalnizca durumu anlatir.
+ * yetkili alanlara zaten erisemez. Ekran yalnızca durumu anlatir.
  */
 export default async function OnayBekleniyorPage() {
   const current = await getCurrentUser();
@@ -49,21 +49,21 @@ export default async function OnayBekleniyorPage() {
           </span>
 
           <h1 className="mt-5 text-xl font-semibold tracking-tight">
-            {rejected ? "Talebiniz onaylanmadi" : "Onay bekleniyor"}
+            {rejected ? "Talebiniz onaylanmadı" : "Onay bekleniyor"}
           </h1>
 
           <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
             {rejected ? (
               <>
                 <strong className="font-medium text-foreground">{wanted}</strong> rolu
-                icin yaptiginiz basvuru egitim yoneticisi tarafindan reddedildi.
-                Farkli bir rol icin yeniden basvurabilirsiniz.
+                için yaptığınız başvuru eğitim yöneticisi tarafından reddedildi.
+                Farklı bir rol için yeniden başvurabilirsiniz.
               </>
             ) : (
               <>
                 <strong className="font-medium text-foreground">{wanted}</strong> rolu
-                icin talebiniz egitim yoneticisine iletildi. Onaylandiginda bu hesapla
-                dogrudan panele girebileceksiniz.
+                için talebiniz eğitim yöneticisine iletildi. Onayladığında bu hesapla
+                doğrudan panele girebileceksiniz.
               </>
             )}
           </p>
@@ -79,7 +79,7 @@ export default async function OnayBekleniyorPage() {
             </div>
             <div className="flex items-baseline justify-between gap-3">
               <dt className="text-muted-foreground">
-                {rejected ? "Karar tarihi" : "Basvuru tarihi"}
+                {rejected ? "Karar tarihi" : "Başvuru tarihi"}
               </dt>
               <dd className="font-medium">
                 {formatDateTime(profile.role_reviewed_at ?? profile.updated_at)}
@@ -94,7 +94,7 @@ export default async function OnayBekleniyorPage() {
                 className={cn(buttonVariants(), "flex-1 gap-2")}
               >
                 <UserCog className="h-4 w-4" />
-                Baska bir rol sec
+                Başka bir rol seç
               </Link>
             ) : (
               <Link
@@ -109,7 +109,7 @@ export default async function OnayBekleniyorPage() {
             <form action="/auth/signout" method="post" className="flex-1">
               <Button type="submit" variant="ghost" className="w-full gap-2">
                 <LogOut className="h-4 w-4" />
-                Cikis yap
+                Çıkış yap
               </Button>
             </form>
           </div>

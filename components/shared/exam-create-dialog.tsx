@@ -22,16 +22,16 @@ import { Textarea } from "@/components/ui/textarea";
 
 export interface ExamCreateDialogProps {
   /**
-   * Supabase yapilandirilmis mi? Demo modunda form yine acilir ve incelenebilir;
-   * yalnizca kaydetme adimi hata dondurur. Devre disi buton yerine bu yol
+   * Supabase yapilandirilmis mi? Demo modunda form yine açılır ve incelenebilir;
+   * yalnızca kaydetme adimi hata döndürür. Devre disi buton yerine bu yol
    * secildi: boylece ekranin ne yaptigi gorulebiliyor.
    */
   canPersist?: boolean;
 }
 
 /**
- * Yeni sinav olusturma diyalogu.
- * Sinav taslak olarak dogar; sorular eklendikten sonra yayina alinir.
+ * Yeni sınav oluşturma diyalogu.
+ * Sınav taslak olarak dogar; sorular eklendikten sonra yayına alınır.
  */
 export function ExamCreateDialog({ canPersist = true }: ExamCreateDialogProps) {
   const router = useRouter();
@@ -64,12 +64,12 @@ export function ExamCreateDialog({ canPersist = true }: ExamCreateDialogProps) {
     setPending(false);
 
     if (!result.ok) {
-      toast.error("Sinav olusturulamadi", { description: result.error });
+      toast.error("Sınav oluşturulamadı", { description: result.error });
       return;
     }
 
-    toast.success("Sinav olusturuldu", {
-      description: "Simdi havuzdan soru ekleyip yayina alabilirsiniz.",
+    toast.success("Sınav oluşturuldu", {
+      description: "Şimdi havuzdan soru ekleyip yayına alabilirsiniz.",
     });
 
     setOpen(false);
@@ -77,7 +77,7 @@ export function ExamCreateDialog({ canPersist = true }: ExamCreateDialogProps) {
     setDescription("");
     setStartsAt("");
     setEndsAt("");
-    router.push(`/dashboard/egitmen/sinavlar/${result.data.id}`);
+    router.push(`/dashboard/eğitmen/sınavlar/${result.data.id}`);
   }
 
   return (
@@ -85,40 +85,40 @@ export function ExamCreateDialog({ canPersist = true }: ExamCreateDialogProps) {
       <DialogTrigger asChild>
         <Button className="gap-2">
           <Plus className="h-4 w-4" />
-          Yeni sinav
+          Yeni sınav
         </Button>
       </DialogTrigger>
 
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Yeni sinav olustur</DialogTitle>
+          <DialogTitle>Yeni sınav oluştur</DialogTitle>
           <DialogDescription>
-            Once sinavin adini belirleyin. &ldquo;Olustur&rdquo;a bastiginizda
-            soru secme ekrani acilir; havuzdan soru ekleyip yayina alarak
+            Önce sınavın adini belirleyin. &ldquo;Oluştur&rdquo;a bastiginizda
+            soru seçme ekrani açılır; havuzdan soru ekleyip yayına alarak
             ogrencilere acabilirsiniz.
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="exam-title">Sinav basligi</Label>
+            <Label htmlFor="exam-title">Sınav başlığı</Label>
             <Input
               id="exam-title"
               required
               value={title}
               onChange={(event) => setTitle(event.target.value)}
-              placeholder="Biyoloji 1. Donem Ara Sinavi"
+              placeholder="Biyoloji 1. Dönem Ara Sınavı"
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="exam-description">Aciklama</Label>
+            <Label htmlFor="exam-description">Açıklama</Label>
             <Textarea
               id="exam-description"
               rows={3}
               value={description}
               onChange={(event) => setDescription(event.target.value)}
-              placeholder="Hangi konulari kapsadigini kisaca yazin."
+              placeholder="Hangi konuları kapsadığını kısaca yazın."
               className="resize-y"
             />
           </div>
@@ -132,7 +132,7 @@ export function ExamCreateDialog({ canPersist = true }: ExamCreateDialogProps) {
             <div className="space-y-2">
               <Label htmlFor="exam-starts" className="flex items-center gap-1.5">
                 <CalendarClock className="h-3.5 w-3.5" />
-                Baslangic
+                Başlangıç
               </Label>
               <Input
                 id="exam-starts"
@@ -145,7 +145,7 @@ export function ExamCreateDialog({ canPersist = true }: ExamCreateDialogProps) {
             <div className="space-y-2">
               <Label htmlFor="exam-ends" className="flex items-center gap-1.5">
                 <CalendarClock className="h-3.5 w-3.5" />
-                Bitis
+                Bitiş
               </Label>
               <Input
                 id="exam-ends"
@@ -158,14 +158,14 @@ export function ExamCreateDialog({ canPersist = true }: ExamCreateDialogProps) {
           </div>
 
           <p className="text-xs text-muted-foreground">
-            Tarihler opsiyoneldir; bos birakirsaniz sinav yayina alindigi anda erisilir.
+            Tarihler opsiyoneldir; boş birakirsaniz sınav yayına alindigi anda erisilir.
           </p>
 
           {canPersist ? null : (
             <p className="flex items-start gap-2 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2.5 text-xs text-warning">
               <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               Demo modu: formu inceleyebilirsiniz ama Supabase baglantisi olmadan
-              sinav kaydedilemez.
+              sınav kaydedilemez.
             </p>
           )}
 

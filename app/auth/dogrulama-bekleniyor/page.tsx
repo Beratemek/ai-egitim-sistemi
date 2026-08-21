@@ -10,7 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { isSupabaseConfigured } from "@/lib/env";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 
-export const metadata: Metadata = { title: "E-posta dogrulamasi bekleniyor" };
+export const metadata: Metadata = { title: "E-posta doğrulaması bekleniyor" };
 
 /**
  * Oturum acmis ama e-postasini dogrulamamis kullanicilarin geldigi ekran.
@@ -48,7 +48,7 @@ export default async function DogrulamaBekleniyorPage() {
               </h1>
               <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
                 <span className="font-medium text-foreground">{user.email}</span>{" "}
-                adresine bir dogrulama baglantisi gonderdik. Hesabiniz, baglantiya
+                adresine bir dogrulama baglantisi gonderdik. Hesabınız, baglantiya
                 tiklanana kadar etkinlesmez.
               </p>
             </div>
@@ -59,12 +59,12 @@ export default async function DogrulamaBekleniyorPage() {
               <p>
                 Baglantiyi, uygulamanin calistigi bilgisayarda acmalisiniz - adres
                 <code className="mx-1 font-mono">localhost</code> uzerinden geldigi
-                icin telefondan acilmaz.
+                için telefondan acilmaz.
               </p>
               <p className="mt-2">
-                Baska bir hesapla devam etmek icin{" "}
+                Başka bir hesapla devam etmek için{" "}
                 <Link href="/auth/signout-and-login" className="text-primary underline">
-                  cikis yapin
+                  çıkış yapın
                 </Link>
                 .
               </p>

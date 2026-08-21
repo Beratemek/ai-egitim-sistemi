@@ -56,24 +56,24 @@ type TypeFilter = QuestionType | "hepsi";
 type CategoryFilter = DeneyapCategory | "hepsi";
 
 export interface QuestionPoolTableProps {
-  /** Baslangic verisi. Su an mock; Supabase'e gecerken sunucudan gecirin. */
+  /** Başlangıç verisi. Su an mock; Supabase'e gecerken sunucudan gecirin. */
   questions: readonly Question[];
   /**
-   * true ise onay/red veritabanina yazilir (server action).
-   * false ise degisiklik yalnizca bilesen icindeki state'te kalir - demo modu.
+   * true ise onay/red veritabanına yazilir (server action).
+   * false ise degisiklik yalnızca bilesen icindeki state'te kalir - demo modu.
    */
   persist?: boolean;
 }
 
 const TYPE_LABELS: Record<QuestionType, string> = {
-  test: "Coktan secmeli",
-  acik_uclu: "Acik uclu",
+  test: "Çoktan seçmeli",
+  acik_uclu: "Açık uçlu",
 };
 
 const STATUS_TABS: readonly { value: StatusFilter; label: string }[] = [
-  { value: "hepsi", label: "Tumu" },
+  { value: "hepsi", label: "Tümü" },
   { value: "taslak", label: "Taslak" },
-  { value: "onayli", label: "Onayli" },
+  { value: "onayli", label: "Onaylı" },
   { value: "reddedildi", label: "Reddedildi" },
 ];
 
@@ -124,7 +124,7 @@ export function QuestionPoolTable({
     setPendingId(question.id);
     const previous = rows;
 
-    // Iyimser guncelleme: once arayuz, sonra kalici katman.
+    // Iyimser guncelleme: önce arayuz, sonra kalici katman.
     setRows((current) =>
       current.map((row) =>
         row.id === question.id
@@ -144,7 +144,7 @@ export function QuestionPoolTable({
       });
     } catch (caught) {
       setRows(previous); // basarisiz olursa geri al
-      toast.error("Islem kaydedilemedi", {
+      toast.error("İşlem kaydedilemedi", {
         description: caught instanceof Error ? caught.message : "Lutfen tekrar deneyin.",
       });
     } finally {
@@ -193,7 +193,7 @@ export function QuestionPoolTable({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="hepsi">Tum soru tipleri</SelectItem>
+              <SelectItem value="hepsi">Tüm soru tipleri</SelectItem>
               {QUESTION_TYPES.map((type) => (
                 <SelectItem key={type} value={type}>
                   {TYPE_LABELS[type]}
@@ -210,7 +210,7 @@ export function QuestionPoolTable({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="hepsi">Tum atolye dallari</SelectItem>
+              <SelectItem value="hepsi">Tüm atölye dalları</SelectItem>
               {DENEYAP_CATEGORY_OPTIONS.map((option) => (
                 <SelectItem key={option.value} value={option.value}>
                   {option.label}
@@ -231,7 +231,7 @@ export function QuestionPoolTable({
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
                   <TableHead className="w-[30%]">Soru</TableHead>
-                  <TableHead>Atolye dali</TableHead>
+                  <TableHead>Atölye dalı</TableHead>
                   <TableHead>Ders</TableHead>
                   <TableHead>Konu</TableHead>
                   <TableHead>Tip</TableHead>
@@ -351,7 +351,7 @@ export function QuestionPoolTable({
                           isExpanded && "rotate-180",
                         )}
                       />
-                      {isExpanded ? "Detayi gizle" : "Secenekler / rubrik"}
+                      {isExpanded ? "Detayı gizle" : "Seçenekler / rubrik"}
                     </button>
 
                     {isExpanded ? (
@@ -376,7 +376,7 @@ export function QuestionPoolTable({
       )}
 
       <p className="text-xs text-muted-foreground">
-        {visibleRows.length} / {rows.length} soru gosteriliyor
+        {visibleRows.length} / {rows.length} soru gösteriliyor
       </p>
     </div>
   );
@@ -458,7 +458,7 @@ function QuestionDetail({ question }: { question: Question }) {
     return (
       <div className="space-y-2">
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Secenekler
+          Seçenekler
         </p>
         <ul className="space-y-1.5">
           {(question.options_json ?? []).map((option) => {
@@ -488,10 +488,10 @@ function QuestionDetail({ question }: { question: Question }) {
   return (
     <div className="space-y-2">
       <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-        Puanlama rubrigi
+        Puanlama rubriği
       </p>
       <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">
-        {question.rubric ?? "Rubrik tanimlanmamis."}
+        {question.rubric ?? "Rubrik tanımlanmamış."}
       </pre>
     </div>
   );

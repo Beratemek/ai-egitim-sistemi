@@ -17,8 +17,8 @@ import type { QuestionStatus, QuestionType, SubmissionStatus, UserRole } from "@
 type BadgeVariant = "soft" | "success" | "warning" | "danger" | "outline";
 
 /**
- * Durum rozetleri her zaman IKON + ETIKET tasir.
- * Renk tek basina anlam taşımaz - renk korlugu ve tek renkli ciktilar icin gerekli.
+ * Durum rozetleri her zaman IKON + ETIKET taşır.
+ * Renk tek basina anlam taşımaz - renk korlugu ve tek renkli ciktilar için gerekli.
  */
 const QUESTION_STATUS_META: Record<
   QuestionStatus,

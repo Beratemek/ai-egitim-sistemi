@@ -16,7 +16,7 @@ import { Progress } from "@/components/ui/progress";
 import { getStudentGrowth } from "@/lib/queries";
 import { buildStudyRecommendations } from "@/lib/student-recommendations";
 
-export const metadata: Metadata = { title: "Gelisimim" };
+export const metadata: Metadata = { title: "Gelişimim" };
 
 export default async function OgrenciGelisimPage() {
   const topics = await getStudentGrowth();
@@ -44,25 +44,25 @@ export default async function OgrenciGelisimPage() {
     <>
       <PageHeader
         title="Gelisimim"
-        description="Egitmen onayli cevaplarinizdan hesaplanan kazanim bazli ilerleme."
+        description="Eğitmen onaylı cevaplarınızdan hesaplanan kazanım bazlı ilerleme."
       />
 
       <div className="grid gap-4 sm:grid-cols-3">
         <StatCard
-          label="Onayli cevap"
+          label="Onaylı cevap"
           value={totalAnswers}
           icon={BookOpenCheck}
           accent="primary"
         />
         <StatCard
-          label="Basari ortalamasi"
+          label="Başarı ortalaması"
           value={weightedAverage ?? "-"}
-          hint="100 uzerinden"
+          hint="100 üzerinden"
           icon={Target}
           accent="success"
         />
         <StatCard
-          label="Degerlendirilen kazanim"
+          label="Değerlendirilen kazanım"
           value={topics.length}
           hint={`${outcomeCoverage} tanesi kazanimla eslesmis`}
           icon={TrendingUp}
@@ -75,7 +75,7 @@ export default async function OgrenciGelisimPage() {
             <TrendingUp className="mx-auto h-9 w-9 text-muted-foreground/50" />
             <p className="mt-4 text-sm font-medium">Gelisiminiz henuz hesaplanamiyor</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Egitmen onayli sonuclar geldikce kazanim bazli analiz burada olusacak.
+              Eğitmen onaylı sonuçlar geldikce kazanım bazlı analiz burada olusacak.
             </p>
           </CardContent>
         </Card>
@@ -85,7 +85,7 @@ export default async function OgrenciGelisimPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Sparkles className="h-5 w-5 text-primary" />
-                Sana ozel calisma plani
+                Sana ozel çalışma plani
               </CardTitle>
             </CardHeader>
             <CardContent className="grid gap-4 md:grid-cols-3">
@@ -126,7 +126,7 @@ export default async function OgrenciGelisimPage() {
           <div className="grid gap-6 lg:grid-cols-5">
           <Card className="lg:col-span-3">
             <CardHeader>
-              <CardTitle>Konu bazli basari</CardTitle>
+              <CardTitle>Konu bazlı başarı</CardTitle>
             </CardHeader>
             <CardContent className="space-y-5">
               {topics.map((topic) => (
@@ -141,7 +141,7 @@ export default async function OgrenciGelisimPage() {
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {topic.subject} · {topic.topic}
-                        {topic.outcomeId ? "" : " · Kazanim eslesmesi yok"}
+                        {topic.outcomeId ? "" : " · Kazanım eşleşmesi yok"}
                       </p>
                     </div>
                     <span className="text-sm font-semibold tabular">
@@ -150,7 +150,7 @@ export default async function OgrenciGelisimPage() {
                   </div>
                   <Progress value={topic.averageScore} className="h-2" />
                   <p className="text-xs text-muted-foreground">
-                    {topic.approvedAnswerCount} onayli cevap
+                    {topic.approvedAnswerCount} onaylı cevap
                   </p>
                 </div>
               ))}
@@ -161,13 +161,13 @@ export default async function OgrenciGelisimPage() {
             {strongest ? (
               <Card>
                 <CardContent className="space-y-3 p-5">
-                  <Badge variant="success">Guclu alan</Badge>
+                  <Badge variant="success">Güçlü alan</Badge>
                   <div>
                     <p className="font-semibold">
                       {strongest.outcomeText ?? strongest.topic}
                     </p>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      {strongest.averageScore} ortalama ile en yuksek performansiniz.
+                      {strongest.averageScore} ortalama ile en yüksek performansiniz.
                     </p>
                   </div>
                 </CardContent>
@@ -186,7 +186,7 @@ export default async function OgrenciGelisimPage() {
                       {needsWork.outcomeText ?? needsWork.topic}
                     </p>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      Bu konuda tekrar ve ek calisma performansiniza katkida bulunabilir.
+                      Bu konuda tekrar ve ek çalışma performansiniza katkida bulunabilir.
                     </p>
                   </div>
                 </CardContent>

@@ -25,19 +25,19 @@ import type { Submission } from "@/lib/types";
 
 export interface SubmissionReviewDialogProps {
   submission: Submission;
-  /** Ogrenci adi - baslikta gosterilir. */
+  /** Öğrenci adi - baslikta gösterilir. */
   studentName: string;
-  /** Cevabin ait oldugu soru metni; elde yoksa gecilebilir. */
+  /** Cevabın ait oldugu soru metni; elde yoksa gecilebilir. */
   questionText?: string;
   canPersist?: boolean;
 }
 
 /**
- * Egitmenin AI on puanini onaylama / duzeltme diyalogu.
+ * Eğitmenin AI on puanini onaylama / düzeltme diyalogu.
  *
- * Urunun temel iddiasi burada tamamlanir: AI yalnizca ONERIR, puani
+ * Urunun temel iddiasi burada tamamlanir: AI yalnızca ONERIR, puanı
  * kesinlestiren egitmendir. Onaydan sonra cevap `egitmen_onayli` olur ve
- * ogrenci nihai puani gorur.
+ * öğrenci nihai puanı gorur.
  */
 export function SubmissionReviewDialog({
   submission,
@@ -64,12 +64,12 @@ export function SubmissionReviewDialog({
     parsedScore >= 0 &&
     parsedScore <= 100;
 
-  /** AI puanindan sapma - egitmenin duzeltmesini gorunur kilar. */
+  /** AI puanindan sapma - eğitmenin duzeltmesini görünür kilar. */
   const delta = aiScore !== null && isScoreValid ? parsedScore - aiScore : null;
 
   async function handleApprove() {
     if (!isScoreValid) {
-      setError("Puan 0 ile 100 arasinda bir sayi olmalidir.");
+      setError("Puan 0 ile 100 arasında bir sayı olmalıdır.");
       return;
     }
 
@@ -86,12 +86,12 @@ export function SubmissionReviewDialog({
 
     if (!result.ok) {
       setError(result.error);
-      toast.error("Puan onaylanamadi", { description: result.error });
+      toast.error("Puan onaylanamadı", { description: result.error });
       return;
     }
 
-    toast.success("Puan onaylandi", {
-      description: `${studentName} icin nihai puan ${parsedScore} olarak kaydedildi.`,
+    toast.success("Puan onaylandı", {
+      description: `${studentName} için nihai puan ${parsedScore} olarak kaydedildi.`,
     });
 
     setOpen(false);
@@ -102,16 +102,16 @@ export function SubmissionReviewDialog({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button size="sm" variant="outline" className="gap-1.5">
-          Puani incele
+          Puanı incele
           <ArrowRight className="h-3.5 w-3.5" />
         </Button>
       </DialogTrigger>
 
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Puani onayla</DialogTitle>
+          <DialogTitle>Puanı onayla</DialogTitle>
           <DialogDescription>
-            {studentName} adli ogrencinin cevabi. AI puani bir ONERIDIR; nihai puani
+            {studentName} adli öğrencinin cevabı. AI puanı bir ONERIDIR; nihai puanı
             siz belirlersiniz.
           </DialogDescription>
         </DialogHeader>
@@ -128,7 +128,7 @@ export function SubmissionReviewDialog({
 
           <div className="space-y-1">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Ogrencinin cevabi
+              Öğrencinin cevabı
             </p>
             <p className="max-h-40 overflow-y-auto whitespace-pre-wrap rounded-lg border bg-muted/30 p-3 text-sm leading-relaxed">
               {submission.answer_text}
@@ -153,7 +153,7 @@ export function SubmissionReviewDialog({
               {(submission.ai_criteria_json ?? []).length > 0 ? (
                 <div className="space-y-2 border-t pt-3">
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Rubrik kirilimi
+                    Rubrik kırılımı
                   </p>
                   {(submission.ai_criteria_json ?? []).map((criterion, index) => (
                     <div key={`${criterion.criterion}-${index}`} className="space-y-1">
@@ -181,7 +181,7 @@ export function SubmissionReviewDialog({
             </div>
           ) : (
             <p className="rounded-lg border bg-muted px-3 py-2.5 text-sm text-muted-foreground">
-              Bu cevap icin AI puani yok; puani dogrudan siz belirleyeceksiniz.
+              Bu cevap için AI puanı yok; puanı doğrudan siz belirleyeceksiniz.
             </p>
           )}
 
@@ -208,13 +208,13 @@ export function SubmissionReviewDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor={`note-${submission.id}`}>Egitmen notu (opsiyonel)</Label>
+            <Label htmlFor={`note-${submission.id}`}>Eğitmen notu (opsiyonel)</Label>
             <Textarea
               id={`note-${submission.id}`}
               rows={3}
               value={note}
               onChange={(event) => setNote(event.target.value)}
-              placeholder="Ogrenciye iletilecek kisa aciklama..."
+              placeholder="Öğrenciye iletilecek kısa açıklama..."
               className="resize-y"
             />
           </div>
@@ -251,7 +251,7 @@ export function SubmissionReviewDialog({
             ) : (
               <>
                 <Check className="h-4 w-4" />
-                Puani onayla
+                Puanı onayla
               </>
             )}
           </Button>

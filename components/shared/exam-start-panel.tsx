@@ -17,7 +17,7 @@ interface ExamStartPanelProps {
   endsAt: string | null;
 }
 
-/** Sorulari gostermeden once sinav kurallarini ve baslatma onayini sunar. */
+/** Soruları gostermeden önce sınav kurallarini ve baslatma onayini sunar. */
 export function ExamStartPanel({
   examId,
   questionCount,
@@ -36,40 +36,40 @@ export function ExamStartPanel({
 
     if (!result.ok) {
       setError(result.error);
-      toast.error("Sinav baslatilamadi", { description: result.error });
+      toast.error("Sınav başlatılamadı", { description: result.error });
       return;
     }
 
-    toast.success("Sinav baslatildi");
+    toast.success("Sınav başlatıldı");
     router.refresh();
   }
 
   return (
     <Card className="mx-auto max-w-2xl border-primary/20">
       <CardHeader>
-        <CardTitle>Sinava baslamadan once</CardTitle>
+        <CardTitle>Sınava başlamadan önce</CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="grid gap-3 sm:grid-cols-3">
-          <Info label="Soru sayisi" value={String(questionCount)} />
+          <Info label="Soru sayısı" value={String(questionCount)} />
           <Info label="Toplam puan" value={String(totalPoints)} />
           <Info
             label="Son teslim"
-            value={endsAt ? formatDateTime(endsAt) : "Sure siniri yok"}
+            value={endsAt ? formatDateTime(endsAt) : "Süre sınırı yok"}
           />
         </div>
 
         <ul className="space-y-3 text-sm text-muted-foreground">
-          <Rule>Cevaplariniz her soruda ayri ayri kaydedilir.</Rule>
-          <Rule>Sinavi teslim edene kadar kaydedilen cevaplari degistirebilirsiniz.</Rule>
-          <Rule>Sure doldugunda kaydedilen cevaplar otomatik teslim edilir.</Rule>
-          <Rule>Nihai sonucunuz egitmen onayindan sonra aciklanir.</Rule>
+          <Rule>Cevaplarınız her soruda ayrı ayrı kaydedilir.</Rule>
+          <Rule>Sınavı teslim edene kadar kaydedilen cevapları değiştirebilirsiniz.</Rule>
+          <Rule>Süre dolduğunda kaydedilen cevaplar otomatik teslim edilir.</Rule>
+          <Rule>Nihai sonucunuz eğitmen onayından sonra açıklanır.</Rule>
         </ul>
 
         {endsAt ? (
           <p className="flex items-start gap-2 rounded-lg bg-muted px-3 py-2.5 text-xs text-muted-foreground">
             <CalendarClock className="mt-0.5 h-4 w-4 shrink-0" />
-            Sinavi baslatmaniz son teslim zamanini degistirmez.
+            Sınavı baslatmaniz son teslim zamanini degistirmez.
           </p>
         ) : null}
 
@@ -82,7 +82,7 @@ export function ExamStartPanel({
 
         <Button onClick={handleStart} disabled={pending || questionCount === 0} className="w-full gap-2">
           {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-          {pending ? "Sinav baslatiliyor..." : "Sinava basla"}
+          {pending ? "Sınav başlatılıyor..." : "Sınava başla"}
         </Button>
       </CardContent>
     </Card>

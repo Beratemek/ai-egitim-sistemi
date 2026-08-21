@@ -6,7 +6,7 @@ import { Loader2, Send } from "lucide-react";
 import { resendConfirmationEmail } from "@/app/actions/auth";
 import { Button } from "@/components/ui/button";
 
-/** Dogrulama e-postasini yeniden gonderme butonu ve sonuc mesaji. */
+/** Dogrulama e-postasini yeniden gonderme butonu ve sonuç mesaji. */
 export function ResendConfirmation({ email }: { email: string }) {
   const [pending, startTransition] = React.useTransition();
   const [result, setResult] = React.useState<
@@ -31,7 +31,7 @@ export function ResendConfirmation({ email }: { email: string }) {
         ) : (
           <Send className="h-4 w-4" />
         )}
-        Dogrulama e-postasini yeniden gonder
+        Dogrulama e-postasini yeniden gönder
       </Button>
 
       {result ? (

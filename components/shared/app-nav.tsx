@@ -89,7 +89,7 @@ const BASE_NAV = {
 /**
  * Rol basina sol menu.
  *
- * `admin` gizli bir roldur ve sitedeki her panele girer; menusu de diger tum
+ * `admin` gizli bir roldur ve sitedeki her panele girer; menüsü de diger tüm
  * rollerin menulerinin birlesimidir. Boylece yeni bir sayfa hangi role
  * eklenirse eklensin admin otomatik olarak gorur.
  */
@@ -105,7 +105,7 @@ export const ROLE_NAV: Record<UserRole, readonly NavItem[]> = {
 
 export interface NavLinksProps {
   role: UserRole;
-  /** Mobil cekmecede baglantiya tiklandiginda paneli kapatmak icin. */
+  /** Mobil cekmecede baglantiya tiklandiginda paneli kapatmak için. */
   onNavigate?: () => void;
 }
 

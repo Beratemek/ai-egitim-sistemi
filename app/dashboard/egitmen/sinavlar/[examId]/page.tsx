@@ -10,10 +10,10 @@ import { Badge } from "@/components/ui/badge";
 import { isSupabaseConfigured } from "@/lib/env";
 import { getExamDetail, getQuestions, getSubmissions } from "@/lib/queries";
 
-export const metadata: Metadata = { title: "Sinav Detayi" };
+export const metadata: Metadata = { title: "Sınav Detayı" };
 
 /**
- * Sinav kurma ekrani.
+ * Sınav kurma ekrani.
  * Next.js 15'te `params` asenkrondur; bu yuzden await edilir.
  */
 export default async function SinavDetayPage({
@@ -38,18 +38,18 @@ export default async function SinavDetayPage({
         className="flex w-fit items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground print:hidden"
       >
         <ArrowLeft className="h-4 w-4" />
-        Sinavlar
+        Sınavlar
       </Link>
 
       <PageHeader
         className="print:hidden"
         title={detail.exam.title}
         description={
-          detail.exam.description || "Havuzdan soru ekleyip sinavi yayina alin."
+          detail.exam.description || "Havuzdan soru ekleyip sınavı yayına alın."
         }
         actions={
           isSupabaseConfigured ? null : (
-            <Badge variant="warning">Demo — degisiklikler kaydedilmez</Badge>
+            <Badge variant="warning">Demo — değişiklikler kaydedilmez</Badge>
           )
         }
       />

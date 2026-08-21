@@ -9,11 +9,11 @@ import { getExams, getQuestions } from "@/lib/queries";
 export const metadata: Metadata = { title: "Soru Havuzu" };
 
 /**
- * Egitmenin soru havuzu.
+ * Eğitmenin soru havuzu.
  *
- * Yalnizca ONAYLI sorular gosterilir - taslak inceleme ve onay/red icerik
- * uzmaninin ekranindadir. Egitmen havuzu atolye dali -> konu -> soru olarak
- * gezer, isaretledigi sorulari bir sinava ekler.
+ * Yalnızca Onaylı sorular gösterilir - taslak inceleme ve onay/red içerik
+ * uzmaninin ekranindadir. Eğitmen havuzu atölye dalı -> konu -> soru olarak
+ * gezer, isaretledigi soruları bir sınava ekler.
  */
 export default async function SoruHavuzuPage() {
   const [questions, exams] = await Promise.all([
@@ -25,10 +25,10 @@ export default async function SoruHavuzuPage() {
     <>
       <PageHeader
         title="Soru Havuzu"
-        description="Havuz atolye dali, konu ve soru olarak kirilir. Dala girin, konuyu acin, sorulari isaretleyip sinaviniza ekleyin."
+        description="Havuz atölye dalı, konu ve soru olarak kırılır. Dala girin, konuyu açın, soruları işaretleyip sınavınıza ekleyin."
         actions={
           isSupabaseConfigured ? null : (
-            <Badge variant="warning">Demo — degisiklikler kaydedilmez</Badge>
+            <Badge variant="warning">Demo — değişiklikler kaydedilmez</Badge>
           )
         }
       />

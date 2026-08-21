@@ -48,9 +48,9 @@ import type {
 type TypeChoice = QuestionType | "karisik";
 
 /**
- * Toplu revizyon dugmeleri. Serbest metin bilincli olarak YOK: "sunu sunu
- * degistir" gibi tek soruya ozgu talimatlar toplu isleme uygun degil, onlar
- * kart icindeki duzenleme diyalogunda veriliyor.
+ * Toplu revizyon dugmeleri. Serbest metin bilincli olarak Yok: "sunu sunu
+ * degistir" gibi tek soruya ozgu talimatlar toplu isleme uygun değil, onlar
+ * kart icindeki düzenleme diyalogunda veriliyor.
  */
 const BULK_PRESETS: readonly { key: string; label: string }[] = [
   { key: "zorlastir", label: "Zorlastir" },
@@ -60,36 +60,36 @@ const BULK_PRESETS: readonly { key: string; label: string }[] = [
 ];
 
 export interface QuestionGeneratorFormProps {
-  /** Havuzda halihazirda kullanilan ders adlari; oneri olarak sunulur. */
+  /** Havuzda halihazirda kullanılan ders adlari; öneri olarak sunulur. */
   subjects?: readonly string[];
-  /** AI'in bugune kadar ogrendigi ornek sayilari. */
+  /** AI'in bugune kadar ogrendigi örnek sayilari. */
   preferenceStats: { liked: number; disliked: number };
   /** Supabase yoksa kaydetme kapali olur. */
   canPersist: boolean;
 }
 
 /**
- * Icerik uzmaninin kaynak metin + kazanim girip AI'dan soru taslagi
+ * İçerik uzmaninin kaynak metin + kazanım girip AI'dan soru taslağı
  * uretmesini saglar.
  *
- * Uretilen her taslak begenilebilir/reddedilebilir; bu geri bildirim
- * `question_preferences` tablosuna yazilir ve bir sonraki uretimde modele
- * ornek olarak verilir. Begenilen taslaklar tek tikla havuza gonderilir.
+ * Üretilen her taslak begenilebilir/reddedilebilir; bu geri bildirim
+ * `question_preferences` tablosuna yazilir ve bir sonraki üretimde modele
+ * örnek olarak verilir. Begenilen taslaklar tek tikla havuza gönderilir.
  */
 export function QuestionGeneratorForm({
   subjects = [],
   preferenceStats,
   canPersist,
 }: QuestionGeneratorFormProps) {
-  /** DENEYAP atolye dali - uretilen sorular bu dala baglanir. */
+  /** DENEYAP atölye dalı - üretilen sorular bu dala baglanir. */
   const [category, setCategory] = React.useState<DeneyapCategory | "">("");
   const [subject, setSubject] = React.useState("");
   const [topic, setTopic] = React.useState("");
   const [kazanim, setKazanim] = React.useState("");
   const [context, setContext] = React.useState("");
   /**
-   * Soru adedi METIN olarak tutulur: `Number(value) || 1` kalibi alani
-   * bosaltilir bosaltilmaz 1'e cevirdigi icin kullanici istedigi sayiyi
+   * Soru adedi Metin olarak tutulur: `Number(value) || 1` kalibi alanı
+   * bosaltilir bosaltilmaz 1'e cevirdigi için kullanıcı istedigi sayiyi
    * yazamiyordu. Gonderirken sayiya cevrilip 1-20 araligina sikistirilir.
    */
   const [count, setCount] = React.useState("5");
@@ -100,22 +100,22 @@ export function QuestionGeneratorForm({
   const [error, setError] = React.useState<string | null>(null);
   const [results, setResults] = React.useState<GeneratedQuestion[]>([]);
   const [selected, setSelected] = React.useState<Set<number>>(new Set());
-  /** Toplu revizyon sirasinda hangi talimat calisiyor ve kacinci soruda. */
+  /** Toplu revizyon sırasında hangi talimat çalışıyor ve kacinci soruda. */
   const [bulkPreset, setBulkPreset] = React.useState<string | null>(null);
   const [bulkDone, setBulkDone] = React.useState(0);
 
   const learnedTotal = preferenceStats.liked + preferenceStats.disliked;
 
-  /** Alan bos veya gecersizse 5'e duser; her zaman 1-20 araliginda. */
+  /** Alan boş veya gecersizse 5'e düşer; her zaman 1-20 araliginda. */
   const resolvedCount = Math.min(Math.max(Number.parseInt(count, 10) || 5, 1), 20);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    // Metin alani sekmelerden birinde gizli kalabildigi icin dogrulama burada.
+    // Metin alanı sekmelerden birinde gizli kalabildigi için dogrulama burada.
     if (context.trim().length < 20) {
       const message =
-        "Kaynak metin en az 20 karakter olmalidir. Metni yapistirin ya da bir dosya yukleyin.";
+        "Kaynak metin en az 20 karakter olmalıdır. Metni yapıştırın ya da bir dosya yükleyin.";
       setError(message);
       toast.error("Kaynak metin eksik", { description: message });
       return;
@@ -145,17 +145,17 @@ export function QuestionGeneratorForm({
 
       setResults(body.data);
       setSelected(new Set());
-      toast.success(`${body.data.length} soru taslagi uretildi`, {
+      toast.success(`${body.data.length} soru taslağı üretildi`, {
         description:
           learnedTotal > 0
-            ? `${preferenceStats.liked} begeni ve ${preferenceStats.disliked} red ornegi dikkate alindi.`
-            : "Taslaklari begenerek AI'a tarzinizi ogretebilirsiniz.",
+            ? `${preferenceStats.liked} beğeni ve ${preferenceStats.disliked} red örneği dikkate alındı.`
+            : "Taslakları beğenerek AI'a tarzınızı öğretebilirsiniz.",
       });
     } catch (caught) {
       const message =
-        caught instanceof Error ? caught.message : "Soru uretilirken bir hata olustu.";
+        caught instanceof Error ? caught.message : "Soru üretilirken bir hata oluştu.";
       setError(message);
-      toast.error("Soru uretilemedi", { description: message });
+      toast.error("Soru üretilemedi", { description: message });
     } finally {
       setPending(false);
     }
@@ -168,7 +168,7 @@ export function QuestionGeneratorForm({
       .filter((question): question is GeneratedQuestion => question !== undefined);
 
     if (chosen.length === 0) {
-      toast.error("Once en az bir soru secin");
+      toast.error("Önce en az bir soru seçin");
       return;
     }
 
@@ -182,12 +182,12 @@ export function QuestionGeneratorForm({
     setSaving(false);
 
     if (!result.ok) {
-      toast.error("Havuza gonderilemedi", { description: result.error });
+      toast.error("Havuza gönderilemedi", { description: result.error });
       return;
     }
 
-    toast.success(`${result.data.saved} soru havuza gonderildi`, {
-      description: "Egitmen onayindan sonra sinavlarda kullanilabilir.",
+    toast.success(`${result.data.saved} soru havuza gönderildi`, {
+      description: "Eğitmen onayından sonra sınavlarda kullanılabilir.",
     });
 
     // Kaydedilenleri listeden dus
@@ -195,7 +195,7 @@ export function QuestionGeneratorForm({
     setSelected(new Set());
   }
 
-  /** Duzenlenen ya da revize edilen taslagi listede yerine koyar. */
+  /** Duzenlenen ya da revize edilen taslağı listede yerine koyar. */
   function replaceResult(index: number, revised: GeneratedQuestion) {
     setResults((current) =>
       current.map((item, position) => (position === index ? revised : item)),
@@ -203,11 +203,11 @@ export function QuestionGeneratorForm({
   }
 
   /**
-   * Secili taslaklari ayni talimatla revize eder.
+   * Seçili taslakları ayni talimatla revize eder.
    *
-   * Cagrilar SIRAYLA yapiliyor: ucretsiz katmanda dakika basina istek siniri
-   * var, hepsini paralel gondermek kotayi bir kerede tuketiyor. Ilerleme
-   * kullaniciya "2/3" seklinde gosterilir.
+   * Cagrilar SIRAYLA yapiliyor: ucretsiz katmanda dakika basina istek sınırı
+   * var, hepsini paralel gondermek kotayi bir kerede tuketiyor. İlerleme
+   * kullaniciya "2/3" seklinde gösterilir.
    */
   async function bulkRevise(preset: string) {
     const indexes = [...selected].sort((a, b) => a - b);
@@ -253,7 +253,7 @@ export function QuestionGeneratorForm({
       toast.success(`${indexes.length} soru revize edildi`);
     } else {
       toast.warning(`${indexes.length - failed} soru revize edildi`, {
-        description: `${failed} soruda hata olustu, tekrar deneyebilirsiniz.`,
+        description: `${failed} soruda hata oluştu, tekrar deneyebilirsiniz.`,
       });
     }
   }
@@ -275,23 +275,23 @@ export function QuestionGeneratorForm({
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Wand2 className="h-4.5 w-4.5 text-primary" />
-              Kazanimdan soru uret
+              Kazanımdan soru üret
             </CardTitle>
             <CardDescription>
-              Konu ve kazanimi yazin, kaynak metni girin.
+              Konu ve kazanımı yazın, kaynak metni girin.
             </CardDescription>
           </CardHeader>
 
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="category">Atolye dali</Label>
+                <Label htmlFor="category">Atölye dalı</Label>
                 <Select
                   value={category}
                   onValueChange={(value) => setCategory(value as DeneyapCategory)}
                 >
                   <SelectTrigger id="category">
-                    <SelectValue placeholder="DENEYAP dali secin" />
+                    <SelectValue placeholder="DENEYAP dalı seçin" />
                   </SelectTrigger>
                   <SelectContent>
                     {DENEYAP_CATEGORY_OPTIONS.map((option) => (
@@ -302,7 +302,7 @@ export function QuestionGeneratorForm({
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  Uretilen sorular bu dala kaydedilir; havuz dal bazinda filtrelenir.
+                  Üretilen sorular bu dala kaydedilir; havuz dal bazinda filtrelenir.
                 </p>
               </div>
 
@@ -351,13 +351,13 @@ export function QuestionGeneratorForm({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="kazanim">Kazanim</Label>
+                <Label htmlFor="kazanim">Kazanım</Label>
                 <Input
                   id="kazanim"
                   required
                   value={kazanim}
                   onChange={(event) => setKazanim(event.target.value)}
-                  placeholder="Ogrenci fotosentezin evrelerini aciklar."
+                  placeholder="Öğrenci fotosentezin evrelerini açıklar."
                 />
               </div>
 
@@ -375,8 +375,8 @@ export function QuestionGeneratorForm({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="karisik">Karisik</SelectItem>
-                    <SelectItem value="test">Coktan secmeli</SelectItem>
-                    <SelectItem value="acik_uclu">Acik uclu</SelectItem>
+                    <SelectItem value="test">Çoktan seçmeli</SelectItem>
+                    <SelectItem value="acik_uclu">Açık uçlu</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -400,7 +400,7 @@ export function QuestionGeneratorForm({
                 ) : (
                   <>
                     <Sparkles className="h-4 w-4" />
-                    Soru uret
+                    Soru üret
                   </>
                 )}
               </Button>
@@ -419,16 +419,16 @@ export function QuestionGeneratorForm({
                 <p className="text-sm font-medium">AI tarz hafizasi</p>
                 {learnedTotal === 0 ? (
                   <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                    Henuz ornek yok. Uretilen taslaklari begenip reddettikce AI
-                    sizin soru tarzinizi ogrenir ve sonraki uretimlerde ona yaklasir.
+                    Henüz örnek yok. Üretilen taslakları begenip reddettikce AI
+                    sizin soru tarzınızı ogrenir ve sonraki uretimlerde ona yaklasir.
                   </p>
                 ) : (
                   <>
                     <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                      Bir sonraki uretimde bu ornekler modele veriliyor.
+                      Bir sonraki üretimde bu ornekler modele veriliyor.
                     </p>
                     <div className="mt-2 flex flex-wrap gap-2">
-                      <Badge variant="success">{preferenceStats.liked} begeni</Badge>
+                      <Badge variant="success">{preferenceStats.liked} beğeni</Badge>
                       <Badge variant="danger">{preferenceStats.disliked} red</Badge>
                     </div>
                   </>
@@ -439,23 +439,23 @@ export function QuestionGeneratorForm({
         </Card>
       </div>
 
-      {/* ---------- Sag: sonuclar ---------- */}
+      {/* ---------- Sag: sonuçlar ---------- */}
       <div className="space-y-3 xl:col-span-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-            Uretilen taslaklar
+            Üretilen taslaklar
           </h2>
 
           {results.length > 0 ? (
             <div className="flex items-center gap-2">
-              <Badge variant="soft">{selected.size} / {results.length} secili</Badge>
+              <Badge variant="soft">{selected.size} / {results.length} seçili</Badge>
               <Button
                 size="sm"
                 className="gap-1.5"
                 disabled={saving || selected.size === 0 || !canPersist}
                 onClick={() => void handleSaveSelected()}
                 title={
-                  canPersist ? undefined : "Kaydetmek icin Supabase baglantisi gerekiyor"
+                  canPersist ? undefined : "Kaydetmek için Supabase baglantisi gerekiyor"
                 }
               >
                 {saving ? (
@@ -463,7 +463,7 @@ export function QuestionGeneratorForm({
                 ) : (
                   <UploadCloud className="h-3.5 w-3.5" />
                 )}
-                Havuza gonder
+                Havuza gönder
               </Button>
             </div>
           ) : null}
@@ -487,7 +487,7 @@ export function QuestionGeneratorForm({
               <Sparkles className="h-8 w-8 text-muted-foreground/50" />
               <p className="font-medium">Henuz soru uretilmedi</p>
               <p className="max-w-xs text-sm text-muted-foreground">
-                Soldaki formu doldurup &quot;Soru uret&quot; butonuna basin.
+                Soldaki formu doldurup &quot;Soru üret&quot; butonuna basın.
               </p>
             </CardContent>
           </Card>
@@ -511,14 +511,14 @@ export function QuestionGeneratorForm({
         )}
 
         {/*
-          Toplu eylem cubugu: 2+ taslak secilince gorunur ve ekranin altina
+          Toplu eylem cubugu: 2+ taslak secilince görünür ve ekranin altina
           yapisir. Kartlarin her birine dort dugme koymak yerine boyle
           yapildi - varsayilan gorunum temiz kaliyor, toplu is de mumkun.
         */}
         {selected.size >= 2 ? (
           <div className="sticky bottom-4 z-10 flex flex-wrap items-center gap-2 rounded-xl border bg-card/95 p-3 shadow-lg backdrop-blur">
             <span className="text-sm font-medium">
-              {selected.size} soru secili
+              {selected.size} soru seçili
             </span>
 
             {bulkPreset ? (

@@ -7,8 +7,8 @@ import { cn } from "@/lib/utils";
 export interface CheckboxProps
   extends Omit<React.ComponentProps<"input">, "type"> {
   /**
-   * Kismi secim. Native `indeterminate` bir HTML niteligi degil, DOM
-   * ozelligidir; bu yuzden ref uzerinden atanir.
+   * Kismi seçim. Native `indeterminate` bir HTML niteligi değil, DOM
+   * ozelligidir; bu yuzden ref üzerinden atanir.
    */
   indeterminate?: boolean;
 }

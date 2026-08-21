@@ -4,23 +4,23 @@ import { cn } from "@/lib/utils";
 import { paginate, type NumberedQuestion } from "@/lib/exam-paper";
 
 /**
- * Basilmaya hazir sinav kagidi.
+ * Basilmaya hazır sınav kâğıdı.
  *
- * Ekranda gercek olcusunde (210x297mm) bir yaprak gibi durur; yazdirmada
+ * Ekranda gerçek olcusunde (210x297mm) bir yaprak gibi durur; yazdirmada
  * `print:` varyantlari ile golge/cerceve kalkar ve `@page` kurallari
  * (bkz. app/globals.css) devreye girer. Renkler bilerek sabit: panel koyu
- * temada olsa da kagit her zaman beyaz kalir.
+ * temada olsa da kâğıt her zaman beyaz kalir.
  */
 
 export interface ExamPaperMeta {
   title: string;
   school: string;
   lesson: string;
-  /** Sinif / sube bilgisi. `className` React ile cakistigi icin bu ad. */
+  /** Sınıf / sube bilgisi. `className` React ile cakistigi için bu ad. */
   grade: string;
-  /** ISO tarih (yyyy-aa-gg). Bos ise kagitta noktali bosluk birakilir. */
+  /** ISO tarih (yyyy-aa-gg). Boş ise kagitta noktali bosluk birakilir. */
   date: string;
-  /** Sinav suresi, dakika. */
+  /** Sınav süresi, dakika. */
   duration: string;
   instructions: string;
 }
@@ -28,11 +28,11 @@ export interface ExamPaperMeta {
 export interface ExamPaperProps {
   meta: ExamPaperMeta;
   questions: readonly NumberedQuestion[];
-  /** Sona ayri bir yaprak olarak cevap anahtari eklenir. */
+  /** Sona ayrı bir yaprak olarak cevap anahtarı eklenir. */
   showAnswerKey?: boolean;
 }
 
-/** Acik uclu sorularin altina birakilan cizgi sayisi. */
+/** Açık uçlu soruların altina bırakılan cizgi sayısı. */
 const ANSWER_LINES = 4;
 
 export function ExamPaper({ meta, questions, showAnswerKey = false }: ExamPaperProps) {
@@ -274,7 +274,7 @@ function PaperFoot({
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Cevap anahtari                                                            */
+/*  Cevap anahtarı                                                            */
 /* -------------------------------------------------------------------------- */
 
 function AnswerKeySheet({
@@ -356,7 +356,7 @@ function AnswerKeySheet({
 
 /* -------------------------------------------------------------------------- */
 
-/** ISO tarihi "20.08.2026" yapar; bos ise kagitta doldurulacak bosluk birakir. */
+/** ISO tarihi "20.08.2026" yapar; boş ise kagitta doldurulacak bosluk birakir. */
 function formatPaperDate(iso: string): string {
   if (!iso) return "...... / ...... / ..........";
 

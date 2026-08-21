@@ -22,47 +22,47 @@ import { cn } from "@/lib/utils";
 const PIPELINE: readonly { icon: LucideIcon; title: string; body: string }[] = [
   {
     icon: FileUp,
-    title: "Icerik yuklenir",
-    body: "Icerik uzmani kaynak metni ve kazanimi sisteme girer.",
+    title: "İçerik yüklenir",
+    body: "İçerik uzmanı kaynak metni ve kazanımı sisteme girer.",
   },
   {
     icon: BrainCircuit,
-    title: "AI soru uretir",
-    body: "Model kazanima uygun test ve acik uclu taslaklari sema zorlamali JSON olarak dondurur.",
+    title: "AI soru üretir",
+    body: "Model kazanıma uygun test ve açık uçlu taslakları şema zorlamalı JSON olarak döndürür.",
   },
   {
     icon: ClipboardCheck,
-    title: "Egitmen onaylar",
-    body: "Taslaklar incelenir; onaylananlar soru havuzuna girer, digerleri reddedilir.",
+    title: "Eğitmen onaylar",
+    body: "Taslaklar incelenir; onaylananlar soru havuzuna girer, diğerleri reddedilir.",
   },
   {
     icon: GraduationCap,
-    title: "Ogrenci cevaplar",
-    body: "Sinav sirasinda acik uclu cevaplar toplanir.",
+    title: "Öğrenci cevaplar",
+    body: "Sınav sırasında açık uçlu cevaplar toplanır.",
   },
   {
     icon: ShieldCheck,
-    title: "AI puanlar, egitmen dogrular",
-    body: "Cevap rubrige gore puanlanir; nihai puani her zaman egitmen onaylar.",
+    title: "AI puanlar, eğitmen doğrular",
+    body: "Cevap rubriğe göre puanlanır; nihai puanı her zaman eğitmen onaylar.",
   },
   {
     icon: LineChart,
-    title: "Yonetici raporlar",
-    body: "Sinav bazli ortalama, katilim ve onay oranlari izlenir.",
+    title: "Yönetici raporlar",
+    body: "Sınav bazlı ortalama, katılım ve onay oranları izlenir.",
   },
 ];
 
 export default function HomePage() {
   return (
     <div className="min-h-screen">
-      {/* ---------- Ust cubuk ---------- */}
+      {/* ---------- Üst cubuk ---------- */}
       <header className="sticky top-0 z-20 border-b bg-background/80 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
           <BrandMark />
           <div className="flex items-center gap-2">
             <ThemeToggle />
             <Link href="/login" className={cn(buttonVariants({ size: "sm" }), "gap-2")}>
-              Giris yap
+              Giriş yap
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
@@ -91,8 +91,8 @@ export default function HomePage() {
               </h1>
 
               <p className="mx-auto mt-5 max-w-2xl text-lg leading-relaxed text-muted-foreground">
-                Kazanimdan soruya, cevaptan puana kadar tum degerlendirme surecini
-                yapay zeka ile hizlandirin — son sozu her zaman egitmen soylesin.
+                Kazanımdan soruya, cevaptan puana kadar tüm değerlendirme surecini
+                yapay zeka ile hizlandirin — son sozu her zaman eğitmen soylesin.
               </p>
 
               <div className="mt-8 flex flex-wrap justify-center gap-3">
@@ -100,7 +100,7 @@ export default function HomePage() {
                   href="/login"
                   className={cn(buttonVariants({ size: "lg" }), "gap-2")}
                 >
-                  Hemen basla
+                  Hemen başla
                   <ArrowRight className="h-4 w-4" />
                 </Link>
                 <Link
@@ -124,7 +124,7 @@ export default function HomePage() {
               Dort rol, dort panel
             </h2>
             <p className="mt-2 text-muted-foreground">
-              Her kullanici yalnizca kendi isine odaklanan bir arayuz gorur.
+              Her kullanıcı yalnızca kendi isine odaklanan bir arayuz gorur.
             </p>
           </div>
 
