@@ -369,6 +369,124 @@ function collectUsable(
 }
 
 /* -------------------------------------------------------------------------- */
+/*  reviseQuestion                                                            */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Hazir revizyon istekleri.
+ *
+ * Icerik uzmani cogu zaman ayni dort seyi istiyor; her seferinde yazmasin
+ * diye tek tikla gonderilen kalip talimatlar. Anahtarlar arayuzdeki
+ * dugmelerle, degerler modele giden metinle eslesir.
+ */
+export const REVISION_PRESETS = {
+  zorlastir:
+    "Soruyu ZORLASTIR: daha ust bilissel seviyeye tasi (uygulama, analiz), " +
+    "celdiricileri birbirine yaklastir ama tek dogru cevabi koru. Konu ayni kalsin.",
+  kolaylastir:
+    "Soruyu KOLAYLASTIR: dili sadelestir, tek adimda cevaplanabilir hale getir, " +
+    "celdiricileri belirgin sekilde yanlis yap. Konu ayni kalsin.",
+  kisalt:
+    "Soru kokunu KISALT: gereksiz betimlemeleri at, tek cumleye indir. " +
+    "Olculen bilgi ve secenekler ayni kalsin.",
+  celdirici:
+    "CELDIRICILERI GUCLENDIR: yanlis siklarin her biri yaygin bir kavram " +
+    "yanilgisina karsilik gelsin ve makul gorunsun. Dogru cevap degismesin.",
+} as const;
+
+export type RevisionPreset = keyof typeof REVISION_PRESETS;
+
+export function isRevisionPreset(value: unknown): value is RevisionPreset {
+  return typeof value === "string" && value in REVISION_PRESETS;
+}
+
+export interface ReviseQuestionOptions {
+  /** DENEYAP atolye dali adi - modele alan baglami verir. */
+  categoryLabel?: string;
+  /** Sorunun olctugu kazanim; revizyonun hedefi degismesin diye gonderilir. */
+  kazanim?: string;
+  /** Kaynak metin. Verilirse model bilgi uydurmadan revize eder. */
+  context?: string;
+}
+
+/**
+ * Var olan bir soru taslagini icerik uzmaninin talimatina gore yeniden yazar.
+ *
+ * Uretimden farki: sifirdan soru uretmez, ELDEKI soruyu degistirir. Soru tipi
+ * (test / acik uclu) ve olculen kazanim korunur; degisen sey zorluk, uzunluk
+ * veya celdirici kalitesidir.
+ *
+ * Cikti uretimdeki ayni iki asamadan gecer: sema zorlamasi + kaynaga atif
+ * yapan sorulari eleme.
+ */
+export async function reviseQuestion(
+  question: GeneratedQuestion,
+  instruction: string,
+  options: ReviseQuestionOptions = {},
+): Promise<GeneratedQuestion> {
+  const trimmed = instruction.trim();
+  if (!trimmed) {
+    throw new Error("[ai] reviseQuestion: talimat bos olamaz.");
+  }
+
+  if (serverEnv.aiMockMode) {
+    return mockReviseQuestion(question, trimmed);
+  }
+
+  const { categoryLabel, kazanim, context } = options;
+
+  const shapeRule =
+    question.type === "test"
+      ? "Soru COKTAN SECMELI kalmali: 4 sik ve tek dogru cevap bulunmali, rubric null olmali."
+      : "Soru ACIK UCLU kalmali: options ve correct_answer null, rubric madde madde ve toplami 100 puan olmali.";
+
+  const { object } = await generateObject({
+    model: getModel(serverEnv.aiModelGeneration),
+    schema: generatedQuestionSchema,
+    system: [
+      "Sen deneyimli bir olcme-degerlendirme uzmanisin.",
+      "Sana VAR OLAN bir sinav sorusu ve uzmanin revizyon talimati verilir.",
+      "Soruyu talimata gore yeniden yazarsin; sifirdan yeni bir soru URETMEZSIN.",
+      "Sorunun tipi ve olctugu kazanim DEGISMEZ; yalnizca talimatta istenen ozellik degisir.",
+      shapeRule,
+      "ASLA kaynaga atifta bulunma: 'kaynak metne gore', 'kitaba gore', 'kacinci haftada' gibi ifadeler yasak.",
+      "Ogrenci soruyu tek basina okuyup cevaplayabilmeli.",
+      "Bilgi uydurma; verilen konunun disina cikma.",
+    ].join(" "),
+    prompt: [
+      categoryLabel ? `ATOLYE DALI:\n${categoryLabel}` : "",
+      kazanim ? `OLCULEN KAZANIM:\n${kazanim}` : "",
+      context ? `BILGI KAYNAGI (atif YAPMA):\n${context}` : "",
+      `MEVCUT SORU:\n${JSON.stringify(
+        {
+          topic: question.topic,
+          text: question.text,
+          type: question.type,
+          options: question.options,
+          correct_answer: question.correct_answer,
+          rubric: question.rubric,
+          difficulty: question.difficulty,
+        },
+        null,
+        2,
+      )}`,
+      `UZMANIN TALIMATI:\n${trimmed}`,
+      "GOREV: Talimati uygulayarak sorunun revize edilmis halini dondur.",
+    ]
+      .filter(Boolean)
+      .join("\n\n"),
+  });
+
+  if (looksLikeMetaQuestion(object.text)) {
+    throw new Error(
+      "[ai] Revize edilen soru kaynaga atif yaptigi icin reddedildi. Talimati biraz daha acik yazip tekrar deneyin.",
+    );
+  }
+
+  return normalizeGeneratedQuestion(object, question.topic);
+}
+
+/* -------------------------------------------------------------------------- */
 /*  gradeAnswer                                                               */
 /* -------------------------------------------------------------------------- */
 
@@ -565,6 +683,29 @@ function mockGenerateQuestions(
       difficulty,
     };
   });
+}
+
+/**
+ * Mock modda revizyon: gercek model cagrilmaz, degisiklik gorunur kilinir.
+ * Zorluk talimata gore kaydirilir ve soru kokune etiket eklenir.
+ */
+function mockReviseQuestion(
+  question: GeneratedQuestion,
+  instruction: string,
+): GeneratedQuestion {
+  const lower = instruction.toLocaleLowerCase("tr");
+
+  const difficulty: GeneratedQuestion["difficulty"] = lower.includes("zorlastir")
+    ? "zor"
+    : lower.includes("kolaylastir")
+      ? "kolay"
+      : question.difficulty;
+
+  const text = lower.includes("kisalt")
+    ? `[MOCK revize] ${question.text.split(" ").slice(0, 8).join(" ")}?`
+    : `[MOCK revize] ${question.text}`;
+
+  return { ...question, text, difficulty };
 }
 
 function mockGradeAnswer(

@@ -274,6 +274,21 @@ export interface GenerateQuestionsRequest {
   type?: QuestionType | "karisik";
 }
 
+export interface ReviseQuestionRequest {
+  /** Revize edilecek taslak. */
+  question: GeneratedQuestion;
+  /** Hazir talimat anahtari: zorlastir | kolaylastir | kisalt | celdirici. */
+  preset?: string;
+  /** Uzmanin serbest talimati. `preset` ile birlikte de gonderilebilir. */
+  instruction?: string;
+  /** Sorunun olctugu kazanim - revizyonda hedef kaymasin. */
+  kazanim?: string;
+  /** Kaynak metin - model bilgi uydurmasin. */
+  context?: string;
+  /** DENEYAP atolye dali. */
+  category?: DeneyapCategory;
+}
+
 export interface GradeAnswerRequest {
   studentAnswer: string;
   rubric: string;

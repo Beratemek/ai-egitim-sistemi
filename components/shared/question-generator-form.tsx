@@ -47,6 +47,18 @@ import type {
 
 type TypeChoice = QuestionType | "karisik";
 
+/**
+ * Toplu revizyon dugmeleri. Serbest metin bilincli olarak YOK: "sunu sunu
+ * degistir" gibi tek soruya ozgu talimatlar toplu isleme uygun degil, onlar
+ * kart icindeki duzenleme diyalogunda veriliyor.
+ */
+const BULK_PRESETS: readonly { key: string; label: string }[] = [
+  { key: "zorlastir", label: "Zorlastir" },
+  { key: "kolaylastir", label: "Kolaylastir" },
+  { key: "kisalt", label: "Kisalt" },
+  { key: "celdirici", label: "Celdirici+" },
+];
+
 export interface QuestionGeneratorFormProps {
   /** Havuzda halihazirda kullanilan ders adlari; oneri olarak sunulur. */
   subjects?: readonly string[];
@@ -88,6 +100,9 @@ export function QuestionGeneratorForm({
   const [error, setError] = React.useState<string | null>(null);
   const [results, setResults] = React.useState<GeneratedQuestion[]>([]);
   const [selected, setSelected] = React.useState<Set<number>>(new Set());
+  /** Toplu revizyon sirasinda hangi talimat calisiyor ve kacinci soruda. */
+  const [bulkPreset, setBulkPreset] = React.useState<string | null>(null);
+  const [bulkDone, setBulkDone] = React.useState(0);
 
   const learnedTotal = preferenceStats.liked + preferenceStats.disliked;
 
@@ -178,6 +193,69 @@ export function QuestionGeneratorForm({
     // Kaydedilenleri listeden dus
     setResults((current) => current.filter((_, index) => !selected.has(index)));
     setSelected(new Set());
+  }
+
+  /** Duzenlenen ya da revize edilen taslagi listede yerine koyar. */
+  function replaceResult(index: number, revised: GeneratedQuestion) {
+    setResults((current) =>
+      current.map((item, position) => (position === index ? revised : item)),
+    );
+  }
+
+  /**
+   * Secili taslaklari ayni talimatla revize eder.
+   *
+   * Cagrilar SIRAYLA yapiliyor: ucretsiz katmanda dakika basina istek siniri
+   * var, hepsini paralel gondermek kotayi bir kerede tuketiyor. Ilerleme
+   * kullaniciya "2/3" seklinde gosterilir.
+   */
+  async function bulkRevise(preset: string) {
+    const indexes = [...selected].sort((a, b) => a - b);
+    if (indexes.length === 0) return;
+
+    setBulkPreset(preset);
+    setBulkDone(0);
+
+    let failed = 0;
+
+    for (const index of indexes) {
+      const question = results[index];
+      if (!question) continue;
+
+      try {
+        const response = await fetch("/api/ai/revise-question", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            question,
+            preset,
+            ...(kazanim ? { kazanim } : {}),
+            ...(context ? { context } : {}),
+            ...(category ? { category } : {}),
+          }),
+        });
+
+        const result = (await response.json()) as ApiResponse<GeneratedQuestion>;
+        if (!result.ok) throw new Error(result.error);
+
+        replaceResult(index, result.data);
+      } catch {
+        failed += 1;
+      }
+
+      setBulkDone((done) => done + 1);
+    }
+
+    setBulkPreset(null);
+    setBulkDone(0);
+
+    if (failed === 0) {
+      toast.success(`${indexes.length} soru revize edildi`);
+    } else {
+      toast.warning(`${indexes.length - failed} soru revize edildi`, {
+        description: `${failed} soruda hata olustu, tekrar deneyebilirsiniz.`,
+      });
+    }
   }
 
   function toggleSelected(index: number, isSelected: boolean) {
@@ -422,12 +500,53 @@ export function QuestionGeneratorForm({
                   index={index}
                   selected={selected.has(index)}
                   onToggleSelected={(value) => toggleSelected(index, value)}
-                  {...(category ? { categoryName: categoryLabel(category) } : {})}
+                  onReplace={(revised) => replaceResult(index, revised)}
+                  {...(kazanim ? { kazanim } : {})}
+                  {...(context ? { context } : {})}
+                  {...(category ? { category, categoryName: categoryLabel(category) } : {})}
                 />
               </li>
             ))}
           </ul>
         )}
+
+        {/*
+          Toplu eylem cubugu: 2+ taslak secilince gorunur ve ekranin altina
+          yapisir. Kartlarin her birine dort dugme koymak yerine boyle
+          yapildi - varsayilan gorunum temiz kaliyor, toplu is de mumkun.
+        */}
+        {selected.size >= 2 ? (
+          <div className="sticky bottom-4 z-10 flex flex-wrap items-center gap-2 rounded-xl border bg-card/95 p-3 shadow-lg backdrop-blur">
+            <span className="text-sm font-medium">
+              {selected.size} soru secili
+            </span>
+
+            {bulkPreset ? (
+              <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                {bulkDone} / {selected.size} revize edildi
+              </span>
+            ) : null}
+
+            <div className="ml-auto flex flex-wrap gap-2">
+              {BULK_PRESETS.map((preset) => (
+                <Button
+                  key={preset.key}
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5"
+                  disabled={bulkPreset !== null || saving}
+                  onClick={() => void bulkRevise(preset.key)}
+                >
+                  {bulkPreset === preset.key ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : null}
+                  {preset.label}
+                </Button>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );

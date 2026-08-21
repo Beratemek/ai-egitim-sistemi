@@ -7,7 +7,9 @@ import { toast } from "sonner";
 import { recordPreference } from "@/app/actions/questions";
 import { QuestionTypeBadge } from "@/components/shared/status-badge";
 import { Badge } from "@/components/ui/badge";
+import { QuestionReviseDialog } from "@/components/shared/question-revise-dialog";
 import { Button } from "@/components/ui/button";
+import type { DeneyapCategory } from "@/lib/deneyap";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -24,6 +26,12 @@ const DIFFICULTY_VARIANT: Record<
 
 export interface GeneratedQuestionCardProps {
   question: GeneratedQuestion;
+  /** Duzenleme/revizyon diyalogu icin ek baglam. */
+  kazanim?: string;
+  context?: string;
+  category?: DeneyapCategory;
+  /** Elle duzenleme veya AI revizyonu sonucu; taslagi yerinde degistirir. */
+  onReplace?: (question: GeneratedQuestion) => void;
   /** Secili DENEYAP atolye dali adi; rozet olarak gosterilir. */
   categoryName?: string;
   index: number;
@@ -43,6 +51,10 @@ export interface GeneratedQuestionCardProps {
 export function GeneratedQuestionCard({
   question,
   categoryName,
+  kazanim,
+  context,
+  category,
+  onReplace,
   index,
   selected,
   onToggleSelected,
@@ -200,6 +212,17 @@ export function GeneratedQuestionCard({
             <ThumbsDown className="h-3.5 w-3.5" />
             Begenmedim
           </Button>
+
+          {onReplace ? (
+            <QuestionReviseDialog
+              question={question}
+              index={index}
+              onSave={onReplace}
+              {...(kazanim ? { kazanim } : {})}
+              {...(context ? { context } : {})}
+              {...(category ? { category } : {})}
+            />
+          ) : null}
 
           <span className="ml-auto text-xs text-muted-foreground">
             Geri bildirim AI&apos;in bir sonraki uretimini sekillendirir
