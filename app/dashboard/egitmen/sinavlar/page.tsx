@@ -1,6 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, CalendarClock, FileText, Library } from "lucide-react";
+import {
+  ArrowRight,
+  BookMarked,
+  CalendarClock,
+  FileText,
+  Library,
+} from "lucide-react";
 
 import { ExamCreateDialog } from "@/components/shared/exam-create-dialog";
 import { PageHeader } from "@/components/shared/page-header";
@@ -13,7 +19,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { isSupabaseConfigured } from "@/lib/env";
-import { getExamSummaries } from "@/lib/queries";
+import { getExamSummaries, getSubjectOptions } from "@/lib/queries";
 import { formatDateTime } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Sınavlar" };
@@ -23,7 +29,10 @@ export const metadata: Metadata = { title: "Sınavlar" };
  * Sınav oluşturma -> soru ekleme -> yayına alma akisinin giriş noktasi.
  */
 export default async function SinavlarPage() {
-  const exams = await getExamSummaries();
+  const [exams, subjectOptions] = await Promise.all([
+    getExamSummaries(),
+    getSubjectOptions(),
+  ]);
 
   return (
     <>
@@ -35,7 +44,10 @@ export default async function SinavlarPage() {
             {isSupabaseConfigured ? null : (
               <Badge variant="warning">Demo — kayıt yapılamaz</Badge>
             )}
-            <ExamCreateDialog canPersist={isSupabaseConfigured} />
+            <ExamCreateDialog
+              canPersist={isSupabaseConfigured}
+              subjectOptions={subjectOptions}
+            />
           </div>
         }
       />
@@ -74,6 +86,12 @@ export default async function SinavlarPage() {
 
                 <CardContent className="space-y-3">
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
+                    {exam.subject ? (
+                      <span className="flex items-center gap-1.5">
+                        <BookMarked className="h-3.5 w-3.5" />
+                        {exam.subject}
+                      </span>
+                    ) : null}
                     <span className="flex items-center gap-1.5">
                       <Library className="h-3.5 w-3.5" />
                       {exam.questionCount} soru

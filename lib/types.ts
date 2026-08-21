@@ -147,6 +147,12 @@ export type Exam = {
   id: string;
   title: string;
   description: string;
+  /**
+   * Sinavin dersi. Ders yetkisinin dayanagi budur: egitmen yalnizca
+   * yetkili oldugu dersteki sinavlari gorur. Atanmamissa (null) sinav
+   * tum egitmenlere aciktir.
+   */
+  subject: string | null;
   instructor_id: string;
   is_published: boolean;
   starts_at: string | null;
@@ -159,6 +165,14 @@ export type ExamQuestion = {
   question_id: string;
   position: number;
   points: number;
+};
+
+/** Bir egitmene verilmis ders yetkisi. Sistem yoneticisi atar. */
+export type InstructorSubject = {
+  user_id: string;
+  subject: string;
+  granted_by: string | null;
+  granted_at: string;
 };
 
 export type ExamAssignment = {
@@ -371,7 +385,13 @@ export interface Database {
         Exam,
         Insertable<
           Exam,
-          "id" | "created_at" | "description" | "is_published" | "starts_at" | "ends_at"
+          | "id"
+          | "created_at"
+          | "description"
+          | "is_published"
+          | "starts_at"
+          | "ends_at"
+          | "subject"
         >
       >;
       exam_questions: TableDefinition<
@@ -381,6 +401,10 @@ export interface Database {
       exam_assignments: TableDefinition<
         ExamAssignment,
         Insertable<ExamAssignment, "id" | "assigned_at" | "assigned_by" | "due_at">
+      >;
+      instructor_subjects: TableDefinition<
+        InstructorSubject,
+        Insertable<InstructorSubject, "granted_by" | "granted_at">
       >;
       exam_attempts: TableDefinition<
         ExamAttempt,
@@ -466,6 +490,14 @@ export interface Database {
       set_active_role: {
         Args: { target: UserRole };
         Returns: UserRole;
+      };
+      set_instructor_subjects: {
+        Args: { target_user: string; subjects: string[] };
+        Returns: string[];
+      };
+      my_subjects: {
+        Args: Record<string, never>;
+        Returns: string[];
       };
       set_user_classroom: {
         Args: { target_user: string; new_classroom: string | null };

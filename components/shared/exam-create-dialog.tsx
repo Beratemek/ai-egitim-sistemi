@@ -27,18 +27,29 @@ export interface ExamCreateDialogProps {
    * secildi: boylece ekranin ne yaptigi gorulebiliyor.
    */
   canPersist?: boolean;
+  /**
+   * Secilebilir ders adlari; soru havuzundan turetilir.
+   *
+   * Ders yetkisinin dayanagi budur: sinava ders atanmazsa TUM egitmenler
+   * gorur, atanirsa yalnizca o derse yetkili olanlar.
+   */
+  subjectOptions?: readonly string[];
 }
 
 /**
  * Yeni sınav oluşturma diyalogu.
  * Sınav taslak olarak dogar; sorular eklendikten sonra yayına alınır.
  */
-export function ExamCreateDialog({ canPersist = true }: ExamCreateDialogProps) {
+export function ExamCreateDialog({
+  canPersist = true,
+  subjectOptions = [],
+}: ExamCreateDialogProps) {
   const router = useRouter();
 
   const [open, setOpen] = React.useState(false);
   const [title, setTitle] = React.useState("");
   const [description, setDescription] = React.useState("");
+  const [subject, setSubject] = React.useState("");
   const [startsAt, setStartsAt] = React.useState("");
   const [endsAt, setEndsAt] = React.useState("");
   const [pending, setPending] = React.useState(false);
@@ -57,6 +68,7 @@ export function ExamCreateDialog({ canPersist = true }: ExamCreateDialogProps) {
     const result = await createExam({
       title,
       description,
+      subject,
       ...(toIso(startsAt) ? { startsAt: toIso(startsAt) } : {}),
       ...(toIso(endsAt) ? { endsAt: toIso(endsAt) } : {}),
     });
@@ -75,6 +87,7 @@ export function ExamCreateDialog({ canPersist = true }: ExamCreateDialogProps) {
     setOpen(false);
     setTitle("");
     setDescription("");
+    setSubject("");
     setStartsAt("");
     setEndsAt("");
     router.push(`/dashboard/egitmen/sinavlar/${result.data.id}`);
@@ -121,6 +134,27 @@ export function ExamCreateDialog({ canPersist = true }: ExamCreateDialogProps) {
               placeholder="Hangi konuları kapsadığını kısaca yazın."
               className="resize-y"
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="exam-subject">Ders</Label>
+            <Input
+              id="exam-subject"
+              list="exam-subject-options"
+              value={subject}
+              onChange={(event) => setSubject(event.target.value)}
+              placeholder="Biyoloji"
+              autoComplete="off"
+            />
+            <datalist id="exam-subject-options">
+              {subjectOptions.map((option) => (
+                <option key={option} value={option} />
+              ))}
+            </datalist>
+            <p className="text-xs text-muted-foreground">
+              Sınavı yalnızca bu derse yetkili eğitmenler görür. Boş
+              bırakırsanız tüm eğitmenlere açık kalır.
+            </p>
           </div>
 
           {/*

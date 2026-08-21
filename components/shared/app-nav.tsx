@@ -1,10 +1,12 @@
 "use client";
 
+import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   BarChart3,
   BookOpen,
+  ClipboardCheck,
   ClipboardList,
   GraduationCap,
   LayoutDashboard,
@@ -49,6 +51,12 @@ const BASE_NAV = {
       label: "Soru Havuzu",
       icon: Library,
       description: "Dal bazlı havuz, sınava soru ekle",
+    },
+    {
+      href: "/dashboard/egitmen/kontrol",
+      label: "Sınav Kontrolü",
+      icon: ClipboardCheck,
+      description: "Sınıf bazlı bütün değerlendirme",
     },
     {
       href: "/dashboard/egitmen/sinavlar",
@@ -117,14 +125,33 @@ export function NavLinks({ role, onNavigate }: NavLinksProps) {
   const pathname = usePathname();
   const items = ROLE_NAV[role];
 
+  /**
+   * Secili menu ogesi: EN UZUN eslesen yol.
+   *
+   * Menu ogeleri ic ice: /dashboard/egitmen hem kendisi hem de
+   * /dashboard/egitmen/kontrol icin eslesir. "onek eslesirse secili" kurali
+   * ust ve alt ogeyi AYNI ANDA yakardi; en uzun eslesme alt ogeyi kazandirir.
+   * Hicbir alt oge eslesmiyorsa (or. /dashboard/ogrenci/sinav/<id>) ust oge
+   * secili kalir - istenen davranis budur.
+   */
+  const activeHref = React.useMemo(() => {
+    let best: string | null = null;
+
+    for (const item of items) {
+      const matches =
+        pathname === item.href || pathname.startsWith(`${item.href}/`);
+      if (matches && (best === null || item.href.length > best.length)) {
+        best = item.href;
+      }
+    }
+
+    return best;
+  }, [items, pathname]);
+
   return (
     <nav className="space-y-1">
       {items.map((item) => {
-        const isActive =
-          pathname === item.href ||
-          (item.href !== "/dashboard/ogrenci" && pathname.startsWith(`${item.href}/`)) ||
-          (item.href === "/dashboard/ogrenci" &&
-            pathname.startsWith("/dashboard/ogrenci/sinav/"));
+        const isActive = item.href === activeHref;
         const Icon = item.icon;
 
         return (

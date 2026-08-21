@@ -575,3 +575,119 @@ export async function approveSubmission(
 
   return { ok: true, data: undefined };
 }
+
+export interface ApproveSubmissionsInput {
+  /** Onaylanacak cevaplarin kimlikleri. */
+  submissionIds: readonly string[];
+}
+
+/**
+ * AI on puanlarini toplu olarak onaylar.
+ *
+ * Egitmen sinavi BUTUN olarak degerlendirir: 30 ogrencinin 20 cevabini tek
+ * tek acmak yerine, AI puanini oldugu gibi kabul eder ve yalnizca itiraz
+ * ettigi cevaba dokunur.
+ *
+ * Her satirin puani farkli oldugu icin PostgREST ile tek UPDATE yeterli
+ * degil; satirlar AYNI PUANA gore gruplanip grup basina tek istek atilir.
+ * AI puanlari kumelendigi icin (cok sayida 100 ve 0) bu genelde bir avuc
+ * istege iner - satir basina istekten cok daha ucuz.
+ */
+export async function approveSubmissions(
+  input: ApproveSubmissionsInput,
+): Promise<ActionResult<{ approved: number }>> {
+  if (!isSupabaseConfigured) return demoGuard();
+
+  const ids = [...new Set(input.submissionIds)].filter(Boolean);
+  if (ids.length === 0) return { ok: false, error: "Onaylanacak cevap secilmedi." };
+
+  const current = await getCurrentUser();
+  if (!current) return { ok: false, error: "Oturum acmaniz gerekiyor." };
+
+  const supabase = await createServerSupabaseClient();
+
+  // Yalnizca gercekten onay bekleyenler; zaten onaylanmis bir cevabin
+  // puanini AI puanina geri cekmek egitmenin duzeltmesini silerdi.
+  const { data: pending, error: readError } = await supabase
+    .from("submissions")
+    .select("id, exam_id, student_id, ai_score")
+    .in("id", ids)
+    .eq("status", "ai_degerlendirildi");
+
+  if (readError) return { ok: false, error: readError.message };
+
+  if (!pending || pending.length === 0) {
+    return { ok: false, error: "Secilen cevaplar arasinda onay bekleyen yok." };
+  }
+
+  const byScore = new Map<number, string[]>();
+  for (const row of pending) {
+    // AI puani uretilmemisse 0 sayilmaz; egitmen elle puanlamali.
+    if (row.ai_score === null) continue;
+    const score = Math.round(row.ai_score * 100) / 100;
+    const bucket = byScore.get(score) ?? [];
+    bucket.push(row.id);
+    byScore.set(score, bucket);
+  }
+
+  if (byScore.size === 0) {
+    return {
+      ok: false,
+      error: "Bu cevaplarin AI on puani yok; tek tek puanlamaniz gerekiyor.",
+    };
+  }
+
+  let approved = 0;
+
+  for (const [score, groupIds] of byScore) {
+    // `.select()` sart: RLS eslesmezse PostgREST hata dondurmez, sessizce
+    // 0 satir gunceller ve egitmen "onaylandi" yazisini gorur.
+    const { data: updated, error } = await supabase
+      .from("submissions")
+      .update({
+        instructor_approved_score: score,
+        status: "egitmen_onayli",
+        reviewed_by: current.user.id,
+      })
+      .in("id", groupIds)
+      .eq("status", "ai_degerlendirildi")
+      .select("id");
+
+    if (error) return { ok: false, error: error.message };
+    approved += updated?.length ?? 0;
+  }
+
+  if (approved === 0) {
+    return {
+      ok: false,
+      error:
+        "Puanlar kaydedilemedi: bu cevaplari onaylama yetkiniz yok ya da cevaplar artik mevcut degil.",
+    };
+  }
+
+  // Etkilenen her (sinav, ogrenci) ikilisi icin sonuc yeniden hesaplanir.
+  const pairs = new Map<string, { exam: string; student: string }>();
+  for (const row of pending) {
+    pairs.set(`${row.exam_id} ${row.student_id}`, {
+      exam: row.exam_id,
+      student: row.student_id,
+    });
+  }
+
+  for (const pair of pairs.values()) {
+    const { error } = await supabase.rpc("recalculate_exam_attempt_result", {
+      target_exam: pair.exam,
+      target_student: pair.student,
+    });
+    // Ogrenci akisi henuz kurulmamis ortamlarda bu RPC yok; onay yine gecerli.
+    if (error && !isStudentFlowUnavailable(error)) {
+      return { ok: false, error: error.message };
+    }
+  }
+
+  revalidatePath("/dashboard/egitmen", "layout");
+  revalidatePath("/dashboard/ogrenci");
+  revalidatePath("/dashboard/yonetici");
+
+  return { ok: true, data: { approved } };
+}

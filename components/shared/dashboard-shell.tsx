@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { LogOut, Menu } from "lucide-react";
+import Link from "next/link";
+import { LogOut, Menu, UserRound } from "lucide-react";
 
 import { NavLinks, RoleCard } from "@/components/shared/app-nav";
 import { ActiveRoleSwitcher } from "@/components/shared/active-role-switcher";
@@ -196,6 +197,13 @@ export function DashboardShell({
                     {definition.label}
                   </p>
                 </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href="/dashboard/profil" className="flex items-center gap-2">
+                    <UserRound className="h-4 w-4" />
+                    Profilim
+                  </Link>
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
                   <form action="/auth/signout" method="post" className="w-full">

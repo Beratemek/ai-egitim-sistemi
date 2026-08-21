@@ -29,7 +29,8 @@ export default async function HosGeldinizPage() {
       <div className="flex flex-1 items-center justify-center px-4 pb-16">
         <div className="w-full max-w-2xl">
           <RoleOnboarding
-            fullName={current.profile.full_name || current.user.email || ""}
+            fullName={current.profile.full_name}
+            email={current.profile.email ?? current.user.email ?? ""}
             previousRole={current.profile.requested_role}
             rejected={current.profile.role_status === "reddedildi"}
           />
