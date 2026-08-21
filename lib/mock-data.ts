@@ -22,6 +22,10 @@ export const MOCK_USERS: readonly UserProfile[] = [
   {
     id: "00000000-0000-4000-8000-000000000001",
     role: "icerik_uzmani",
+    role_status: "onayli",
+    requested_role: null,
+    role_reviewed_by: null,
+    role_reviewed_at: null,
     full_name: "Elif Demir",
     email: "icerik@ornek.com",
     created_at: "2026-08-01T09:00:00.000Z",
@@ -30,6 +34,10 @@ export const MOCK_USERS: readonly UserProfile[] = [
   {
     id: INSTRUCTOR_ID,
     role: "egitmen",
+    role_status: "onayli",
+    requested_role: null,
+    role_reviewed_by: null,
+    role_reviewed_at: null,
     full_name: "Ayse Yilmaz",
     email: "egitmen@ornek.com",
     created_at: "2026-08-01T09:05:00.000Z",
@@ -38,6 +46,10 @@ export const MOCK_USERS: readonly UserProfile[] = [
   {
     id: STUDENT_ID,
     role: "ogrenci",
+    role_status: "onayli",
+    requested_role: null,
+    role_reviewed_by: null,
+    role_reviewed_at: null,
     full_name: "Mert Kaya",
     email: "ogrenci@ornek.com",
     created_at: "2026-08-02T11:20:00.000Z",
@@ -46,6 +58,10 @@ export const MOCK_USERS: readonly UserProfile[] = [
   {
     id: "00000000-0000-4000-8000-000000000004",
     role: "egitim_yoneticisi",
+    role_status: "onayli",
+    requested_role: null,
+    role_reviewed_by: null,
+    role_reviewed_at: null,
     full_name: "Deniz Aydin",
     email: "yonetici@ornek.com",
     created_at: "2026-08-02T11:25:00.000Z",

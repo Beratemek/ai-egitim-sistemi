@@ -22,6 +22,27 @@ export function isUserRole(value: unknown): value is UserRole {
   return typeof value === "string" && (USER_ROLES as readonly string[]).includes(value);
 }
 
+/**
+ * Rol onay durumu.
+ *
+ * Ogrenci disindaki roller egitim yoneticisi onayi ister; onaya kadar etkin
+ * rol 'ogrenci' kalir ve kullanici bekleme ekranina alinir.
+ */
+export const ROLE_STATUSES = [
+  "secilmedi",
+  "beklemede",
+  "onayli",
+  "reddedildi",
+] as const;
+
+export type RoleStatus = (typeof ROLE_STATUSES)[number];
+
+export function isRoleStatus(value: unknown): value is RoleStatus {
+  return (
+    typeof value === "string" && (ROLE_STATUSES as readonly string[]).includes(value)
+  );
+}
+
 /* -------------------------------------------------------------------------- */
 /*  Enum benzeri birlesim tipleri                                             */
 /* -------------------------------------------------------------------------- */
@@ -51,7 +72,13 @@ export type QuestionOption = {
 
 export type UserProfile = {
   id: string;
+  /** Etkin rol. Onay bekleyen kullanicida 'ogrenci' kalir. */
   role: UserRole;
+  role_status: RoleStatus;
+  /** Kullanicinin talep ettigi rol; onaylaninca `role` olur. */
+  requested_role: UserRole | null;
+  role_reviewed_by: string | null;
+  role_reviewed_at: string | null;
   full_name: string;
   email: string | null;
   created_at: string;
@@ -335,10 +362,19 @@ export interface Database {
         Args: { target: UserRole };
         Returns: boolean;
       };
+      request_role: {
+        Args: { target: UserRole };
+        Returns: RoleStatus;
+      };
+      review_role_request: {
+        Args: { target_user: string; approve: boolean };
+        Returns: RoleStatus;
+      };
     };
     Enums: {
       deneyap_category: DeneyapCategory;
       user_role: UserRole;
+      role_status: RoleStatus;
       question_type: QuestionType;
       question_status: QuestionStatus;
       submission_status: SubmissionStatus;
