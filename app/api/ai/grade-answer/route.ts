@@ -1,5 +1,6 @@
 import { gradeAnswer } from "@/lib/ai";
-import { errorMessage, jsonError, jsonOk, readJson, requireRole } from "@/lib/api";
+import { describeAiError } from "@/lib/ai";
+import { jsonError, jsonOk, readJson, requireRole } from "@/lib/api";
 import type { GradeAnswerRequest, GradingResult } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -38,6 +39,6 @@ export async function POST(request: Request) {
 
     return jsonOk(result);
   } catch (caught) {
-    return jsonError(errorMessage(caught), 500);
+    return jsonError(describeAiError(caught), 500);
   }
 }

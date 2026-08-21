@@ -57,6 +57,59 @@ function getModel(modelId: string): LanguageModelV1 {
 }
 
 /* -------------------------------------------------------------------------- */
+/*  Saglayici hatalarini okunabilir hale getirme                              */
+/* -------------------------------------------------------------------------- */
+
+/** Kota hatasinin govdesinde gecen "retryDelay": "36s" degerini yakalar. */
+const RETRY_DELAY = /retryDelay["\s:]+(\d+(?:\.\d+)?)s/i;
+
+/**
+ * Model saglayicisinin ham hatasini kullanicinin anlayacagi bir mesaja cevirir.
+ *
+ * Ozellikle kota hatasi onemli: Gemini'nin ucretsiz katmani gunluk sabit bir
+ * istek hakki verir ve doldugunda uzun ingilizce bir govde doner. Kullanici
+ * "ne yapmali" bilgisini goremeden kaliyordu.
+ */
+export function describeAiError(caught: unknown): string {
+  const raw = caught instanceof Error ? caught.message : String(caught);
+
+  const isQuota =
+    /quota|RESOURCE_EXHAUSTED|rate.?limit|429/i.test(raw) &&
+    !/invalid|not found/i.test(raw);
+
+  if (isQuota) {
+    const match = RETRY_DELAY.exec(raw);
+    const seconds = match ? Math.ceil(Number(match[1])) : null;
+    const when = seconds
+      ? `Yaklasik ${seconds} saniye sonra tekrar deneyebilirsiniz.`
+      : "Bir sure sonra tekrar deneyebilirsiniz.";
+
+    return (
+      `Yapay zeka saglayicisinin kota siniri doldu. ${when} ` +
+      "Ucretsiz katmanda gunluk istek hakki sinirlidir; " +
+      "faturalandirmayi acarak ya da AI_MOCK_MODE=true ile simulasyon moduna " +
+      "gecerek calismaya devam edebilirsiniz."
+    );
+  }
+
+  if (/API key|API_KEY_INVALID|unauthenticated|401|403/i.test(raw)) {
+    return (
+      "Yapay zeka anahtari gecersiz ya da yetkisiz. .env dosyasindaki " +
+      "OPENAI_API_KEY degerini kontrol edip sunucuyu yeniden baslatin."
+    );
+  }
+
+  if (/model|not found|404/i.test(raw)) {
+    return (
+      "Secilen model bulunamadi. .env dosyasindaki AI_MODEL_GENERATION / " +
+      "AI_MODEL_GRADING degerlerini kontrol edin."
+    );
+  }
+
+  return raw;
+}
+
+/* -------------------------------------------------------------------------- */
 /*  Semalar                                                                   */
 /* -------------------------------------------------------------------------- */
 
@@ -273,6 +326,7 @@ export async function generateQuestions(
          gibi konu disi bilgileri olcmeye kalkiyordu. Sinav KAZANIMI olcer.
   */
   const { object } = await generateObject({
+    maxRetries: 0,
     model: getModel(serverEnv.aiModelGeneration),
     schema: generateQuestionsSchema,
     system: [
@@ -311,7 +365,17 @@ export async function generateQuestions(
   */
   const missing = count - first.length;
 
-  const { object: retry } = await generateObject({
+  /*
+    Eksik kalanlari tamamlamak icin IKINCI bir cagri yapilir. Bu cagri kota
+    hatasi alirsa elimizdekini atmiyoruz: ilk turda uretilmis sorular gecerli,
+    kullanicinin emegi bosa gitmemeli.
+  */
+  type GenerationResult = z.infer<typeof generateQuestionsSchema>;
+  let retry: GenerationResult = { questions: [] };
+
+  try {
+    const result = await generateObject({
+    maxRetries: 0,
     model: getModel(serverEnv.aiModelGeneration),
     schema: generateQuestionsSchema,
     system: [
@@ -333,6 +397,12 @@ export async function generateQuestions(
       .filter(Boolean)
       .join("\n\n"),
   });
+
+    retry = result.object;
+  } catch (caught) {
+    if (first.length === 0) throw caught;
+    console.warn("[ai] Tamamlama cagrisi basarisiz:", describeAiError(caught));
+  }
 
   const combined = [...first, ...collectUsable(retry.questions, topic ?? kazanim)];
 
@@ -441,6 +511,7 @@ export async function reviseQuestion(
       : "Soru ACIK UCLU kalmali: options ve correct_answer null, rubric madde madde ve toplami 100 puan olmali.";
 
   const { object } = await generateObject({
+    maxRetries: 0,
     model: getModel(serverEnv.aiModelGeneration),
     schema: generatedQuestionSchema,
     system: [
@@ -528,6 +599,7 @@ export async function gradeAnswer(
   }
 
   const { object } = await generateObject({
+    maxRetries: 0,
     model: getModel(serverEnv.aiModelGrading),
     schema: gradingResultSchema,
     system: [

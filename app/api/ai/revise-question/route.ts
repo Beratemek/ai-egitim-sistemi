@@ -4,7 +4,8 @@ import {
   reviseQuestion,
   type RevisionPreset,
 } from "@/lib/ai";
-import { errorMessage, jsonError, jsonOk, readJson, requireRole } from "@/lib/api";
+import { describeAiError } from "@/lib/ai";
+import { jsonError, jsonOk, readJson, requireRole } from "@/lib/api";
 import { categoryLabel, isDeneyapCategory } from "@/lib/deneyap";
 import type { GeneratedQuestion, ReviseQuestionRequest } from "@/lib/types";
 
@@ -78,6 +79,6 @@ export async function POST(request: Request) {
 
     return jsonOk<GeneratedQuestion>(revised);
   } catch (caught) {
-    return jsonError(errorMessage(caught), 500);
+    return jsonError(describeAiError(caught), 500);
   }
 }
