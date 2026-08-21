@@ -365,28 +365,29 @@ export function UserAdminTable({
                           <section className="space-y-2.5">
                             <SectionTitle icon={ShieldAlert} label="Roller" />
 
+                            <div className="space-y-1">
+                              {ROLE_LIST.map((definition) => (
+                                <OptionRow
+                                  key={definition.role}
+                                  id={`rol-${user.id}-${definition.role}`}
+                                  label={definition.label}
+                                  hint={definition.description}
+                                  checked={roles.includes(definition.role)}
+                                  disabled={busy}
+                                  onToggle={() =>
+                                    void toggleRole(user, definition.role)
+                                  }
+                                />
+                              ))}
+                            </div>
+
                             {isSelf ? (
                               <p className="rounded-md border border-dashed px-3 py-2 text-xs leading-relaxed text-muted-foreground">
-                                Kendi rollerinizi değiştiremezsiniz. Aksi halde
-                                sistemde hiç yönetici kalmayabilirdi.
+                                Kendi satırınız. Sistemdeki tek yönetici sizseniz
+                                yönetici rolünüzü bırakamazsınız — rol atayabilecek
+                                kimse kalmazdı.
                               </p>
-                            ) : (
-                              <div className="space-y-1">
-                                {ROLE_LIST.map((definition) => (
-                                  <OptionRow
-                                    key={definition.role}
-                                    id={`rol-${user.id}-${definition.role}`}
-                                    label={definition.label}
-                                    hint={definition.description}
-                                    checked={roles.includes(definition.role)}
-                                    disabled={busy}
-                                    onToggle={() =>
-                                      void toggleRole(user, definition.role)
-                                    }
-                                  />
-                                ))}
-                              </div>
-                            )}
+                            ) : null}
                           </section>
 
                           {/* Sinif */}

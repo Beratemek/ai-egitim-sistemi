@@ -6,7 +6,7 @@ Bu klasörde **doğrudan çalıştırılacak dosyalar durur.** Supabase SQL Edit
 yukarıdan aşağı, numara sırasıyla çalıştır:
 
 ```
-BEKLEYEN-1-...  →  BEKLEYEN-2-...  →  BEKLEYEN-3-...  →  BEKLEYEN-4-...
+BEKLEYEN-1-...  →  BEKLEYEN-2-...  →  BEKLEYEN-3-...  →  BEKLEYEN-4-...  →  BEKLEYEN-5-...
 ```
 
 Çalıştırdıktan sonra dosyayı `uygulandi/` klasörüne taşı. Böylece bu klasörde
@@ -40,11 +40,7 @@ Atlanan bir adım "function does not exist" hatası verir.
 
 ## Şu an bekleyenler
 
-| Dosya | Ne yapar | Neden önemli |
-|---|---|---|
-| `BEKLEYEN-1-veri-sizintilarini-kapat.sql` | İki okuma politikasını daraltır | Her eğitmen tüm içerik uzmanlarının soru taslaklarını, her öğrenci kaynak metinleri okuyabiliyor |
-| `BEKLEYEN-2-tum-roller-onaya-dussun.sql` | Öğrenci de sistem yöneticisi onayına düşer | Şu an öğrenci seçen kullanıcı doğrudan içeri giriyor |
-| `BEKLEYEN-3-ders-yetkisi-bosluklar.sql` | Ders yetkisini eksik kalan üç yerde tamamlar | **Bunsuz ders yetkili eğitmen puan onaylayınca sınav sonuçlanmıyor** |
-| `BEKLEYEN-4-profil-sutunlarini-koru.sql` | `classroom` ve `email` sütunlarını korumaya alır | Öğrenci kendini başka dersliğe alabiliyor |
+**Yok.** Bütün migration'lar uygulandı.
 
-Çalıştırıp çalıştırmadığından emin değilsen tekrar çalıştır — zararı yok.
+Yeni bir tane yazıldığında bu klasörde `BEKLEYEN-<n>-...sql` adıyla belirir;
+çalıştırdıktan sonra `uygulandi/` klasörüne taşınır.

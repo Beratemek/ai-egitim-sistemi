@@ -22,13 +22,13 @@ const PENDING_PATH = "/onay-bekleniyor";
  * DEGILDIR - veri erisimini her zaman veritabanindaki RLS politikalari belirler,
  * cerez yalnizca hangi panele yonlendirilecegini soyler.
  *
- * Sure KISA tutuluyor: yonetici bir rolu geri aldiginda kullanicinin cerezi
- * sunucudan silinemez (baska bir tarayicinin cerezine dokunulamaz), yani rol
- * kaldirildiktan sonra o panelin KABUGU bu sure kadar acilmaya devam eder.
- * Icerik yine bos gelir - sorgular RLS'e tabidir - ama kafa karistirmamasi
- * icin pencere dar olmali.
+ * Sure secimi bir denge: cerez dolunca middleware veritabanina gidiyor ve bu
+ * tur uzak Supabase ornegimizde yaklasik 150 ms - her sayfa gecisinde
+ * hissedilir. Kisa tutmanin tek kazanci, yonetici bir rolu geri aldiginda o
+ * panelin KABUGUNUN daha cabuk kapanmasi; icerik zaten bos gelir cunku
+ * sorgular RLS'e tabidir. Gorunur gecikmeye deger bir kazanc degil.
  */
-const ROLE_CACHE_MAX_AGE = 60; // 1 dakika
+const ROLE_CACHE_MAX_AGE = 300; // 5 dakika
 
 /**
  * Middleware uc is yapar:

@@ -53,6 +53,9 @@ export async function updateProfile(
     return { ok: false, error: "Profil kaydedilemedi. Lütfen tekrar deneyin." };
   }
 
-  revalidatePath("/", "layout");
+  // Ad ust cubukta ve profil sayfasinda gorunuyor; tum siteyi gecersiz
+  // kilmak (revalidatePath("/", "layout")) her kaydetmede butun agaci
+  // yeniden kurduruyordu.
+  revalidatePath("/dashboard", "layout");
   return { ok: true, data: { fullName } };
 }

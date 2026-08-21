@@ -6,6 +6,8 @@
  * Sayfalar dogrudan `supabase.from(...)` cagirmaz, hep buradan okur.
  */
 
+import { cache } from "react";
+
 import { isSupabaseConfigured } from "@/lib/env";
 import { subjectKey } from "@/lib/subjects";
 import {
@@ -98,7 +100,7 @@ export interface QuestionFilters {
   topic?: string;
 }
 
-export async function getQuestions(filters: QuestionFilters = {}): Promise<Question[]> {
+export const getQuestions = cache(async function getQuestions(filters: QuestionFilters = {}): Promise<Question[]> {
   if (!isSupabaseConfigured) {
     return MOCK_QUESTIONS.filter(
       (question) =>
@@ -118,13 +120,13 @@ export async function getQuestions(filters: QuestionFilters = {}): Promise<Quest
 
   const { data } = await query;
   return data ?? [];
-}
+})
 
 /* -------------------------------------------------------------------------- */
 /*  Sinavlar                                                                  */
 /* -------------------------------------------------------------------------- */
 
-export async function getExams(options: { onlyPublished?: boolean } = {}): Promise<Exam[]> {
+export const getExams = cache(async function getExams(options: { onlyPublished?: boolean } = {}): Promise<Exam[]> {
   if (!isSupabaseConfigured) {
     return MOCK_EXAMS.filter((exam) => !options.onlyPublished || exam.is_published);
   }
@@ -136,7 +138,7 @@ export async function getExams(options: { onlyPublished?: boolean } = {}): Promi
 
   const { data } = await query;
   return data ?? [];
-}
+})
 
 export interface ExamDetail {
   exam: Exam;
@@ -159,19 +161,18 @@ export async function getExamDetail(examId: string): Promise<ExamDetail | null> 
 
   const supabase = await createServerSupabaseClient();
 
-  const { data: exam } = await supabase
-    .from("exams")
-    .select("*")
-    .eq("id", examId)
-    .maybeSingle();
+  // Sinav ile soru baglantilari birbirine bagli degil; sirali beklemek bir
+  // tur (uzak Supabase ornekte yaklasik 150 ms) fazladan maliyetti.
+  const [{ data: exam }, { data: links }] = await Promise.all([
+    supabase.from("exams").select("*").eq("id", examId).maybeSingle(),
+    supabase
+      .from("exam_questions")
+      .select("question_id, position, points")
+      .eq("exam_id", examId)
+      .order("position", { ascending: true }),
+  ]);
 
   if (!exam) return null;
-
-  const { data: links } = await supabase
-    .from("exam_questions")
-    .select("question_id, position, points")
-    .eq("exam_id", examId)
-    .order("position", { ascending: true });
 
   const questionIds = (links ?? []).map((link) => link.question_id);
   if (questionIds.length === 0) return { exam, questions: [] };
@@ -698,7 +699,7 @@ export async function getStudentGrowth(): Promise<StudentGrowthTopic[]> {
 /*  Kullanicilar                                                              */
 /* -------------------------------------------------------------------------- */
 
-export async function getUsers(): Promise<UserProfile[]> {
+export const getUsers = cache(async function getUsers(): Promise<UserProfile[]> {
   if (!isSupabaseConfigured) return [...MOCK_USERS];
 
   const supabase = await createServerSupabaseClient();
@@ -708,7 +709,7 @@ export async function getUsers(): Promise<UserProfile[]> {
     .order("created_at", { ascending: true });
 
   return data ?? [];
-}
+})
 
 /**
  * Karara baglanmayi bekleyen rol talepleri.
@@ -1208,7 +1209,9 @@ function average(values: readonly number[]): number | null {
  * olmayan ders ise hic gorunmez.
  */
 export async function getSubjectOptions(): Promise<string[]> {
-  const questions = await getQuestions();
+  // Iki okuma birbirine bagli degil; sirali beklemek bir tur (yaklasik
+  // 150 ms) fazladan maliyet demekti.
+  const [questions, exams] = await Promise.all([getQuestions(), getExams()]);
 
   const seen = new Map<string, string>();
   for (const question of questions) {
@@ -1218,7 +1221,6 @@ export async function getSubjectOptions(): Promise<string[]> {
     seen.set(subjectKey(subject), subject);
   }
 
-  const exams = await getExams();
   for (const exam of exams) {
     const subject = exam.subject?.trim();
     if (!subject) continue;
