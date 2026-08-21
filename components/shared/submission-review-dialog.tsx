@@ -150,6 +150,34 @@ export function SubmissionReviewDialog({
                   {submission.ai_feedback}
                 </p>
               ) : null}
+              {(submission.ai_criteria_json ?? []).length > 0 ? (
+                <div className="space-y-2 border-t pt-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Rubrik kirilimi
+                  </p>
+                  {(submission.ai_criteria_json ?? []).map((criterion, index) => (
+                    <div key={`${criterion.criterion}-${index}`} className="space-y-1">
+                      <div className="flex items-baseline justify-between gap-3 text-xs">
+                        <span className="font-medium">{criterion.criterion}</span>
+                        <span className="tabular text-muted-foreground">
+                          {criterion.earned} / {criterion.max}
+                        </span>
+                      </div>
+                      <Progress
+                        value={
+                          criterion.max > 0
+                            ? (criterion.earned / criterion.max) * 100
+                            : 0
+                        }
+                        className="h-1"
+                      />
+                      <p className="text-xs leading-relaxed text-muted-foreground">
+                        {criterion.comment}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
             </div>
           ) : (
             <p className="rounded-lg border bg-muted px-3 py-2.5 text-sm text-muted-foreground">

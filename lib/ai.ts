@@ -245,7 +245,7 @@ export async function generateQuestions(
   kazanim: string,
   options: GenerateQuestionsOptions = {},
 ): Promise<GeneratedQuestion[]> {
-  const { count = 5, type = "karisik", topic, styleGuide, categoryLabel } = options;
+  const { count = 5, type = "karisik", topic, styleGuide } = options;
 
   if (!context.trim() || !kazanim.trim()) {
     throw new Error("[ai] generateQuestions: context ve kazanim bos olamaz.");

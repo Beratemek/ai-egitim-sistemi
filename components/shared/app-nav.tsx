@@ -9,6 +9,8 @@ import {
   GraduationCap,
   LayoutDashboard,
   Library,
+  TrendingUp,
+  Trophy,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -61,6 +63,18 @@ export const ROLE_NAV: Record<UserRole, readonly NavItem[]> = {
       icon: GraduationCap,
       description: "Sorulari yanitla",
     },
+    {
+      href: "/dashboard/ogrenci/sonuclar",
+      label: "Sonuclarim",
+      icon: Trophy,
+      description: "Onaylanan puan ve geri bildirimler",
+    },
+    {
+      href: "/dashboard/ogrenci/gelisim",
+      label: "Gelisimim",
+      icon: TrendingUp,
+      description: "Kazanim bazli ilerlemeni izle",
+    },
   ],
   egitim_yoneticisi: [
     {
@@ -85,7 +99,11 @@ export function NavLinks({ role, onNavigate }: NavLinksProps) {
   return (
     <nav className="space-y-1">
       {items.map((item) => {
-        const isActive = pathname === item.href;
+        const isActive =
+          pathname === item.href ||
+          (item.href !== "/dashboard/ogrenci" && pathname.startsWith(`${item.href}/`)) ||
+          (item.href === "/dashboard/ogrenci" &&
+            pathname.startsWith("/dashboard/ogrenci/sinav/"));
         const Icon = item.icon;
 
         return (

@@ -242,6 +242,7 @@ export const MOCK_SUBMISSIONS: readonly Submission[] = [
     ai_score: 85,
     ai_feedback:
       "Dongunun yeri ve karbon tutulmasi dogru aciklanmis. ATP/NADPH kullanimina deginilmis ancak indirgenme adimlari biraz daha ayrintilandirilabilirdi.",
+    ai_criteria_json: [],
     instructor_approved_score: null,
     instructor_note: null,
     status: "ai_degerlendirildi",
@@ -259,6 +260,7 @@ export const MOCK_SUBMISSIONS: readonly Submission[] = [
     ai_score: 70,
     ai_feedback:
       "Ornek dogru ancak kuvvetlerin farkli cisimlere etki ettigi acikca belirtilmemis.",
+    ai_criteria_json: [],
     instructor_approved_score: 75,
     instructor_note: "Ornek yeterli; kucuk bir puan artisi yapildi.",
     status: "egitmen_onayli",

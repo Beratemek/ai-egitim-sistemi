@@ -178,13 +178,16 @@ soruda rubrik garanti edilir.
 
 - Tum tablolarda **RLS acik**. Rol kontrolu, politika ozyinelemesini onlemek
   icin `SECURITY DEFINER` isaretli `public.has_role()` fonksiyonu uzerinden yapilir.
-- Ogrenci yalnizca `status = 'onayli'` sorulari ve kendi `submissions`
-  kayitlarini gorebilir.
+- Ogrenci soru metinlerini `get_student_exam_questions()` RPC'sinden, kendi
+  cevaplarini `get_my_submissions()` RPC'sinden okur. Dogru cevap/rubrik ile
+  ara AI ve egitmen puanlari sinav `sonuclandi` olmadan istemciye donmez.
 - `POST /api/submissions` rubrigi **istemciden degil veritabanindan** okur;
   aksi halde ogrenci kendi rubrigini gonderip puanini yukseltebilirdi.
 - `SUPABASE_SERVICE_ROLE_KEY` yalnizca `lib/supabase-server.ts` icindeki
-  `createAdminSupabaseClient()` tarafindan kullanilir ve `NEXT_PUBLIC_` on eki
-  tasimaz; istemciye asla gonderilmez.
+  `createAdminSupabaseClient()` tarafindan AI puanlama yazmalarinda kullanilir.
+  `NEXT_PUBLIC_` on eki tasimaz; istemciye asla gonderilmez. Bu anahtar
+  tanimlanmadan `20260821203000_student_assessment_security.sql` migration'i
+  ortak veritabanina uygulanmamalidir.
 
 ## Veri katmani
 
