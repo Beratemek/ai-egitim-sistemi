@@ -96,6 +96,7 @@ comment on table public.learning_outcomes is 'Icerik uzmani tarafindan yuklenen 
 -- --- questions -------------------------------------------------------------
 create table if not exists public.questions (
   id             uuid primary key default gen_random_uuid(),
+  subject        text not null default 'Ders atanmamis',  -- ders: dal ile konu arasi kirilim
   topic          text not null,
   text           text not null,
   type           public.question_type not null,
@@ -117,6 +118,12 @@ create table if not exists public.questions (
     (type = 'acik_uclu' and rubric is not null)
   )
 );
+
+comment on column public.questions.subject is 'Ders adi. Havuz dal -> ders -> konu -> soru olarak kirilir.';
+
+-- Semayi daha once kurmus veritabanlari icin: sutunu sonradan ekle.
+alter table public.questions add column if not exists subject text not null default 'Ders atanmamis';
+create index if not exists questions_subject_idx on public.questions (subject);
 
 comment on table public.questions is 'Soru havuzu. AI uretir, egitmen onaylar.';
 

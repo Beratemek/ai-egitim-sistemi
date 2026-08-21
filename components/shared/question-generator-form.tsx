@@ -48,6 +48,8 @@ import type {
 type TypeChoice = QuestionType | "karisik";
 
 export interface QuestionGeneratorFormProps {
+  /** Havuzda halihazirda kullanilan ders adlari; oneri olarak sunulur. */
+  subjects?: readonly string[];
   /** AI'in bugune kadar ogrendigi ornek sayilari. */
   preferenceStats: { liked: number; disliked: number };
   /** Supabase yoksa kaydetme kapali olur. */
@@ -63,11 +65,13 @@ export interface QuestionGeneratorFormProps {
  * ornek olarak verilir. Begenilen taslaklar tek tikla havuza gonderilir.
  */
 export function QuestionGeneratorForm({
+  subjects = [],
   preferenceStats,
   canPersist,
 }: QuestionGeneratorFormProps) {
   /** DENEYAP atolye dali - uretilen sorular bu dala baglanir. */
   const [category, setCategory] = React.useState<DeneyapCategory | "">("");
+  const [subject, setSubject] = React.useState("");
   const [topic, setTopic] = React.useState("");
   const [kazanim, setKazanim] = React.useState("");
   const [context, setContext] = React.useState("");
@@ -156,6 +160,8 @@ export function QuestionGeneratorForm({
     setSaving(true);
     const result = await saveGeneratedQuestions({
       questions: chosen,
+      subject,
+      topic,
       ...(category ? { category } : {}),
     });
     setSaving(false);
@@ -222,14 +228,32 @@ export function QuestionGeneratorForm({
                 </p>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-4 sm:grid-cols-3">
+                <div className="space-y-2">
+                  <Label htmlFor="subject">Ders</Label>
+                  <Input
+                    id="subject"
+                    required
+                    list="ders-onerileri"
+                    value={subject}
+                    onChange={(event) => setSubject(event.target.value)}
+                    placeholder="Matematik"
+                  />
+                  <datalist id="ders-onerileri">
+                    {subjects.map((item) => (
+                      <option key={item} value={item} />
+                    ))}
+                  </datalist>
+                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="topic">Konu</Label>
                   <Input
                     id="topic"
+                    required
                     value={topic}
                     onChange={(event) => setTopic(event.target.value)}
-                    placeholder="Fotosentez"
+                    placeholder="Trigonometri"
                   />
                 </div>
 

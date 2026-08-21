@@ -73,6 +73,8 @@ export type Question = {
   id: string;
   /** DENEYAP atolye dali (bkz. lib/deneyap.ts). Eski kayitlarda null olabilir. */
   category: DeneyapCategory | null;
+  /** Ders adi. Havuz "dal -> ders -> konu -> soru" olarak kirilir. */
+  subject: string;
   topic: string;
   text: string;
   type: QuestionType;
@@ -263,6 +265,7 @@ export interface Database {
           | "created_at"
           | "updated_at"
           | "category"
+          | "subject"
           | "status"
           | "outcome_id"
           | "created_by"
