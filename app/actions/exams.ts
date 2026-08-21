@@ -172,12 +172,23 @@ export async function setExamPublished(
     }
   }
 
-  const { error } = await supabase
+  // RLS bir satirla eslesmezse PostgREST hata dondurmez; `.select()` olmadan
+  // yayina alma basarili sanilir ama sinav taslak kalir.
+  const { data: updated, error } = await supabase
     .from("exams")
     .update({ is_published: isPublished })
-    .eq("id", examId);
+    .eq("id", examId)
+    .select("id");
 
   if (error) return { ok: false, error: error.message };
+
+  if (!updated || updated.length === 0) {
+    return {
+      ok: false,
+      error:
+        "Sinav guncellenemedi: bu sinav uzerinde yetkiniz yok ya da sinav artik mevcut degil.",
+    };
+  }
 
   revalidateExamPaths(examId);
   return { ok: true, data: undefined };
