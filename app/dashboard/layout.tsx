@@ -33,7 +33,9 @@ export default async function DashboardLayout({
     <DashboardShell
       role={current.profile.role}
       fullName={current.profile.full_name || current.user.email || "Kullanici"}
-      devSwitch={isDevRoleSwitchEnabled}
+      devSwitch={
+        isDevRoleSwitchEnabled && current.actualRole === "egitim_yoneticisi"
+      }
       actualRole={current.actualRole}
       impersonating={current.impersonatedRole !== null}
     >
