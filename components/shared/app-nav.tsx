@@ -90,9 +90,10 @@ const BASE_NAV = {
 /**
  * Rol basina sol menu.
  *
- * `admin` gizli bir roldur ve sitedeki her panele girer; menüsü de diger tüm
- * rollerin menulerinin birlesimidir. Boylece yeni bir sayfa hangi role
- * eklenirse eklensin admin otomatik olarak gorur.
+ * `admin` SISTEMI yonetir: roller, kullanicilar, siniflar ve panel ayarlari.
+ * Soru uretmek, sinav olusturmak, cevap onaylamak gibi ROL ISLERI menusunde
+ * YOKTUR - onlar ilgili rollerin isidir. Yonetici bu islere karismasi
+ * gerekiyorsa kendisine o rolu de atatir (bkz. coklu rol).
  */
 export const ROLE_NAV: Record<UserRole, readonly NavItem[]> = {
   ...BASE_NAV,
@@ -103,10 +104,6 @@ export const ROLE_NAV: Record<UserRole, readonly NavItem[]> = {
       icon: ShieldCheck,
       description: "Roller, kullanıcılar ve sınıflar",
     },
-    ...BASE_NAV.egitim_yoneticisi,
-    ...BASE_NAV.icerik_uzmani,
-    ...BASE_NAV.egitmen,
-    ...BASE_NAV.ogrenci,
   ],
 };
 
