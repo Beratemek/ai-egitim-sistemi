@@ -1,5 +1,6 @@
 import { generateQuestions } from "@/lib/ai";
-import { errorMessage, jsonError, jsonOk, readJson, requireRole } from "@/lib/api";
+import { describeAiError } from "@/lib/ai";
+import { jsonError, jsonOk, readJson, requireRole } from "@/lib/api";
 import { categoryLabel, isDeneyapCategory } from "@/lib/deneyap";
 import { getStyleGuide } from "@/lib/queries";
 import type { GenerateQuestionsRequest, GeneratedQuestion } from "@/lib/types";
@@ -53,6 +54,6 @@ export async function POST(request: Request) {
 
     return jsonOk(questions);
   } catch (caught) {
-    return jsonError(errorMessage(caught), 500);
+    return jsonError(describeAiError(caught), 500);
   }
 }
