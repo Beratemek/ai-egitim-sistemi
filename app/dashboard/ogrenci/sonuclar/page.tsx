@@ -10,7 +10,7 @@ import { Progress } from "@/components/ui/progress";
 import { getStudentResults } from "@/lib/queries";
 import { formatDateTime, formatScore } from "@/lib/utils";
 
-export const metadata: Metadata = { title: "Sonuclarim" };
+export const metadata: Metadata = { title: "Sonuçlarım" };
 
 export default async function OgrenciSonuclariPage() {
   const results = await getStudentResults();
@@ -29,22 +29,22 @@ export default async function OgrenciSonuclariPage() {
     <>
       <PageHeader
         title="Sonuclarim"
-        description="Yalnizca egitmen tarafindan onaylanmis nihai sinav sonuclari."
+        description="Yalnızca eğitmen tarafından onaylanmış nihai sınav sonuçları."
       />
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard label="Sonuclanan sinav" value={results.length} icon={ClipboardCheck} />
+        <StatCard label="Sonuçlanan sınav" value={results.length} icon={ClipboardCheck} />
         <StatCard
           label="Genel ortalama"
           value={average ?? "-"}
-          hint="100 uzerinden"
+          hint="100 üzerinden"
           icon={Target}
           accent="success"
         />
         <StatCard
-          label="En yuksek puan"
+          label="En yüksek puan"
           value={best ?? "-"}
-          hint="100 uzerinden"
+          hint="100 üzerinden"
           icon={Trophy}
           accent="primary"
         />
@@ -56,7 +56,7 @@ export default async function OgrenciSonuclariPage() {
             <CheckCircle2 className="mx-auto h-9 w-9 text-muted-foreground/50" />
             <p className="mt-4 text-sm font-medium">Henuz aciklanan sonucunuz yok</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Egitmen degerlendirmesi tamamlanan sinavlar burada gorunecek.
+              Eğitmen değerlendirmesi tamamlanan sınavlar burada gorunecek.
             </p>
           </CardContent>
         </Card>
@@ -69,7 +69,7 @@ export default async function OgrenciSonuclariPage() {
                   <CardTitle>{exam.title}</CardTitle>
                   <Badge variant="success" className="gap-1.5">
                     <CheckCircle2 className="h-3.5 w-3.5" />
-                    Egitmen onayli
+                    Eğitmen onaylı
                   </Badge>
                 </div>
               </CardHeader>
@@ -91,7 +91,7 @@ export default async function OgrenciSonuclariPage() {
                     Aciklanma: {formatDateTime(attempt.completed_at)}
                   </span>
                   <Link
-                    href={`/dashboard/ogrenci/sinav/${exam.id}`}
+                    href={`/dashboard/öğrenci/sınav/${exam.id}`}
                     className="flex items-center gap-1 font-medium text-primary"
                   >
                     Cevap ve geri bildirimler

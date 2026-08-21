@@ -14,11 +14,11 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: {
-    default: "AI Destekli Egitim Sistemi",
-    template: "%s | AI Destekli Egitim Sistemi",
+    default: "AI Destekli Eğitim Sistemi",
+    template: "%s | AI Destekli Eğitim Sistemi",
   },
   description:
-    "Yapay zeka ile soru ureten, acik uclu cevaplari rubrige gore puanlayan ve egitmen onayiyla calisan olcme-degerlendirme platformu.",
+    "Yapay zeka ile soru üreten, açık uçlu cevapları rubriğe göre puanlayan ve eğitmen onayıyla çalışan ölçme-değerlendirme platformu.",
 };
 
 export default function RootLayout({

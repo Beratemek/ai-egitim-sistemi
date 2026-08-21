@@ -32,21 +32,31 @@ import { ROLE_DEFINITIONS } from "@/lib/roles";
 import type { UserRole } from "@/lib/types";
 
 export interface DashboardShellProps {
+  /** Basliklarda ve rol kartinda gosterilen rol. */
   role: UserRole;
+  /**
+   * Sol menunun hangi role gore cizilecegi.
+   *
+   * `admin` icin bu `admin` kalir: yonetici her panele girebildigi icin
+   * menusu tum rollerin birlesimidir. `role` ise bulundugu sayfaya gore
+   * degisir - egitmen sayfasindaysa baslikta "Egitmen Paneli" yazar.
+   */
+  navRole?: UserRole;
   fullName: string;
-  /** Supabase yapilandirilmadiginda demo rozeti gosterilir. */
+  /** Supabase yapilandirilmadiginda demo rozeti gösterilir. */
   demoMode?: boolean;
-  /** Gelistirici rol degistiricisi acik mi? */
+  /** Geliştirici rol degistiricisi açık mi? */
   devSwitch?: boolean;
-  /** Veritabanindaki gercek rol (rol degistirici icin). */
+  /** Veritabanındaki gerçek rol (rol değiştirici için). */
   actualRole?: UserRole;
-  /** Su an baska bir rol taklit ediliyor mu? */
+  /** Su an başka bir rol taklit ediliyor mu? */
   impersonating?: boolean;
   children: React.ReactNode;
 }
 
 export function DashboardShell({
   role,
+  navRole,
   fullName,
   demoMode = false,
   devSwitch = false,
@@ -55,6 +65,7 @@ export function DashboardShell({
   children,
 }: DashboardShellProps) {
   const [mobileOpen, setMobileOpen] = React.useState(false);
+  const menuRole = navRole ?? role;
   const definition = ROLE_DEFINITIONS[role];
   const RoleIcon = ROLE_ICONS[role];
 
@@ -75,9 +86,9 @@ export function DashboardShell({
 
         <div className="flex-1 overflow-y-auto px-3 py-4">
           <p className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Menu
+            Menü
           </p>
-          <NavLinks role={role} />
+          <NavLinks role={menuRole} />
         </div>
 
         <div className="border-t p-3">
@@ -85,9 +96,9 @@ export function DashboardShell({
         </div>
       </aside>
 
-      {/* ---------- Icerik sutunu ---------- */}
+      {/* ---------- İçerik sutunu ---------- */}
       <div className="lg:pl-[264px] print:pl-0">
-        {/* ---------- Ust cubuk ---------- */}
+        {/* ---------- Üst cubuk ---------- */}
         <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b bg-background/80 px-4 backdrop-blur-md sm:px-6 print:hidden">
           {/* Mobil cekmece */}
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
@@ -96,7 +107,7 @@ export function DashboardShell({
                 variant="ghost"
                 size="icon"
                 className="lg:hidden"
-                aria-label="Menuyu ac"
+                aria-label="Menüyü ac"
               >
                 <Menu className="h-5 w-5" />
               </Button>
@@ -109,12 +120,12 @@ export function DashboardShell({
                   </div>
                 </SheetTitle>
                 <SheetDescription className="sr-only">
-                  Panel gezinti menusu
+                  Panel gezinti menüsü
                 </SheetDescription>
               </SheetHeader>
 
               <div className="px-3 py-4">
-                <NavLinks role={role} onNavigate={() => setMobileOpen(false)} />
+                <NavLinks role={menuRole} onNavigate={() => setMobileOpen(false)} />
               </div>
 
               <div className="px-3">
@@ -123,7 +134,7 @@ export function DashboardShell({
             </SheetContent>
           </Sheet>
 
-          {/* Mobilde marka, masaustunde rol basligi */}
+          {/* Mobilde marka, masaustunde rol başlığı */}
           <div className="flex min-w-0 flex-1 items-center gap-3">
             <div className="lg:hidden">
               <BrandMark />
@@ -159,7 +170,7 @@ export function DashboardShell({
                 <Button
                   variant="ghost"
                   className="h-9 gap-2 px-2"
-                  aria-label="Hesap menusu"
+                  aria-label="Hesap menüsü"
                 >
                   <Avatar className="h-7 w-7">
                     <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">
@@ -187,7 +198,7 @@ export function DashboardShell({
                       className="flex w-full items-center gap-2 text-left"
                     >
                       <LogOut className="h-4 w-4" />
-                      Cikis yap
+                      Çıkış yap
                     </button>
                   </form>
                 </DropdownMenuItem>

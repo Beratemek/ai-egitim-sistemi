@@ -34,7 +34,7 @@ import {
 } from "@/lib/student-exam-status";
 import { formatDateTime } from "@/lib/utils";
 
-export const metadata: Metadata = { title: "Ogrenci" };
+export const metadata: Metadata = { title: "Öğrenci" };
 
 type ExamItem = { exam: StudentExamCard; status: StudentExamStatus };
 type BadgeVariant = "default" | "soft" | "success" | "warning" | "danger";
@@ -45,13 +45,13 @@ const STATUS_META: Record<
 > = {
   yaklasan: {
     label: "Yaklasan",
-    cta: "Ayrintilari gor",
+    cta: "Ayrıntıları gör",
     variant: "soft",
     icon: Clock3,
   },
   baslanabilir: {
     label: "Baslanabilir",
-    cta: "Sinava basla",
+    cta: "Sınava başla",
     variant: "default",
     icon: CirclePlay,
   },
@@ -62,20 +62,20 @@ const STATUS_META: Record<
     icon: CirclePlay,
   },
   suresi_doldu: {
-    label: "Suresi doldu",
-    cta: "Sinavi incele",
+    label: "Süresi doldu",
+    cta: "Sınavı incele",
     variant: "danger",
     icon: LockKeyhole,
   },
   onay_bekliyor: {
     label: "Onay bekliyor",
-    cta: "Cevaplari gor",
+    cta: "Cevapları gör",
     variant: "warning",
     icon: Hourglass,
   },
   sonuclandi: {
     label: "Sonuclandi",
-    cta: "Sonuclari gor",
+    cta: "Sonuçları gör",
     variant: "success",
     icon: CheckCircle2,
   },
@@ -119,12 +119,12 @@ export default async function OgrenciPage() {
     <>
       <PageHeader
         title="Sinavlarim"
-        description="Acik sinavlara katilin; sonuclarinizi egitmen onayindan sonra gorun."
+        description="Açık sınavlara katılın; sonuçlarınızı eğitmen onayından sonra görün."
       />
 
       <div className="grid gap-4 sm:grid-cols-3">
         <StatCard
-          label="Aktif sinav"
+          label="Aktif sınav"
           value={activeExams.length}
           icon={CalendarClock}
           accent="primary"
@@ -147,29 +147,29 @@ export default async function OgrenciPage() {
       <div className="grid gap-6 lg:grid-cols-5">
         <div className="space-y-7 lg:col-span-3">
           <ExamSection
-            title="Girebileceginiz sinavlar"
+            title="Girebileceğiniz sınavlar"
             items={activeExams}
-            emptyMessage="Su an cevaplamaya acik sinav yok."
+            emptyMessage="Su an cevaplamaya açık sınav yok."
           />
 
           {upcomingExams.length > 0 ? (
-            <ExamSection title="Yaklasan sinavlar" items={upcomingExams} />
+            <ExamSection title="Yaklaşan sınavlar" items={upcomingExams} />
           ) : null}
 
           {expiredExams.length > 0 ? (
-            <ExamSection title="Suresi dolan sinavlar" items={expiredExams} />
+            <ExamSection title="Süresi dolan sınavlar" items={expiredExams} />
           ) : null}
         </div>
 
         <div className="space-y-3 lg:col-span-2">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-            Sinav gecmisim
+            Sınav gecmisim
           </h2>
 
           {examHistory.length === 0 ? (
             <Card className="border-dashed">
               <CardContent className="py-10 text-center text-sm text-muted-foreground">
-                Henuz basladiginiz bir sinav yok.
+                Henüz basladiginiz bir sınav yok.
               </CardContent>
             </Card>
           ) : (
@@ -210,12 +210,12 @@ function ExamHistoryCard({
     .sort((a, b) => b.localeCompare(a))[0];
   const message =
     status === "sonuclandi"
-      ? "Egitmen onayli sonucunuz aciklandi."
+      ? "Eğitmen onaylı sonucunuz açıklandı."
       : status === "onay_bekliyor"
-        ? "Cevaplariniz degerlendirmede; sonuc egitmen onayindan sonra aciklanacak."
+        ? "Cevaplarınız değerlendirmede; sonuç eğitmen onayından sonra açıklanacak."
         : status === "suresi_doldu"
-          ? "Sinav suresi sona erdi. Kayitli cevaplarinizi inceleyebilirsiniz."
-          : "Cevaplariniz taslak olarak kayitli; sinavi bitirene kadar duzenleyebilirsiniz.";
+          ? "Sınav süresi sona erdi. Kayıtlı cevaplarınızı inceleyebilirsiniz."
+          : "Cevaplarınız taslak olarak kayıtlı; sınavı bitirene kadar düzenleyebilirsiniz.";
 
   return (
     <Card>
@@ -251,7 +251,7 @@ function ExamHistoryCard({
             {latest ? formatDateTime(latest) : "-"}
           </span>
           <Link
-            href={`/dashboard/ogrenci/sinav/${exam.id}`}
+            href={`/dashboard/öğrenci/sınav/${exam.id}`}
             className="flex items-center gap-1 font-medium text-primary"
           >
             {score === null ? meta.cta : `${score} / 100`}
@@ -306,14 +306,14 @@ function StudentExamCardView({
   const StatusIcon = meta.icon;
   const dateLabel =
     status === "yaklasan" && exam.starts_at
-      ? `Baslangic: ${formatDateTime(exam.starts_at)}`
+      ? `Başlangıç: ${formatDateTime(exam.starts_at)}`
       : exam.ends_at
         ? `${status === "suresi_doldu" ? "Sona erdi" : "Bitis"}: ${formatDateTime(exam.ends_at)}`
-        : "Sure siniri yok";
+        : "Süre sınırı yok";
 
   return (
     <Link
-      href={`/dashboard/ogrenci/sinav/${exam.id}`}
+      href={`/dashboard/öğrenci/sınav/${exam.id}`}
       className="group block"
     >
       <Card className="transition-all group-hover:border-primary/50 group-hover:shadow-md">

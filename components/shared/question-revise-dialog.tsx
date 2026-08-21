@@ -33,45 +33,45 @@ import { cn } from "@/lib/utils";
 import type { DeneyapCategory } from "@/lib/deneyap";
 import type { ApiResponse, GeneratedQuestion, QuestionOption } from "@/lib/types";
 
-/** Tek tikla gonderilen hazir talimatlar. Anahtarlar API ile eslesir. */
+/** Tek tikla gonderilen hazır talimatlar. Anahtarlar API ile eslesir. */
 const PRESETS: readonly { key: string; label: string; icon: LucideIcon }[] = [
   { key: "zorlastir", label: "Zorlastir", icon: TrendingUp },
   { key: "kolaylastir", label: "Kolaylastir", icon: TrendingDown },
   { key: "kisalt", label: "Kisalt", icon: ArrowDownWideNarrow },
-  { key: "celdirici", label: "Celdiricileri guclendir", icon: Sparkles },
+  { key: "celdirici", label: "Çeldiricileri güçlendir", icon: Sparkles },
 ];
 
 const OPTION_KEYS = ["A", "B", "C", "D"] as const;
 
 export interface QuestionReviseDialogProps {
   question: GeneratedQuestion;
-  /** Kacinci taslak - baslikta gosterilir. */
+  /** Kacinci taslak - baslikta gösterilir. */
   index: number;
   /** Kaydedilen (elle duzenlenmis ya da revize edilmis) soruyu geri verir. */
   onSave: (question: GeneratedQuestion) => void;
-  /** Revizyonda modele baglam olarak gonderilir. */
-  kazanim?: string;
+  /** Revizyonda modele baglam olarak gönderilir. */
+  kazanım?: string;
   context?: string;
   category?: DeneyapCategory;
 }
 
 /**
- * Soru duzenleme ve AI revizyon diyalogu.
+ * Soru düzenleme ve AI revizyon diyalogu.
  *
- * Iki yol bir arada:
- *   - ELLE: soru koku, siklar, dogru cevap ve rubrik dogrudan degistirilir
- *     (brifteki "egitmen duzenler" maddesi).
- *   - AI ILE: hazir talimat dugmeleri veya serbest metin; model soruyu
- *     yeniden yazar, sonuc ayni alanlara duser ve "geri al" ile donulebilir.
+ * İki yol bir arada:
+ *   - ELLE: soru kökü, şıklar, doğru cevap ve rubrik doğrudan degistirilir
+ *     (brifteki "eğitmen düzenler" maddesi).
+ *   - AI ILE: hazır talimat dugmeleri veya serbest metin; model soruyu
+ *     yeniden yazar, sonuç ayni alanlara düşer ve "geri al" ile donulebilir.
  *
- * Diyalog kapanmadan hicbir sey kalici degil; "Kaydet" basilinca cagiran
+ * Diyalog kapanmadan hicbir sey kalici değil; "Kaydet" basilinca cagiran
  * bilesene aktarilir.
  */
 export function QuestionReviseDialog({
   question,
   index,
   onSave,
-  kazanim,
+  kazanım,
   context,
   category,
 }: QuestionReviseDialogProps) {
@@ -79,7 +79,7 @@ export function QuestionReviseDialog({
 
   /** Uzerinde calisilan hal. Diyalog her acilista sifirlanir. */
   const [draft, setDraft] = React.useState<GeneratedQuestion>(question);
-  /** AI revizyonundan onceki hal - "geri al" icin. */
+  /** AI revizyonundan önceki hal - "geri al" için. */
   const [previous, setPrevious] = React.useState<GeneratedQuestion | null>(null);
   const [instruction, setInstruction] = React.useState("");
   const [pending, setPending] = React.useState<string | null>(null);
@@ -104,7 +104,7 @@ export function QuestionReviseDialog({
     }));
   }
 
-  /** Test sorusunda sik listesi eksikse dort satiri tamamlar. */
+  /** Test sorusunda şık listesi eksikse dort satiri tamamlar. */
   const options: QuestionOption[] = React.useMemo(() => {
     if (draft.type !== "test") return [];
     const existing = draft.options ?? [];
@@ -116,7 +116,7 @@ export function QuestionReviseDialog({
   async function revise(preset?: string) {
     const freeText = instruction.trim();
     if (!preset && !freeText) {
-      setError("Ne yapilmasini istediginizi secin ya da yazin.");
+      setError("Ne yapılmasını istediğinizi seçin ya da yazın.");
       return;
     }
 
@@ -131,7 +131,7 @@ export function QuestionReviseDialog({
           question: draft,
           ...(preset ? { preset } : {}),
           ...(freeText ? { instruction: freeText } : {}),
-          ...(kazanim ? { kazanim } : {}),
+          ...(kazanım ? { kazanım } : {}),
           ...(context ? { context } : {}),
           ...(category ? { category } : {}),
         }),
@@ -144,11 +144,11 @@ export function QuestionReviseDialog({
       setDraft(result.data);
       setInstruction("");
       toast.success("Soru revize edildi", {
-        description: "Begenmezseniz 'Geri al' ile onceki hale donebilirsiniz.",
+        description: "Beğenmezseniz 'Geri al' ile önceki hale dönebilirsiniz.",
       });
     } catch (caught) {
       const message =
-        caught instanceof Error ? caught.message : "Revizyon sirasinda hata olustu.";
+        caught instanceof Error ? caught.message : "Revizyon sırasında hata oluştu.";
       setError(message);
       toast.error("Revize edilemedi", { description: message });
     } finally {
@@ -158,24 +158,24 @@ export function QuestionReviseDialog({
 
   function save() {
     if (!draft.text.trim()) {
-      setError("Soru koku bos olamaz.");
+      setError("Soru kökü boş olamaz.");
       return;
     }
 
     if (draft.type === "test") {
       const filled = options.filter((option) => option.text.trim());
       if (filled.length < 2) {
-        setError("Coktan secmeli soruda en az iki sik dolu olmalidir.");
+        setError("Çoktan seçmeli soruda en az iki şık dolu olmalıdır.");
         return;
       }
       if (!draft.correct_answer) {
-        setError("Dogru sikki secin.");
+        setError("Doğru şıkkı seçin.");
         return;
       }
       onSave({ ...draft, options: filled, rubric: null });
     } else {
       if (!draft.rubric?.trim()) {
-        setError("Acik uclu soruda rubrik zorunludur.");
+        setError("Açık uçlu soruda rubrik zorunludur.");
         return;
       }
       onSave({ ...draft, options: null, correct_answer: null });
@@ -189,23 +189,23 @@ export function QuestionReviseDialog({
       <DialogTrigger asChild>
         <Button size="sm" variant="ghost" className="gap-1.5 text-muted-foreground">
           <Pencil className="h-3.5 w-3.5" />
-          Duzenle
+          Düzenle
         </Button>
       </DialogTrigger>
 
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>{index + 1}. soruyu duzenle</DialogTitle>
+          <DialogTitle>{index + 1}. soruyu düzenle</DialogTitle>
           <DialogDescription>
             Alanlari elle degistirebilir ya da AI&apos;a nasil duzeltmesini
-            istediginizi soyleyebilirsiniz. Kaydetmeden hicbir sey kalici olmaz.
+            istediğinizi soyleyebilirsiniz. Kaydetmeden hicbir sey kalici olmaz.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* ---------- Soru koku ---------- */}
+          {/* ---------- Soru kökü ---------- */}
           <div className="space-y-2">
-            <Label htmlFor="revise-text">Soru koku</Label>
+            <Label htmlFor="revise-text">Soru kökü</Label>
             <Textarea
               id="revise-text"
               rows={3}
@@ -217,12 +217,12 @@ export function QuestionReviseDialog({
             />
           </div>
 
-          {/* ---------- Siklar / rubrik ---------- */}
+          {/* ---------- Şıklar / rubrik ---------- */}
           {draft.type === "test" ? (
             <div className="space-y-2">
-              <Label>Secenekler</Label>
+              <Label>Seçenekler</Label>
               <p className="text-xs text-muted-foreground">
-                Dogru sikki isaretlemek icin soldaki harfe basin.
+                Doğru şıkkı isaretlemek için soldaki harfe basın.
               </p>
 
               {options.map((option) => {
@@ -239,7 +239,7 @@ export function QuestionReviseDialog({
                         }))
                       }
                       aria-pressed={isCorrect}
-                      aria-label={`${option.key} sikkini dogru cevap yap`}
+                      aria-label={`${option.key} sikkini doğru cevap yap`}
                       className={cn(
                         "flex h-9 w-9 shrink-0 items-center justify-center rounded-md border font-mono text-sm transition-colors",
                         isCorrect
@@ -260,7 +260,7 @@ export function QuestionReviseDialog({
             </div>
           ) : (
             <div className="space-y-2">
-              <Label htmlFor="revise-rubric">Puanlama rubrigi</Label>
+              <Label htmlFor="revise-rubric">Puanlama rubriği</Label>
               <Textarea
                 id="revise-rubric"
                 rows={5}
@@ -272,7 +272,7 @@ export function QuestionReviseDialog({
                 className="resize-y font-mono text-xs"
               />
               <p className="text-xs text-muted-foreground">
-                Maddelerin puan toplami 100 olmalidir.
+                Maddelerin puan toplami 100 olmalıdır.
               </p>
             </div>
           )}
@@ -328,7 +328,7 @@ export function QuestionReviseDialog({
               <Input
                 value={instruction}
                 onChange={(event) => setInstruction(event.target.value)}
-                placeholder="...ya da ne istediginizi yazin (ornek: sayisal bir ornek ekle)"
+                placeholder="...ya da ne istediğinizi yazın (örnek: sayısal bir örnek ekle)"
                 className="flex-1"
                 disabled={pending !== null}
               />

@@ -27,7 +27,7 @@ import { isUserRole, type UserRole } from "@/lib/types";
 type Mode = "giris" | "kayit";
 
 export interface LoginFormProps {
-  /** /auth/callback tarafindan ?error= ile tasinan hata mesaji. */
+  /** /auth/callback tarafından ?error= ile tasinan hata mesaji. */
   callbackError?: string | null;
 }
 
@@ -64,7 +64,7 @@ export function LoginForm({ callbackError = null }: LoginFormProps) {
             data: { full_name: fullName, role },
             // Dogrulama e-postasindaki baglanti buraya doner. Belirtilmezse
             // Supabase "Site URL" koküne doner, oradaki ?code=... hicbir yerde
-            // islenmez ve kullanici dogrulamaya ragmen oturum acmamis olur.
+            // islenmez ve kullanıcı dogrulamaya ragmen oturum acmamis olur.
             emailRedirectTo: `${publicEnv.siteUrl}/auth/callback`,
           },
         });
@@ -73,7 +73,7 @@ export function LoginForm({ callbackError = null }: LoginFormProps) {
 
         if (!data.session) {
           setInfo(
-            "Kayit alindi. E-posta dogrulamasi acikssa gelen kutunuzu kontrol edin, ardindan giris yapin.",
+            "Kayıt alındı. E-posta doğrulaması açıksa gelen kutunuzu kontrol edin, ardından giriş yapın.",
           );
           setMode("giris");
           return;
@@ -105,9 +105,9 @@ export function LoginForm({ callbackError = null }: LoginFormProps) {
       const message =
         caught instanceof Error
           ? caught.message
-          : "Beklenmeyen bir hata olustu. Lutfen tekrar deneyin.";
+          : "Beklenmeyen bir hata oluştu. Lutfen tekrar deneyin.";
 
-      // Supabase bu durumda "Email not confirmed" dondurur.
+      // Supabase bu durumda "Email not confirmed" döndürür.
       setUnconfirmed(/not confirmed/i.test(message));
       setError(message);
     } finally {
@@ -130,8 +130,8 @@ export function LoginForm({ callbackError = null }: LoginFormProps) {
         }}
       >
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="giris">Giris yap</TabsTrigger>
-          <TabsTrigger value="kayit">Kayit ol</TabsTrigger>
+          <TabsTrigger value="giris">Giriş yap</TabsTrigger>
+          <TabsTrigger value="kayit">Kayıt ol</TabsTrigger>
         </TabsList>
       </Tabs>
 
@@ -146,7 +146,7 @@ export function LoginForm({ callbackError = null }: LoginFormProps) {
               required
               value={fullName}
               onChange={(event) => setFullName(event.target.value)}
-              placeholder="Ayse Yilmaz"
+              placeholder="Ayse Yılmaz"
             />
           </div>
 
@@ -177,8 +177,8 @@ export function LoginForm({ callbackError = null }: LoginFormProps) {
             </Select>
             <p className="text-xs text-muted-foreground">
               {role === "ogrenci"
-                ? "Ogrenci hesabi dogrudan acilir."
-                : "Bu rol yetki tasir: talebiniz egitim yoneticisine iletilir, onaylanana kadar bekleme ekraninda kalirsiniz."}
+                ? "Öğrenci hesabı doğrudan açılır."
+                : "Bu rol yetki taşır: talebiniz eğitim yöneticisine iletilir, onaylanana kadar bekleme ekranında kalırsınız."}
             </p>
           </div>
         </>
@@ -241,7 +241,7 @@ export function LoginForm({ callbackError = null }: LoginFormProps) {
           </>
         ) : (
           <>
-            {mode === "giris" ? "Giris yap" : "Kayit ol"}
+            {mode === "giris" ? "Giriş yap" : "Kayıt ol"}
             <ArrowRight className="h-4 w-4" />
           </>
         )}
@@ -261,7 +261,7 @@ export function LoginForm({ callbackError = null }: LoginFormProps) {
   );
 }
 
-/** Supabase yapilandirilmadiginda gosterilen demo giris ekrani. */
+/** Supabase yapilandirilmadiginda gosterilen demo giriş ekrani. */
 function DemoModeNotice() {
   return (
     <div className="space-y-4">
@@ -276,7 +276,7 @@ function DemoModeNotice() {
 
       <div className="space-y-2">
         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Rol secerek devam edin
+          Rol seçerek devam edin
         </p>
 
         {SELECTABLE_ROLES.map((definition) => {

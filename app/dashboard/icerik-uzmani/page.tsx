@@ -17,7 +17,7 @@ import { isSupabaseConfigured, serverEnv } from "@/lib/env";
 import { getOutcomes, getPreferenceStats, getQuestions } from "@/lib/queries";
 import { formatDateTime } from "@/lib/utils";
 
-export const metadata: Metadata = { title: "Icerik Uzmani" };
+export const metadata: Metadata = { title: "İçerik Uzmanı" };
 
 export default async function IcerikUzmaniPage() {
   const [outcomes, questions, preferenceStats] = await Promise.all([
@@ -26,7 +26,7 @@ export default async function IcerikUzmaniPage() {
     getPreferenceStats(),
   ]);
 
-  // Forma oneri olarak verilir; ayni ders iki farkli yazimla girilmesin.
+  // Forma öneri olarak verilir; ayni ders iki farklı yazimla girilmesin.
   const subjects = [...new Set(questions.map((question) => question.subject))]
     .filter(Boolean)
     .sort((a, b) => a.localeCompare(b, "tr"));
@@ -37,8 +37,8 @@ export default async function IcerikUzmaniPage() {
   return (
     <>
       <PageHeader
-        title="Icerik & Kazanimlar"
-        description="Kaynak metinleri yukleyin, AI ile soru taslagi uretin, onaylayarak havuza gonderin."
+        title="İçerik & Kazanımlar"
+        description="Kaynak metinleri yükleyin, AI ile soru taslağı üretin, onaylayarak havuza gönderin."
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -49,9 +49,9 @@ export default async function IcerikUzmaniPage() {
           accent="primary"
         />
         <StatCard
-          label="Uretilen soru"
+          label="Üretilen soru"
           value={aiGenerated}
-          hint="AI kaynakli"
+          hint="AI kaynaklı"
           icon={Sparkles}
           accent="success"
         />
@@ -63,9 +63,9 @@ export default async function IcerikUzmaniPage() {
           accent="warning"
         />
         <StatCard
-          label="Tarz ornegi"
+          label="Tarz örneği"
           value={preferenceStats.liked + preferenceStats.disliked}
-          hint={`${preferenceStats.liked} begeni · ${preferenceStats.disliked} red`}
+          hint={`${preferenceStats.liked} beğeni · ${preferenceStats.disliked} red`}
           icon={ThumbsUp}
         />
       </div>
@@ -78,14 +78,14 @@ export default async function IcerikUzmaniPage() {
         canPersist={isSupabaseConfigured}
       />
 
-      {/* ---------- Havuz onayi ---------- */}
+      {/* ---------- Havuz onayı ---------- */}
       <Card>
         <CardHeader>
-          <CardTitle>Soru havuzu onayi</CardTitle>
+          <CardTitle>Soru havuzu onayı</CardTitle>
           <CardDescription>
-            Onayladiginiz sorular egitmenin havuzuna duser ve sinavlarda
-            kullanilabilir hale gelir. Reddedilenler havuza girmez.
-            {isSupabaseConfigured ? null : " Demo modunda degisiklikler kaydedilmez."}
+            Onayladiginiz sorular eğitmenin havuzuna düşer ve sınavlarda
+            kullanılabilir hale gelir. Reddedilenler havuza girmez.
+            {isSupabaseConfigured ? null : " Demo modunda değişiklikler kaydedilmez."}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -95,17 +95,17 @@ export default async function IcerikUzmaniPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Yuklenen kazanimlar</CardTitle>
+          <CardTitle>Yüklenen kazanımlar</CardTitle>
           <CardDescription>
             {isSupabaseConfigured
-              ? "Veritabanindaki kazanimlar."
-              : "Demo verisi gosteriliyor."}
+              ? "Veritabanındaki kazanımlar."
+              : "Demo verisi gösteriliyor."}
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 lg:grid-cols-2">
           {outcomes.length === 0 ? (
             <p className="py-6 text-center text-sm text-muted-foreground lg:col-span-2">
-              Henuz kazanim eklenmemis.
+              Henüz kazanım eklenmemis.
             </p>
           ) : (
             outcomes.map((outcome) => (

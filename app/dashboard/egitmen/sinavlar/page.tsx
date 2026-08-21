@@ -16,11 +16,11 @@ import { isSupabaseConfigured } from "@/lib/env";
 import { getExamSummaries } from "@/lib/queries";
 import { formatDateTime } from "@/lib/utils";
 
-export const metadata: Metadata = { title: "Sinavlar" };
+export const metadata: Metadata = { title: "Sınavlar" };
 
 /**
- * Egitmenin sinav listesi.
- * Sinav olusturma -> soru ekleme -> yayina alma akisinin giris noktasi.
+ * Eğitmenin sınav listesi.
+ * Sınav oluşturma -> soru ekleme -> yayına alma akisinin giriş noktasi.
  */
 export default async function SinavlarPage() {
   const exams = await getExamSummaries();
@@ -29,11 +29,11 @@ export default async function SinavlarPage() {
     <>
       <PageHeader
         title="Sinavlar"
-        description="Havuzdaki onayli sorulardan sinav seti olusturun ve yayina alin."
+        description="Havuzdaki onaylı sorulardan sınav seti oluşturun ve yayına alın."
         actions={
           <div className="flex items-center gap-2">
             {isSupabaseConfigured ? null : (
-              <Badge variant="warning">Demo — kayit yapilamaz</Badge>
+              <Badge variant="warning">Demo — kayıt yapılamaz</Badge>
             )}
             <ExamCreateDialog canPersist={isSupabaseConfigured} />
           </div>
@@ -46,8 +46,8 @@ export default async function SinavlarPage() {
             <Library className="h-8 w-8 text-muted-foreground/50" />
             <p className="font-medium">Henuz sinav olusturulmadi</p>
             <p className="max-w-sm text-sm text-muted-foreground">
-              &ldquo;Yeni sinav&rdquo; ile baslayin; ardindan soru havuzundan onayli
-              sorulari secerek sinav setini kurun.
+              &ldquo;Yeni sınav&rdquo; ile başlayın; ardından soru havuzundan onaylı
+              soruları seçerek sınav setini kurun.
             </p>
           </CardContent>
         </Card>
@@ -56,7 +56,7 @@ export default async function SinavlarPage() {
           {exams.map((exam) => (
             <Link
               key={exam.id}
-              href={`/dashboard/egitmen/sinavlar/${exam.id}`}
+              href={`/dashboard/eğitmen/sınavlar/${exam.id}`}
               className="group"
             >
               <Card className="h-full transition-all group-hover:border-primary/50 group-hover:shadow-md">

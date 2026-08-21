@@ -26,32 +26,32 @@ const DIFFICULTY_VARIANT: Record<
 
 export interface GeneratedQuestionCardProps {
   question: GeneratedQuestion;
-  /** Duzenleme/revizyon diyalogu icin ek baglam. */
-  kazanim?: string;
+  /** Düzenleme/revizyon diyalogu için ek baglam. */
+  kazanım?: string;
   context?: string;
   category?: DeneyapCategory;
-  /** Elle duzenleme veya AI revizyonu sonucu; taslagi yerinde degistirir. */
+  /** Elle düzenleme veya AI revizyonu sonucu; taslağı yerinde degistirir. */
   onReplace?: (question: GeneratedQuestion) => void;
-  /** Secili DENEYAP atolye dali adi; rozet olarak gosterilir. */
+  /** Seçili DENEYAP atölye dalı adi; rozet olarak gösterilir. */
   categoryName?: string;
   index: number;
-  /** Havuza gonderilmek uzere secili mi? */
+  /** Havuza gonderilmek uzere seçili mi? */
   selected: boolean;
   onToggleSelected: (selected: boolean) => void;
   outcomeId?: string;
 }
 
 /**
- * Tek bir AI taslagi.
+ * Tek bir AI taslağı.
  *
- * Begen / begenme dugmeleri taslagi tercih hafizasina yazar; bir sonraki
- * uretimde model bu ornekleri gorur. Begenmedigi taslaga uzman kisa bir
- * gerekce de yazabilir - o gerekce de modele gider.
+ * Begen / begenme dugmeleri taslağı tercih hafizasina yazar; bir sonraki
+ * üretimde model bu ornekleri gorur. Begenmedigi taslaga uzman kısa bir
+ * gerekçe de yazabilir - o gerekçe de modele gider.
  */
 export function GeneratedQuestionCard({
   question,
   categoryName,
-  kazanim,
+  kazanım,
   context,
   category,
   onReplace,
@@ -88,8 +88,8 @@ export function GeneratedQuestionCard({
     if (next === "begendi") {
       // Begenilen soru dogal olarak havuza da aday.
       onToggleSelected(true);
-      toast.success("Begeni kaydedildi", {
-        description: "AI bir sonraki uretimde bu tarzi daha cok kullanacak.",
+      toast.success("Beğeni kaydedildi", {
+        description: "AI bir sonraki üretimde bu tarzı daha çok kullanacak.",
       });
     } else {
       onToggleSelected(false);
@@ -115,7 +115,7 @@ export function GeneratedQuestionCard({
               checked={selected}
               onChange={(event) => onToggleSelected(event.target.checked)}
               className="h-4 w-4 rounded border-input accent-[hsl(var(--primary))]"
-              aria-label={`${index + 1}. soruyu havuza gonder`}
+              aria-label={`${index + 1}. soruyu havuza gönder`}
             />
             <span className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/10 text-xs font-semibold text-primary">
               {index + 1}
@@ -218,7 +218,7 @@ export function GeneratedQuestionCard({
               question={question}
               index={index}
               onSave={onReplace}
-              {...(kazanim ? { kazanim } : {})}
+              {...(kazanım ? { kazanım } : {})}
               {...(context ? { context } : {})}
               {...(category ? { category } : {})}
             />
@@ -234,7 +234,7 @@ export function GeneratedQuestionCard({
             <Input
               value={note}
               onChange={(event) => setNote(event.target.value)}
-              placeholder="Nesi eksik? (ornek: celdiriciler zayif, cok kolay)"
+              placeholder="Nesi eksik? (örnek: çeldiriciler zayıf, çok kolay)"
               className="flex-1"
             />
             <Button
@@ -247,7 +247,7 @@ export function GeneratedQuestionCard({
               {pending === "begenmedi" ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : null}
-              Gonder
+              Gönder
             </Button>
           </div>
         ) : null}

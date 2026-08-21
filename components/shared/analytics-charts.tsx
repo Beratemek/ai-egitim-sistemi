@@ -35,8 +35,8 @@ import type { ScoreTrendPoint } from "@/lib/mock-data";
 /* --------------------------------------------------------------------------
  *  Renkler
  *
- *  Kategorik seriler ve durum renkleri dogrulanmis bir paletten alinmistir.
- *  Iki seri (mavi / turuncu) her iki temada da renk korlugu ayrimi ve
+ *  Kategorik seriler ve durum renkleri doğrulanmış bir paletten alinmistir.
+ *  İki seri (mavi / turuncu) her iki temada da renk korlugu ayrimi ve
  *  yuzeye karsi 3:1 kontrast esiklerini gecer.
  *
  *  Durum renkleri (yesil / sari / kirmizi) sabittir ve HER ZAMAN ikon +
@@ -53,13 +53,13 @@ const STATUS_COLORS: Record<QuestionStatus, string> = {
 };
 
 const STATUS_META: Record<QuestionStatus, { label: string; icon: LucideIcon }> = {
-  onayli: { label: "Onayli", icon: CheckCircle2 },
+  onayli: { label: "Onaylı", icon: CheckCircle2 },
   taslak: { label: "Taslak", icon: CircleDashed },
   reddedildi: { label: "Reddedildi", icon: XCircle },
 };
 
 /* ==========================================================================
- *  1. Sinav bazli ortalama puan  (tek seri -> lejant yok, dogrudan etiket)
+ *  1. Sınav bazlı ortalama puan  (tek seri -> lejant yok, doğrudan etiket)
  * ========================================================================== */
 
 const examAverageConfig = {
@@ -77,9 +77,9 @@ export function ExamAverageChart({ data }: { data: readonly ExamStatistics[] }) 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Sinav bazli ortalama puan</CardTitle>
+        <CardTitle>Sınav bazlı ortalama puan</CardTitle>
         <CardDescription>
-          Egitmen onayi verilmis puanlar; onay bekleyenlerde AI on puani kullanilir.
+          Eğitmen onayı verilmis puanlar; onay bekleyenlerde AI on puanı kullanilir.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -121,7 +121,7 @@ export function ExamAverageChart({ data }: { data: readonly ExamStatistics[] }) 
                 content={<ChartTooltipContent />}
               />
               <Bar dataKey="average" fill="var(--color-average)" radius={[0, 4, 4, 0]}>
-                {/* Tek seri: lejant yerine dogrudan deger etiketi */}
+                {/* Tek seri: lejant yerine doğrudan deger etiketi */}
                 <LabelList
                   dataKey="average"
                   position="right"
@@ -161,7 +161,7 @@ export function QuestionStatusChart({ questions }: { questions: readonly Questio
   ];
 
   const config = {
-    onayli: { label: "Onayli", color: STATUS_COLORS.onayli },
+    onayli: { label: "Onaylı", color: STATUS_COLORS.onayli },
     taslak: { label: "Taslak", color: STATUS_COLORS.taslak },
     reddedildi: { label: "Reddedildi", color: STATUS_COLORS.reddedildi },
   } satisfies ChartConfig;
@@ -173,7 +173,7 @@ export function QuestionStatusChart({ questions }: { questions: readonly Questio
       <CardHeader>
         <CardTitle>Soru havuzu durumu</CardTitle>
         <CardDescription>
-          Toplam {total} sorunun egitmen incelemesine gore dagilimi.
+          Toplam {total} sorunun eğitmen incelemesine göre dagilimi.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -213,7 +213,7 @@ export function QuestionStatusChart({ questions }: { questions: readonly Questio
               </BarChart>
             </ChartContainer>
 
-            {/* Ikon + etiket + sayi: anlam renge tek basina birakilmaz */}
+            {/* Ikon + etiket + sayı: anlam renge tek basina birakilmaz */}
             <ul className="space-y-2">
               {order.map((status) => {
                 const meta = STATUS_META[status];
@@ -250,12 +250,12 @@ export function QuestionStatusChart({ questions }: { questions: readonly Questio
 }
 
 /* ==========================================================================
- *  3. Basari trendi  (iki seri -> lejant + imlec ipucu)
+ *  3. Başarı trendi  (iki seri -> lejant + imlec ipucu)
  * ========================================================================== */
 
 const trendConfig = {
-  aiScore: { label: "AI on puani", theme: SERIES_BLUE },
-  approvedScore: { label: "Egitmen onayli", theme: SERIES_ORANGE },
+  aiScore: { label: "AI on puanı", theme: SERIES_BLUE },
+  approvedScore: { label: "Eğitmen onaylı", theme: SERIES_ORANGE },
 } satisfies ChartConfig;
 
 export function ScoreTrendChart({ data }: { data: readonly ScoreTrendPoint[] }) {
@@ -264,7 +264,7 @@ export function ScoreTrendChart({ data }: { data: readonly ScoreTrendPoint[] }) 
       <CardHeader>
         <CardTitle>Ortalama puan trendi</CardTitle>
         <CardDescription>
-          AI&apos;in verdigi on puan ile egitmen onayindan sonraki nihai puanin
+          AI&apos;in verdigi on puan ile eğitmen onayından sonraki nihai puanin
           hafta bazinda karsilastirmasi.
         </CardDescription>
       </CardHeader>

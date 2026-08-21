@@ -14,10 +14,10 @@ import type { UserProfile } from "@/lib/types";
 import { formatDateTime } from "@/lib/utils";
 
 /**
- * Egitim yoneticisinin rol onay kuyrugu.
+ * Eğitim yoneticisinin rol onay kuyrugu.
  *
- * Karar veritabanindaki `review_role_request` fonksiyonuna gider; orada rol
- * yeniden dogrulanir, yani bu ekrani atlayip dogrudan istek atmak da ise
+ * Karar veritabanındaki `review_role_request` fonksiyonuna gider; orada rol
+ * yeniden dogrulanir, yani bu ekrani atlayip doğrudan istek atmak da ise
  * yaramaz.
  */
 
@@ -38,13 +38,13 @@ export function RoleRequestList({ requests }: RoleRequestListProps) {
 
       const wanted = user.requested_role ? roleLabel(user.requested_role) : "rol";
 
-      toast.success(approve ? `${wanted} onaylandi` : "Talep reddedildi", {
+      toast.success(approve ? `${wanted} onaylandı` : "Talep reddedildi", {
         description: user.full_name || user.email || undefined,
       });
 
       router.refresh();
     } catch (caught) {
-      toast.error("Islem kaydedilemedi", {
+      toast.error("İşlem kaydedilemedi", {
         description:
           caught instanceof Error ? caught.message : "Lutfen tekrar deneyin.",
       });
@@ -59,7 +59,7 @@ export function RoleRequestList({ requests }: RoleRequestListProps) {
         <ShieldCheck className="h-8 w-8 text-muted-foreground/50" />
         <p className="font-medium">Bekleyen rol talebi yok</p>
         <p className="max-w-sm text-sm text-muted-foreground">
-          Ogrenci disinda bir rol secen her yeni kullanici burada onayinizi
+          Öğrenci disinda bir rol secen her yeni kullanıcı burada onayınızı
           bekler.
         </p>
       </div>

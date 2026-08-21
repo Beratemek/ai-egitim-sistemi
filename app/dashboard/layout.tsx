@@ -11,14 +11,14 @@ import type { UserRole } from "@/lib/types";
 export default async function DashboardLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  // Supabase yapilandirilmamissa demo modunda calis: rolu URL'den cikar.
+  // Supabase yapilandirilmamissa demo modunda calis: rolu URL'den çıkar.
   if (!isSupabaseConfigured) {
     const headerList = await headers();
     const pathname = headerList.get("x-pathname") ?? "/dashboard";
     const role: UserRole = roleForPath(pathname) ?? "egitmen";
 
     return (
-      <DashboardShell role={role} fullName="Demo Kullanici" demoMode>
+      <DashboardShell role={role} fullName="Demo Kullanıcı" demoMode>
         {children}
       </DashboardShell>
     );
@@ -26,12 +26,26 @@ export default async function DashboardLayout({
 
   const current = await getCurrentUser();
 
-  // Middleware zaten yonlendiriyor; bu yalnizca ek guvenlik katmanidir.
+  // Middleware zaten yonlendiriyor; bu yalnızca ek guvenlik katmanidir.
   if (!current) redirect("/login");
+
+  /**
+   * `admin` her panele girebilir. Hangi paneldeyse basliklarda ve rol
+   * kartinda O rol gorunur - egitmen sayfasindaysa "Egitmen Paneli". Sol
+   * menu ise `navRole` ile admin'de kalir, boylece paneller arasinda
+   * gezinmeye devam edebilir.
+   */
+  const isAdmin = current.profile.role === "admin";
+  const requestHeaders = await headers();
+  const activeRole: UserRole = isAdmin
+    ? (roleForPath(requestHeaders.get("x-pathname") ?? "/dashboard") ??
+      "egitim_yoneticisi")
+    : current.profile.role;
 
   return (
     <DashboardShell
-      role={current.profile.role}
+      role={activeRole}
+      navRole={current.profile.role}
       fullName={current.profile.full_name || current.user.email || "Kullanici"}
       devSwitch={
         isDevRoleSwitchEnabled && current.actualRole === "admin"

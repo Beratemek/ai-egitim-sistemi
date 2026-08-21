@@ -31,13 +31,13 @@ import {
 } from "@/lib/student-exam-status";
 import { formatDateTime } from "@/lib/utils";
 
-export const metadata: Metadata = { title: "Sinav" };
+export const metadata: Metadata = { title: "Sınav" };
 
 /**
- * Ogrencinin sinav ekrani: sinavdaki tum sorular sirayla yanitlanir.
+ * Öğrencinin sınav ekrani: sınavdaki tüm sorular sirayla yanitlanir.
  *
- * Sorular `getStudentExamDetail` ile cekilir; bu fonksiyon dogru cevap ve
- * rubrigi BILINCLI OLARAK getirmez (bkz. lib/queries.ts).
+ * Sorular `getStudentExamDetail` ile cekilir; bu fonksiyon doğru cevap ve
+ * rubriği BILINCLI Olarak getirmez (bkz. lib/queries.ts).
  */
 export default async function OgrenciSinavPage({
   params,
@@ -62,7 +62,7 @@ export default async function OgrenciSinavPage({
     totalPoints,
   } = detail;
 
-  // Soru -> ogrencinin cevabi eslesmesi.
+  // Soru -> öğrencinin cevabı eşleşmesi.
   const answerByQuestion = new Map(
     submissions
       .filter((submission) => submission.question_id !== null)
@@ -98,12 +98,12 @@ export default async function OgrenciSinavPage({
         className="flex w-fit items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
       >
         <ArrowLeft className="h-4 w-4" />
-        Sinavlarim
+        Sınavlarım
       </Link>
 
       <PageHeader
         title={exam.title}
-        description={exam.description || "Sorulari yanitlayin."}
+        description={exam.description || "Soruları yanıtlayın."}
         actions={<ExamStatusBadge status={status} />}
       />
 
@@ -114,7 +114,7 @@ export default async function OgrenciSinavPage({
           <CardContent className="grid gap-4 p-5 sm:grid-cols-3">
             <ResultMetric label="Nihai puan" value={`${attempt.final_score ?? "-"} / 100`} />
             <ResultMetric
-              label="Kazanilan puan"
+              label="Kazanılan puan"
               value={`${attempt.earned_points ?? "-"} / ${attempt.total_points ?? "-"}`}
             />
             <ResultMetric
@@ -138,7 +138,7 @@ export default async function OgrenciSinavPage({
         />
       ) : null}
 
-      {/* ---------- Ilerleme ---------- */}
+      {/* ---------- İlerleme ---------- */}
       {!requiresStart ? (
         <Card>
           <CardContent className="space-y-3 p-5">
@@ -183,7 +183,7 @@ export default async function OgrenciSinavPage({
       {requiresStart ? null : questions.length === 0 ? (
         <Card className="border-dashed">
           <CardContent className="py-16 text-center text-sm text-muted-foreground">
-            Bu sinava henuz soru eklenmemis.
+            Bu sınava henüz soru eklenmemis.
           </CardContent>
         </Card>
       ) : (
@@ -217,16 +217,16 @@ function getLockReason(
   switch (status) {
     case "yaklasan":
       return startsAt
-        ? `Bu sinav ${formatDateTime(startsAt)} tarihinde baslayacak. Baslangictan once cevap veremezsiniz.`
-        : "Bu sinav henuz baslamadi.";
+        ? `Bu sınav ${formatDateTime(startsAt)} tarihinde baslayacak. Baslangictan önce cevap veremezsiniz.`
+        : "Bu sınav henüz başlamadı.";
     case "suresi_doldu":
       return endsAt
-        ? `Bu sinav ${formatDateTime(endsAt)} tarihinde sona erdi. Yeni cevap gonderemezsiniz.`
-        : "Bu sinavin cevaplama suresi sona erdi.";
+        ? `Bu sınav ${formatDateTime(endsAt)} tarihinde sona erdi. Yeni cevap gonderemezsiniz.`
+        : "Bu sınavın cevaplama süresi sona erdi.";
     case "onay_bekliyor":
-      return "Tum cevaplariniz kaydedildi. Sonuclar egitmen degerlendirmesinden sonra aciklanacak.";
+      return "Tüm cevaplarınız kaydedildi. Sonuçlar eğitmen değerlendirmesinden sonra açıklanacak.";
     case "sonuclandi":
-      return "Sinaviniz degerlendirildi. Onaylanan sonuclarinizi asagida gorebilirsiniz.";
+      return "Sınavınız değerlendirildi. Onaylanan sonuçlarınızı aşağıda görebilirsiniz.";
     default:
       return null;
   }
@@ -242,14 +242,14 @@ function ExamStatusBadge({
       return (
         <Badge variant="soft" className="gap-1.5">
           <Clock3 className="h-3.5 w-3.5" />
-          Yaklasan
+          Yaklaşan
         </Badge>
       );
     case "suresi_doldu":
       return (
         <Badge variant="danger" className="gap-1.5">
           <LockKeyhole className="h-3.5 w-3.5" />
-          Suresi doldu
+          Süresi doldu
         </Badge>
       );
     case "onay_bekliyor":

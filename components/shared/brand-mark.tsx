@@ -11,9 +11,9 @@ export function BrandMark({ className }: { className?: string }) {
         <Sparkles className="h-4 w-4" strokeWidth={2.25} />
       </span>
       <span className="flex flex-col leading-none">
-        <span className="text-sm font-semibold tracking-tight">AI Egitim</span>
+        <span className="text-sm font-semibold tracking-tight">AI Eğitim</span>
         <span className="mt-0.5 text-[11px] text-muted-foreground">
-          Olcme &amp; Degerlendirme
+          Ölçme &amp; Değerlendirme
         </span>
       </span>
     </Link>

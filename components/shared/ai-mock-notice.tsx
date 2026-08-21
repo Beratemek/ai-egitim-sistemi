@@ -2,26 +2,26 @@ import { TriangleAlert } from "lucide-react";
 
 export interface AiMockNoticeProps {
   /**
-   * Hangi yetenegin sahte oldugunu soyler; mesaj buna gore degisir.
-   * "uretim" -> soru uretimi, "puanlama" -> cevap degerlendirme.
+   * Hangi yetenegin sahte oldugunu soyler; mesaj buna göre degisir.
+   * "uretim" -> soru uretimi, "puanlama" -> cevap değerlendirme.
    */
   capability: "uretim" | "puanlama";
-  /** Ogrenci ekraninda ortam degiskeni gibi teknik kurulum ayrintilari gizlenir. */
+  /** Öğrenci ekranında ortam degiskeni gibi teknik kurulum ayrıntıları gizlenir. */
   audience?: "operator" | "student";
 }
 
 const MESSAGE: Record<AiMockNoticeProps["capability"], string> = {
   uretim:
-    "Uretilen sorular gercek degil: metin sablondan geliyor, şıklar her seferinde aynı.",
+    "Üretilen sorular gerçek değil: metin şablondan geliyor, şıklar her seferinde aynı.",
   puanlama:
-    "Verilen puan gercek degil: cevabin icerigine bakilmadan kelime sayisindan hesaplaniyor.",
+    "Verilen puan gerçek değil: cevabın içeriğine bakılmadan kelime sayısından hesaplanıyor.",
 };
 
 /**
  * AI mock moddayken gosterilen uyari.
  *
- * Yalnizca `[MOCK]` on eki yeterli degildi - kolayca gozden kaciyor ve
- * ciktinin gercek sanilmasina yol aciyor. Anahtar tanimlandigi an bu bilesen
+ * Yalnızca `[MOCK]` on eki yeterli degildi - kolayca gozden kaciyor ve
+ * ciktinin gerçek sanilmasina yol aciyor. Anahtar tanimlandigi an bu bilesen
  * hic render edilmez (bkz. serverEnv.aiMockMode).
  */
 export function AiMockNotice({
@@ -38,8 +38,8 @@ export function AiMockNotice({
         <div className="space-y-1 text-sm text-warning">
           <p className="font-semibold">Degerlendirme simulasyon modunda</p>
           <p className="leading-relaxed text-warning/90">
-            Bu ortamda yapay zeka degerlendirmesi temsilidir. Nihai sonucunuz
-            egitmen onayindan sonra aciklanir.
+            Bu ortamda yapay zeka değerlendirmesi temsilidir. Nihai sonucunuz
+            eğitmen onayından sonra açıklanır.
           </p>
         </div>
       </div>
@@ -54,18 +54,18 @@ export function AiMockNotice({
       <TriangleAlert className="mt-0.5 h-4.5 w-4.5 shrink-0 text-warning" />
       <div className="space-y-1 text-sm">
         <p className="font-semibold text-warning">
-          Yapay zeka simulasyon modunda calisiyor
+          Yapay zeka simülasyon modunda çalışıyor
         </p>
         <p className="leading-relaxed text-warning/90">
-          {MESSAGE[capability]} Gercek modele baglanmak icin{" "}
+          {MESSAGE[capability]} Gerçek modele bağlanmak için{" "}
           <code className="rounded bg-warning/15 px-1 py-0.5 font-mono text-xs">
             .env.local
           </code>{" "}
-          dosyasindaki{" "}
+          dosyasındaki{" "}
           <code className="rounded bg-warning/15 px-1 py-0.5 font-mono text-xs">
             OPENAI_API_KEY
           </code>{" "}
-          alanina gecerli bir anahtar yazip sunucuyu yeniden baslatin.
+          alanına geçerli bir anahtar yazıp sunucuyu yeniden başlatın.
         </p>
       </div>
     </div>

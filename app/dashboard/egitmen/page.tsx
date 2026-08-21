@@ -35,7 +35,7 @@ import {
 } from "@/lib/queries";
 import { cn, formatDateTime } from "@/lib/utils";
 
-export const metadata: Metadata = { title: "Egitmen" };
+export const metadata: Metadata = { title: "Eğitmen" };
 
 export default async function EgitmenPage() {
   const [questions, exams, submissions, userNames] =
@@ -46,11 +46,11 @@ export default async function EgitmenPage() {
       getUserNameMap(),
     ]);
 
-  // Cevap -> soru metni eslesmesi: onay diyalogunda soruyu da gosterebilmek icin.
+  // Cevap -> soru metni eşleşmesi: onay diyalogunda soruyu da gosterebilmek için.
   const questionTextById = new Map(questions.map((q) => [q.id, q.text]));
 
-  // Egitmen yalnizca havuza dusmus (onayli) sorularla ilgilenir; taslak
-  // inceleme ve onay/red icerik uzmaninin ekranindadir.
+  // Eğitmen yalnızca havuza dusmus (onaylı) sorularla ilgilenir; taslak
+  // inceleme ve onay/red içerik uzmaninin ekranindadir.
   const approved = questions.filter((q) => q.status === "onayli");
   const topicCount = new Set(approved.map((q) => q.topic)).size;
   const pendingSubmissions = submissions.filter(
@@ -60,8 +60,8 @@ export default async function EgitmenPage() {
   return (
     <>
       <PageHeader
-        title="Genel Bakis"
-        description="Havuzdan sinav olusturun, ogrenci cevaplarinin puanlarini onaylayin."
+        title="Genel Bakış"
+        description="Havuzdan sınav oluşturun, öğrenci cevaplarının puanlarını onaylayın."
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <Link
@@ -76,7 +76,7 @@ export default async function EgitmenPage() {
               className={cn(buttonVariants(), "gap-2")}
             >
               <ClipboardList className="h-4 w-4" />
-              Sinavlar
+              Sınavlar
             </Link>
           </div>
         }
@@ -86,7 +86,7 @@ export default async function EgitmenPage() {
         <StatCard
           label="Havuzdaki soru"
           value={approved.length}
-          hint="Sinavlarda kullanilabilir"
+          hint="Sınavlarda kullanılabilir"
           icon={Library}
           accent="success"
         />
@@ -97,11 +97,11 @@ export default async function EgitmenPage() {
           icon={Layers}
           accent="primary"
         />
-        <StatCard label="Sinav" value={exams.length} icon={CalendarClock} />
+        <StatCard label="Sınav" value={exams.length} icon={CalendarClock} />
         <StatCard
-          label="Puan onayi bekleyen"
+          label="Puan onayı bekleyen"
           value={pendingSubmissions.length}
-          hint="AI degerlendirdi"
+          hint="AI değerlendirdi"
           icon={FileCheck2}
           accent="primary"
         />
@@ -109,15 +109,15 @@ export default async function EgitmenPage() {
 
       {serverEnv.aiMockMode ? <AiMockNotice capability="puanlama" /> : null}
 
-      {/* ---------- Puan onayi bekleyen cevaplar ---------- */}
+      {/* ---------- Puan onayı bekleyen cevaplar ---------- */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Sparkles className="h-4.5 w-4.5 text-primary" />
-            Puan onayi bekleyen cevaplar
+            Puan onayı bekleyen cevaplar
           </CardTitle>
           <CardDescription>
-            AI on puan verdi; nihai puani siz belirlersiniz.
+            AI on puan verdi; nihai puanı siz belirlersiniz.
           </CardDescription>
         </CardHeader>
 
@@ -170,7 +170,7 @@ export default async function EgitmenPage() {
                   <div className="min-w-[180px] flex-1 space-y-1.5">
                     <div className="flex items-baseline justify-between text-sm">
                       <span className="text-muted-foreground">
-                        {isApproved ? "Onaylanan puan" : "AI on puani"}
+                        {isApproved ? "Onaylanan puan" : "AI on puanı"}
                       </span>
                       <span className="font-semibold tabular">{finalScore} / 100</span>
                     </div>
@@ -180,7 +180,7 @@ export default async function EgitmenPage() {
                   {isApproved ? (
                     <Badge variant="success" className="gap-1.5">
                       <FileCheck2 className="h-3.5 w-3.5" />
-                      Onaylandi
+                      Onaylandı
                     </Badge>
                   ) : (
                     <SubmissionReviewDialog
@@ -204,11 +204,11 @@ export default async function EgitmenPage() {
         </CardContent>
       </Card>
 
-      {/* ---------- Sinavlar ---------- */}
+      {/* ---------- Sınavlar ---------- */}
       <Card>
         <CardHeader>
-          <CardTitle>Sinavlarim</CardTitle>
-          <CardDescription>Olusturdugunuz sinavlar ve yayin durumlari.</CardDescription>
+          <CardTitle>Sınavlarım</CardTitle>
+          <CardDescription>Oluşturduğunuz sınavlar ve yayın durumları.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 sm:grid-cols-2">
           {exams.map((exam) => (

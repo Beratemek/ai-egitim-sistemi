@@ -15,7 +15,7 @@ interface ExamCountdownProps {
   autoSubmit: boolean;
 }
 
-/** Sunucu son tarihine gore sayar; sifirda kayitli cevaplari otomatik teslim eder. */
+/** Sunucu son tarihine göre sayar; sifirda kayıtlı cevapları otomatik teslim eder. */
 export function ExamCountdown({ examId, endsAt, autoSubmit }: ExamCountdownProps) {
   const router = useRouter();
   const deadline = React.useMemo(() => new Date(endsAt).getTime(), [endsAt]);
@@ -40,14 +40,14 @@ export function ExamCountdown({ examId, endsAt, autoSubmit }: ExamCountdownProps
     void finalizeExam(examId, { reason: "time_expired" }).then((result) => {
       setSubmitting(false);
       if (result.ok) {
-        toast.info("Sinav suresi doldu", {
-          description: "Kaydedilen cevaplariniz otomatik olarak teslim edildi.",
+        toast.info("Sınav süresi doldu", {
+          description: "Kaydedilen cevaplarınız otomatik olarak teslim edildi.",
         });
         router.refresh();
         return;
       }
 
-      toast.error("Otomatik teslim tamamlanamadi", {
+      toast.error("Otomatik teslim tamamlanamadı", {
         description: result.error,
       });
       router.refresh();
@@ -78,8 +78,8 @@ export function ExamCountdown({ examId, endsAt, autoSubmit }: ExamCountdownProps
         {submitting
           ? "Otomatik teslim ediliyor..."
           : expired
-            ? "Sure doldu"
-            : `Kalan sure: ${formatRemaining(remainingMs)}`}
+            ? "Süre doldu"
+            : `Kalan süre: ${formatRemaining(remainingMs)}`}
       </span>
     </div>
   );
