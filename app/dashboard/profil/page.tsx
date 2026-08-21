@@ -34,7 +34,7 @@ export default async function ProfilePage() {
           title="Profilim"
           description="Ad soyadınızı güncelleyin; e-posta, rol ve sınıf bilgisi yöneticiden gelir."
         />
-        <ProfileForm profile={DEMO_PROFILE} roles={["egitmen"]} />
+        <ProfileForm profile={DEMO_PROFILE} roles={["egitmen"]} activeRole="egitmen" />
       </>
     );
   }
@@ -52,6 +52,16 @@ export default async function ProfilePage() {
   const roles: readonly UserRole[] =
     profile.roles && profile.roles.length > 0 ? profile.roles : [profile.role];
 
+  /**
+   * Profil ETKIN role gore cizilir.
+   *
+   * Coklu rolu olan kullanici egitmen panelindeyken egitmen profilini,
+   * ogrenci panelindeyken sinifini iceren ogrenci profilini gormeli.
+   * `profile.role` ust cubuktaki rol degistiricinin yazdigi etkin roldur -
+   * basliktaki "... Paneli" ile ayni kaynak.
+   */
+  const activeRole: UserRole = profile.role;
+
   return (
     <>
       <PageHeader
@@ -59,7 +69,7 @@ export default async function ProfilePage() {
         description="Ad soyadınızı güncelleyin; e-posta, rol ve sınıf bilgisi yöneticiden gelir."
       />
       <div className="max-w-2xl">
-        <ProfileForm profile={profile} roles={roles} />
+        <ProfileForm profile={profile} roles={roles} activeRole={activeRole} />
       </div>
     </>
   );

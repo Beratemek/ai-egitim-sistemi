@@ -17,7 +17,9 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ROLE_DEFINITIONS } from "@/lib/roles";
 import type { UserProfile, UserRole } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 /**
  * Kullanicinin kendi profili.
@@ -32,15 +34,26 @@ export interface ProfileFormProps {
   profile: UserProfile;
   /** Kullaniciya verilmis roller (kume). */
   roles: readonly UserRole[];
+  /**
+   * Su an hangi rolun panelindeyse o.
+   *
+   * Profil bu role gore degisir: egitmen panelindeyken egitmen profili,
+   * ogrenci panelindeyken sinifini iceren ogrenci profili gorunur. Coklu
+   * rolu olan kullanicinin tum alanlarini ust uste yigmak yerine icinde
+   * bulundugu baglami gostermek dogru olan.
+   */
+  activeRole: UserRole;
 }
 
-export function ProfileForm({ profile, roles }: ProfileFormProps) {
+export function ProfileForm({ profile, roles, activeRole }: ProfileFormProps) {
   const router = useRouter();
   const [fullName, setFullName] = React.useState(profile.full_name ?? "");
   const [pending, setPending] = React.useState(false);
 
   const dirty = fullName.trim() !== (profile.full_name ?? "").trim();
-  const isStudent = roles.includes("ogrenci");
+  // Sinif yalnizca OGRENCI panelinde anlamli - egitmen profilinde degil.
+  const isStudentPanel = activeRole === "ogrenci";
+  const activeDefinition = ROLE_DEFINITIONS[activeRole];
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -65,10 +78,15 @@ export function ProfileForm({ profile, roles }: ProfileFormProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Profil bilgileri</CardTitle>
+        <CardTitle>{activeDefinition.label} profili</CardTitle>
         <CardDescription>
-          Adınız sınav kâğıtlarında ve eğitmenin cevap listesinde görünür.
-          E-posta, rol ve sınıf bilgisi buradan değiştirilemez.
+          Ad soyadınız her panelde ortaktır. Aşağıdaki diğer bilgiler
+          {" "}
+          <span className="font-medium text-foreground">
+            {activeDefinition.label.toLocaleLowerCase("tr")}
+          </span>{" "}
+          rolünüze aittir; e-posta, rol ve sınıf bilgisi buradan
+          değiştirilemez.
         </CardDescription>
       </CardHeader>
 
@@ -107,7 +125,7 @@ export function ProfileForm({ profile, roles }: ProfileFormProps) {
               </p>
             </div>
 
-            {isStudent ? (
+            {isStudentPanel ? (
               <div className="space-y-2">
                 <Label htmlFor="profile-classroom">Sınıf</Label>
                 <div className="relative">
@@ -131,12 +149,24 @@ export function ProfileForm({ profile, roles }: ProfileFormProps) {
             <Label>Rolleriniz</Label>
             <div className="flex flex-wrap items-center gap-1.5">
               {roles.map((role) => (
-                <RoleBadge key={role} role={role} />
+                <span
+                  key={role}
+                  className={cn(
+                    "rounded-md",
+                    role === activeRole
+                      ? "ring-2 ring-primary ring-offset-1 ring-offset-background"
+                      : "opacity-60",
+                  )}
+                >
+                  <RoleBadge role={role} />
+                </span>
               ))}
             </div>
             <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
               <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-              Rol değişikliği sistem yöneticisi onayıyla yapılır.
+              {roles.length > 1
+                ? "Şu an çerçeveli roldesiniz. Üst çubuktaki rol değiştiriciyle geçiş yapınca bu profil de o role göre değişir."
+                : "Rol değişikliği sistem yöneticisi onayıyla yapılır."}
             </p>
           </div>
 
