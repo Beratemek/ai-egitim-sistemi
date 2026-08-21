@@ -42,6 +42,7 @@ import {
   categoryLabel,
   type DeneyapCategory,
 } from "@/lib/deneyap";
+import { UNASSIGNED_SUBJECT } from "@/lib/exam-paper";
 import { cn, formatDateTime } from "@/lib/utils";
 import {
   QUESTION_TYPES,
@@ -103,7 +104,8 @@ export function QuestionPoolTable({
 
       return (
         question.text.toLocaleLowerCase("tr").includes(needle) ||
-        question.topic.toLocaleLowerCase("tr").includes(needle)
+        question.topic.toLocaleLowerCase("tr").includes(needle) ||
+        (question.subject ?? "").toLocaleLowerCase("tr").includes(needle)
       );
     });
   }, [rows, search, statusFilter, typeFilter, categoryFilter]);
@@ -177,7 +179,7 @@ export function QuestionPoolTable({
               type="search"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Soru veya konu ara..."
+              placeholder="Soru, ders veya konu ara..."
               aria-label="Soru ara"
               className="pl-9"
             />
@@ -228,8 +230,9 @@ export function QuestionPoolTable({
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
-                  <TableHead className="w-[34%]">Soru</TableHead>
+                  <TableHead className="w-[30%]">Soru</TableHead>
                   <TableHead>Atolye dali</TableHead>
+                  <TableHead>Ders</TableHead>
                   <TableHead>Konu</TableHead>
                   <TableHead>Tip</TableHead>
                   <TableHead>Durum</TableHead>
@@ -271,6 +274,9 @@ export function QuestionPoolTable({
                           </Badge>
                         </TableCell>
                         <TableCell className="align-top text-muted-foreground">
+                          {question.subject || UNASSIGNED_SUBJECT}
+                        </TableCell>
+                        <TableCell className="align-top text-muted-foreground">
                           {question.topic}
                         </TableCell>
                         <TableCell className="align-top">
@@ -293,7 +299,7 @@ export function QuestionPoolTable({
 
                       {isExpanded ? (
                         <TableRow className="bg-muted/40 hover:bg-muted/40">
-                          <TableCell colSpan={7} className="py-4">
+                          <TableCell colSpan={8} className="py-4">
                             <QuestionDetail question={question} />
                           </TableCell>
                         </TableRow>
@@ -326,6 +332,8 @@ export function QuestionPoolTable({
                     </p>
 
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                      <span>{question.subject || UNASSIGNED_SUBJECT}</span>
+                      <span aria-hidden>&middot;</span>
                       <span>{question.topic}</span>
                       <span aria-hidden>&middot;</span>
                       <span>{formatDateTime(question.updated_at)}</span>

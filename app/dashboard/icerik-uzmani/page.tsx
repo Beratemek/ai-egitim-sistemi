@@ -26,6 +26,11 @@ export default async function IcerikUzmaniPage() {
     getPreferenceStats(),
   ]);
 
+  // Forma oneri olarak verilir; ayni ders iki farkli yazimla girilmesin.
+  const subjects = [...new Set(questions.map((question) => question.subject))]
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b, "tr"));
+
   const aiGenerated = questions.filter((question) => question.ai_generated).length;
   const pending = questions.filter((question) => question.status === "taslak").length;
 
@@ -68,6 +73,7 @@ export default async function IcerikUzmaniPage() {
       {serverEnv.aiMockMode ? <AiMockNotice capability="uretim" /> : null}
 
       <QuestionGeneratorForm
+        subjects={subjects}
         preferenceStats={preferenceStats}
         canPersist={isSupabaseConfigured}
       />

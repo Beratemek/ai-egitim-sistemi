@@ -77,6 +77,14 @@ export interface SaveQuestionsInput {
   questions: GeneratedQuestion[];
   /** DENEYAP atolye dali; sorular bu dala baglanir. */
   category?: DeneyapCategory;
+  /** Bu partideki tum sorularin yazilacagi ders. Zorunlu. */
+  subject: string;
+  /**
+   * Bu partideki tum sorularin yazilacagi konu.
+   * Verilmezse modelin soru basina urettigi konu kullanilir - ama o zaman
+   * havuz konu bazinda parcalanir, bu yuzden formda zorunlu tutuluyor.
+   */
+  topic?: string;
   outcomeId?: string;
 }
 
@@ -93,6 +101,16 @@ export async function saveGeneratedQuestions(
     return { ok: false, error: "Kaydedilecek soru secilmedi." };
   }
 
+  const subject = input.subject?.trim() ?? "";
+  if (!subject) {
+    return {
+      ok: false,
+      error: "Ders alani zorunlu. Sorularin hangi derse yazilacagini belirtin.",
+    };
+  }
+
+  const topic = input.topic?.trim() ?? "";
+
   const current = await getCurrentUser();
   if (!current) return { ok: false, error: "Oturum acmaniz gerekiyor." };
 
@@ -100,7 +118,11 @@ export async function saveGeneratedQuestions(
 
   const rows = input.questions.map((question) => ({
     category: input.category ?? null,
-    topic: question.topic,
+    subject,
+    // Havuz ders -> konu olarak kirildigi icin parti genelinde TEK konu
+    // anahtari kullanilir; model her soruya farkli bir konu adi uydurursa
+    // havuz gereksiz yere dagilir.
+    topic: topic || question.topic,
     text: question.text,
     type: question.type,
     options_json: question.options,
@@ -146,6 +168,7 @@ export async function updateQuestionStatus(
 
   if (error) return { ok: false, error: error.message };
 
+  revalidatePath("/dashboard/icerik-uzmani");
   revalidatePath("/dashboard/egitmen/soru-havuzu");
   revalidatePath("/dashboard/egitmen");
   return { ok: true, data: undefined };

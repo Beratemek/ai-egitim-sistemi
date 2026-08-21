@@ -9,6 +9,7 @@ import {
   BookOpen,
   ChevronRight,
   FileText,
+  GraduationCap,
   Layers,
   Library,
   ListChecks,
@@ -45,6 +46,7 @@ import {
   groupByCategory,
   pickBalanced,
   type CategoryGroup,
+  type SubjectGroup,
   type TopicGroup,
 } from "@/lib/exam-paper";
 import type { Exam, Question, QuestionType } from "@/lib/types";
@@ -53,12 +55,12 @@ import { cn } from "@/lib/utils";
 /**
  * Egitmenin soru havuzu.
  *
- * Havuz uc kademe halinde, her kademede kutucuklarla gezilir:
- *   Atolye dali  ->  Konu  ->  Soru listesi (isaretlenebilir)
+ * Havuz dort kademe halinde, her kademede kutucuklarla gezilir:
+ *   Atolye dali  ->  Ders  ->  Konu  ->  Soru listesi (isaretlenebilir)
  *
- * Kutucuklar sorulardan turetilir; altinda sorusu olmayan dal veya konu
- * kutucugu hic olusmaz. Icerik uzmani yeni bir dala soru onayladigi anda o
- * dalin kutucugu kendiliginden belirir.
+ * Kutucuklar sorulardan turetilir; altinda sorusu olmayan dal, ders veya konu
+ * kutucugu hic olusmaz. Icerik uzmani yeni bir derse soru onayladigi anda o
+ * dersin kutucugu kendiliginden belirir.
  *
  * Onay / red BURADA YOKTUR - o icerik uzmaninin isidir. Egitmen yalnizca
  * onaylanmis sorulari gorur, secer ve bir sinava ekler. Sinavin kendisi
@@ -84,6 +86,7 @@ export function QuestionPoolBrowser({
   const router = useRouter();
 
   const [activeCategory, setActiveCategory] = React.useState<string | null>(null);
+  const [activeSubject, setActiveSubject] = React.useState<string | null>(null);
   const [activeTopic, setActiveTopic] = React.useState<string | null>(null);
   const [selectedIds, setSelectedIds] = React.useState<ReadonlySet<string>>(
     () => new Set<string>(),
@@ -94,7 +97,7 @@ export function QuestionPoolBrowser({
   const [examId, setExamId] = React.useState<string>(exams[0]?.id ?? "");
   const [pending, setPending] = React.useState(false);
 
-  /** Havuzun tamami: dal -> konu -> soru. Filtreden etkilenmez. */
+  /** Havuzun tamami: dal -> ders -> konu -> soru. Filtreden etkilenmez. */
   const allCategories = React.useMemo(() => groupByCategory(questions), [questions]);
 
   /** Arama / tip filtresinden gecmis hali. */
@@ -111,20 +114,33 @@ export function QuestionPoolBrowser({
     [visibleCategories, activeCategory],
   );
 
-  const openTopic = React.useMemo(
+  const openSubject = React.useMemo(
     () =>
-      openCategory === null || activeTopic === null
+      openCategory === null || activeSubject === null
         ? null
-        : (openCategory.topics.find((group) => group.topic === activeTopic) ?? null),
-    [openCategory, activeTopic],
+        : (openCategory.subjects.find((group) => group.subject === activeSubject) ??
+          null),
+    [openCategory, activeSubject],
   );
 
-  const selectedCount = selectedIds.size;
+  const openTopic = React.useMemo(
+    () =>
+      openSubject === null || activeTopic === null
+        ? null
+        : (openSubject.topics.find((group) => group.topic === activeTopic) ?? null),
+    [openSubject, activeTopic],
+  );
 
   /* ------------------------------ gezinme -------------------------------- */
 
   function backToCategories() {
     setActiveCategory(null);
+    setActiveSubject(null);
+    setActiveTopic(null);
+  }
+
+  function backToSubjects() {
+    setActiveSubject(null);
     setActiveTopic(null);
   }
 
@@ -139,8 +155,8 @@ export function QuestionPoolBrowser({
     });
   }
 
-  function toggleTopic(group: TopicGroup) {
-    const ids = group.questions.map((question) => question.id);
+  /** Verilen kumeyi topluca secer; hepsi seciliyse secimi kaldirir. */
+  function toggleMany(ids: readonly string[]) {
     const allSelected = ids.every((id) => selectedIds.has(id));
 
     setSelectedIds((current) => {
@@ -155,15 +171,17 @@ export function QuestionPoolBrowser({
 
   /**
    * Konular arasinda sirayla gezerek istenen sayida soru secer.
-   * Kapsam bulundugun kademedir: konu acikken o konudan, dal acikken o dalin
-   * konularindan, dal listesindeyken gorunen tum dallardan alir.
+   * Kapsam bulundugun kademedir: konudayken o konudan, derste o dersin
+   * konularindan, dalda o dalin tum derslerinden, en ustte gorunen her seyden.
    */
   function autoSelect() {
     const source = openTopic
       ? [openTopic]
-      : openCategory
-        ? openCategory.topics
-        : visibleCategories.flatMap((group) => group.topics);
+      : openSubject
+        ? openSubject.topics
+        : openCategory
+          ? topicsOfCategory(openCategory)
+          : visibleCategories.flatMap(topicsOfCategory);
 
     const available = source.reduce((total, group) => total + group.questions.length, 0);
     const requested = Number.parseInt(targetCount, 10);
@@ -226,16 +244,18 @@ export function QuestionPoolBrowser({
         exams={exams}
         examId={examId}
         onExamChange={setExamId}
-        selectedCount={selectedCount}
+        selectedCount={selectedIds.size}
         targetCount={targetCount}
         onTargetCountChange={setTargetCount}
         onAutoSelect={autoSelect}
         autoSelectScope={
           openTopic
             ? `${openTopic.topic} konusundan`
-            : openCategory
-              ? `${openCategory.label} dalinin konularindan`
-              : "gorunen tum dallardan"
+            : openSubject
+              ? `${openSubject.subject} dersinin konularindan`
+              : openCategory
+                ? `${openCategory.label} dalinin tum derslerinden`
+                : "gorunen tum dallardan"
         }
         canPersist={canPersist}
         pending={pending}
@@ -251,7 +271,7 @@ export function QuestionPoolBrowser({
               type="search"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Dal, konu veya soru ara..."
+              placeholder="Dal, ders, konu veya soru ara..."
               aria-label="Havuzda ara"
               className="pl-9"
             />
@@ -280,7 +300,8 @@ export function QuestionPoolBrowser({
             <>
               <p className="text-sm text-muted-foreground">
                 {visibleCategories.length} dal ·{" "}
-                {visibleCategories.reduce((sum, g) => sum + g.topics.length, 0)} konu ·{" "}
+                {visibleCategories.reduce((sum, g) => sum + g.subjects.length, 0)} ders ·{" "}
+                {visibleCategories.reduce((sum, g) => sum + g.topicCount, 0)} konu ·{" "}
                 {visibleCategories.reduce((sum, g) => sum + g.questionCount, 0)} soru
               </p>
 
@@ -292,6 +313,7 @@ export function QuestionPoolBrowser({
                     selectedIds={selectedIds}
                     onOpen={() => {
                       setActiveCategory(keyOf(group));
+                      setActiveSubject(null);
                       setActiveTopic(null);
                     }}
                   />
@@ -299,34 +321,59 @@ export function QuestionPoolBrowser({
               </div>
             </>
           )
-        ) : openTopic === null ? (
-          /* ------------- 2. kademe: konu kutucuklari --------------------- */
+        ) : openSubject === null ? (
+          /* ------------- 2. kademe: ders kutucuklari --------------------- */
           <>
             <Breadcrumb
               trail={[{ label: "Atolye dallari", onClick: backToCategories }]}
               current={openCategory.label}
-              meta={`${openCategory.topics.length} konu · ${openCategory.questionCount} soru`}
+              meta={`${openCategory.subjects.length} ders · ${openCategory.questionCount} soru`}
             />
 
             <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-3">
-              {openCategory.topics.map((topic) => (
+              {openCategory.subjects.map((subject) => (
+                <SubjectCard
+                  key={subject.subject}
+                  group={subject}
+                  selectedIds={selectedIds}
+                  onOpen={() => setActiveSubject(subject.subject)}
+                  onToggleAll={() => toggleMany(idsOfSubject(subject))}
+                />
+              ))}
+            </div>
+          </>
+        ) : openTopic === null ? (
+          /* ------------- 3. kademe: konu kutucuklari --------------------- */
+          <>
+            <Breadcrumb
+              trail={[
+                { label: "Atolye dallari", onClick: backToCategories },
+                { label: openCategory.label, onClick: backToSubjects },
+              ]}
+              current={openSubject.subject}
+              meta={`${openSubject.topics.length} konu · ${openSubject.questionCount} soru`}
+            />
+
+            <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-3">
+              {openSubject.topics.map((topic) => (
                 <TopicCard
                   key={topic.topic}
                   group={topic}
                   selectedIds={selectedIds}
                   onOpen={() => setActiveTopic(topic.topic)}
-                  onToggleAll={() => toggleTopic(topic)}
+                  onToggleAll={() => toggleMany(idsOfTopic(topic))}
                 />
               ))}
             </div>
           </>
         ) : (
-          /* ------------- 3. kademe: sorular ------------------------------ */
+          /* ------------- 4. kademe: sorular ------------------------------ */
           <>
             <Breadcrumb
               trail={[
                 { label: "Atolye dallari", onClick: backToCategories },
-                { label: openCategory.label, onClick: () => setActiveTopic(null) },
+                { label: openCategory.label, onClick: backToSubjects },
+                { label: openSubject.subject, onClick: () => setActiveTopic(null) },
               ]}
               current={openTopic.topic}
               meta={`${openTopic.questions.length} soru`}
@@ -335,7 +382,7 @@ export function QuestionPoolBrowser({
             <QuestionList
               group={openTopic}
               selectedIds={selectedIds}
-              onToggleAll={() => toggleTopic(openTopic)}
+              onToggleAll={() => toggleMany(idsOfTopic(openTopic))}
               onToggleQuestion={toggleQuestion}
             />
           </>
@@ -358,14 +405,9 @@ function CategoryCard({
   selectedIds: ReadonlySet<string>;
   onOpen: () => void;
 }) {
-  const selectedCount = group.topics.reduce(
-    (total, topic) =>
-      total + topic.questions.filter((question) => selectedIds.has(question.id)).length,
-    0,
-  );
-
-  const preview = group.topics.slice(0, 3);
-  const rest = group.topics.length - preview.length;
+  const selectedCount = countSelected(idsOfCategory(group), selectedIds);
+  const preview = group.subjects.slice(0, 3);
+  const rest = group.subjects.length - preview.length;
 
   return (
     <button
@@ -391,43 +433,67 @@ function CategoryCard({
       <div className="min-w-0">
         <p className="font-semibold leading-snug">{group.label}</p>
         <p className="mt-0.5 text-sm text-muted-foreground">
-          {group.topics.length} konu · {group.questionCount} soru
+          {group.subjects.length} ders · {group.topicCount} konu ·{" "}
+          {group.questionCount} soru
         </p>
       </div>
 
-      <div className="flex flex-wrap gap-1.5">
-        {preview.map((topic) => (
-          <span
-            key={topic.topic}
-            className="max-w-full truncate rounded border px-1.5 py-0.5 text-xs text-muted-foreground"
-          >
-            {topic.topic}
-          </span>
-        ))}
-        {rest > 0 ? (
-          <span className="rounded border border-dashed px-1.5 py-0.5 text-xs text-muted-foreground">
-            +{rest} konu
-          </span>
-        ) : null}
-      </div>
+      <ChipRow
+        items={preview.map((subject) => subject.subject)}
+        rest={rest}
+        restLabel="ders"
+      />
 
-      <span className="mt-auto flex items-center gap-1 pt-1 text-sm font-medium text-primary">
-        Konulari ac
-        <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-      </span>
+      <CardAction label="Dersleri ac" />
     </button>
   );
 }
 
 /* -------------------------------------------------------------------------- */
-/*  2. kademe - konu kutucugu                                                 */
+/*  2. kademe - ders kutucugu                                                 */
 /* -------------------------------------------------------------------------- */
 
-/**
- * Konu karti. Kartin govdesi konunun sorularina girer; sol ustteki kutucuk
- * ise konudaki tum sorulari tek hamlede secer. Ikisi ic ice degil kardes
- * ogedir - buton icinde buton gecerli HTML degildir.
- */
+function SubjectCard({
+  group,
+  selectedIds,
+  onOpen,
+  onToggleAll,
+}: {
+  group: SubjectGroup;
+  selectedIds: ReadonlySet<string>;
+  onOpen: () => void;
+  onToggleAll: () => void;
+}) {
+  const ids = idsOfSubject(group);
+  const selectedCount = countSelected(ids, selectedIds);
+  const preview = group.topics.slice(0, 3);
+  const rest = group.topics.length - preview.length;
+
+  return (
+    <SelectableCard
+      selectedCount={selectedCount}
+      allSelected={selectedCount === ids.length}
+      onToggleAll={onToggleAll}
+      toggleLabel={`${group.subject} dersindeki tum sorulari sec`}
+      onOpen={onOpen}
+      icon={<GraduationCap className="h-4 w-4 shrink-0 text-primary" />}
+      title={group.subject}
+      subtitle={`${group.topics.length} konu · ${group.questionCount} soru`}
+      action="Konulari ac"
+    >
+      <ChipRow
+        items={preview.map((topic) => topic.topic)}
+        rest={rest}
+        restLabel="konu"
+      />
+    </SelectableCard>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  3. kademe - konu kutucugu                                                 */
+/* -------------------------------------------------------------------------- */
+
 function TopicCard({
   group,
   selectedIds,
@@ -439,16 +505,74 @@ function TopicCard({
   onOpen: () => void;
   onToggleAll: () => void;
 }) {
-  const selectedCount = group.questions.filter((question) =>
-    selectedIds.has(question.id),
-  ).length;
-  const allSelected = selectedCount === group.questions.length;
+  const ids = idsOfTopic(group);
+  const selectedCount = countSelected(ids, selectedIds);
 
   const multipleChoice = group.questions.filter(
     (question) => question.type === "test",
   ).length;
   const openEnded = group.questions.length - multipleChoice;
 
+  return (
+    <SelectableCard
+      selectedCount={selectedCount}
+      allSelected={selectedCount === ids.length}
+      onToggleAll={onToggleAll}
+      toggleLabel={`${group.topic} konusundaki tum sorulari sec`}
+      onOpen={onOpen}
+      icon={<Layers className="h-4 w-4 shrink-0 text-primary" />}
+      title={group.topic}
+      subtitle={`${group.questions.length} soru`}
+      action="Sorulari ac"
+    >
+      <div className="flex flex-wrap gap-1.5">
+        {multipleChoice > 0 ? (
+          <span className="inline-flex items-center gap-1.5 rounded border px-1.5 py-0.5 text-xs text-muted-foreground">
+            <ListChecks className="h-3 w-3" />
+            {multipleChoice} coktan secmeli
+          </span>
+        ) : null}
+        {openEnded > 0 ? (
+          <span className="inline-flex items-center gap-1.5 rounded border px-1.5 py-0.5 text-xs text-muted-foreground">
+            <FileText className="h-3 w-3" />
+            {openEnded} acik uclu
+          </span>
+        ) : null}
+      </div>
+    </SelectableCard>
+  );
+}
+
+/**
+ * Hem ders hem konu kutucugunun ortak govdesi.
+ *
+ * Kartin govdesi bir alt kademeye girer, sol ustteki kutucuk ise o kademedeki
+ * tum sorulari tek hamlede secer. Ikisi ic ice degil kardes ogedir - buton
+ * icinde buton gecerli HTML degildir.
+ */
+function SelectableCard({
+  selectedCount,
+  allSelected,
+  onToggleAll,
+  toggleLabel,
+  onOpen,
+  icon,
+  title,
+  subtitle,
+  action,
+  children,
+}: {
+  selectedCount: number;
+  allSelected: boolean;
+  onToggleAll: () => void;
+  toggleLabel: string;
+  onOpen: () => void;
+  icon: React.ReactNode;
+  title: string;
+  subtitle: string;
+  action: string;
+  children?: React.ReactNode;
+}) {
   return (
     <div
       className={cn(
@@ -457,12 +581,12 @@ function TopicCard({
         selectedCount > 0 && "border-primary/40",
       )}
     >
-      <label className="shrink-0 cursor-pointer p-1" title="Konudaki tum sorulari sec">
+      <label className="shrink-0 cursor-pointer p-1" title={toggleLabel}>
         <Checkbox
           checked={allSelected}
           indeterminate={selectedCount > 0 && !allSelected}
           onChange={onToggleAll}
-          aria-label={`${group.topic} konusundaki tum sorulari sec`}
+          aria-label={toggleLabel}
         />
       </label>
 
@@ -472,46 +596,64 @@ function TopicCard({
         className="flex min-w-0 flex-1 flex-col gap-2 text-left focus-visible:outline-none"
       >
         <div className="flex items-start justify-between gap-2">
-          <Layers className="h-4 w-4 shrink-0 text-primary" />
-
+          {icon}
           {selectedCount > 0 ? (
             <Badge variant="success">{selectedCount} secili</Badge>
           ) : null}
         </div>
 
         <div className="min-w-0">
-          <p className="font-medium leading-snug">{group.topic}</p>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            {group.questions.length} soru
-          </p>
+          <p className="font-medium leading-snug">{title}</p>
+          <p className="mt-0.5 text-sm text-muted-foreground">{subtitle}</p>
         </div>
 
-        <div className="flex flex-wrap gap-1.5">
-          {multipleChoice > 0 ? (
-            <span className="inline-flex items-center gap-1.5 rounded border px-1.5 py-0.5 text-xs text-muted-foreground">
-              <ListChecks className="h-3 w-3" />
-              {multipleChoice} coktan secmeli
-            </span>
-          ) : null}
-          {openEnded > 0 ? (
-            <span className="inline-flex items-center gap-1.5 rounded border px-1.5 py-0.5 text-xs text-muted-foreground">
-              <FileText className="h-3 w-3" />
-              {openEnded} acik uclu
-            </span>
-          ) : null}
-        </div>
+        {children}
 
-        <span className="mt-auto flex items-center gap-1 pt-1 text-sm font-medium text-primary">
-          Sorulari ac
-          <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-        </span>
+        <CardAction label={action} />
       </button>
     </div>
   );
 }
 
+function CardAction({ label }: { label: string }) {
+  return (
+    <span className="mt-auto flex items-center gap-1 pt-1 text-sm font-medium text-primary">
+      {label}
+      <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+    </span>
+  );
+}
+
+function ChipRow({
+  items,
+  rest,
+  restLabel,
+}: {
+  items: readonly string[];
+  rest: number;
+  restLabel: string;
+}) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {items.map((item) => (
+        <span
+          key={item}
+          className="max-w-full truncate rounded border px-1.5 py-0.5 text-xs text-muted-foreground"
+        >
+          {item}
+        </span>
+      ))}
+      {rest > 0 ? (
+        <span className="rounded border border-dashed px-1.5 py-0.5 text-xs text-muted-foreground">
+          +{rest} {restLabel}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 /* -------------------------------------------------------------------------- */
-/*  3. kademe - soru listesi                                                  */
+/*  4. kademe - soru listesi                                                  */
 /* -------------------------------------------------------------------------- */
 
 function QuestionList({
@@ -525,9 +667,7 @@ function QuestionList({
   onToggleAll: () => void;
   onToggleQuestion: (id: string) => void;
 }) {
-  const selectedCount = group.questions.filter((question) =>
-    selectedIds.has(question.id),
-  ).length;
+  const selectedCount = countSelected(idsOfTopic(group), selectedIds);
   const allSelected = selectedCount === group.questions.length;
 
   return (
@@ -803,7 +943,7 @@ function EmptyPool() {
         <p className="font-medium">Havuzda onaylanmis soru yok</p>
         <p className="max-w-sm text-sm text-muted-foreground">
           Icerik uzmani uretilen taslaklari onayladikca sorular burada atolye
-          dali ve konu basliklari altinda birikir.
+          dali, ders ve konu basliklari altinda birikir.
         </p>
       </CardContent>
     </Card>
@@ -825,15 +965,37 @@ function NoMatch() {
 }
 
 /* -------------------------------------------------------------------------- */
+/*  Yardimcilar                                                               */
+/* -------------------------------------------------------------------------- */
 
 /** Dali atanmamis grubun da kararli bir anahtari olmali. */
 function keyOf(group: CategoryGroup): string {
   return group.category ?? "__kategorisiz__";
 }
 
+function topicsOfCategory(group: CategoryGroup): TopicGroup[] {
+  return group.subjects.flatMap((subject) => subject.topics);
+}
+
+function idsOfTopic(group: TopicGroup): string[] {
+  return group.questions.map((question) => question.id);
+}
+
+function idsOfSubject(group: SubjectGroup): string[] {
+  return group.topics.flatMap(idsOfTopic);
+}
+
+function idsOfCategory(group: CategoryGroup): string[] {
+  return group.subjects.flatMap(idsOfSubject);
+}
+
+function countSelected(ids: readonly string[], selected: ReadonlySet<string>): number {
+  return ids.reduce((total, id) => (selected.has(id) ? total + 1 : total), 0);
+}
+
 /**
- * Arama ve tip filtresini dal -> konu -> soru agacina uygular.
- * Dal adi aramayla eslesiyorsa altindaki konular kirpilmaz; boylece
+ * Arama ve tip filtresini dal -> ders -> konu -> soru agacina uygular.
+ * Ust kademenin adi aramayla eslesiyorsa altindakiler kirpilmaz; boylece
  * "Ileri Robotik" yazinca dalin tamami gorulebilir.
  */
 function filterCategories(
@@ -848,31 +1010,47 @@ function filterCategories(
       const categoryMatches =
         !needle || category.label.toLocaleLowerCase("tr").includes(needle);
 
-      const topics = category.topics
-        .map((topic) => {
-          const topicMatches =
-            categoryMatches || topic.topic.toLocaleLowerCase("tr").includes(needle);
+      const subjects = category.subjects
+        .map((subject) => {
+          const subjectMatches =
+            categoryMatches || subject.subject.toLocaleLowerCase("tr").includes(needle);
+
+          const topics = subject.topics
+            .map((topic) => {
+              const topicMatches =
+                subjectMatches || topic.topic.toLocaleLowerCase("tr").includes(needle);
+
+              return {
+                topic: topic.topic,
+                questions: topic.questions.filter((question) => {
+                  if (typeFilter !== "hepsi" && question.type !== typeFilter) {
+                    return false;
+                  }
+                  if (topicMatches) return true;
+                  return question.text.toLocaleLowerCase("tr").includes(needle);
+                }),
+              };
+            })
+            .filter((topic) => topic.questions.length > 0);
 
           return {
-            topic: topic.topic,
-            questions: topic.questions.filter((question) => {
-              if (typeFilter !== "hepsi" && question.type !== typeFilter) return false;
-              if (topicMatches) return true;
-              return question.text.toLocaleLowerCase("tr").includes(needle);
-            }),
+            subject: subject.subject,
+            topics,
+            questionCount: topics.reduce(
+              (total, topic) => total + topic.questions.length,
+              0,
+            ),
           };
         })
-        .filter((topic) => topic.questions.length > 0);
+        .filter((subject) => subject.topics.length > 0);
 
       return {
         category: category.category,
         label: category.label,
-        topics,
-        questionCount: topics.reduce(
-          (total, topic) => total + topic.questions.length,
-          0,
-        ),
+        subjects,
+        topicCount: subjects.reduce((total, s) => total + s.topics.length, 0),
+        questionCount: subjects.reduce((total, s) => total + s.questionCount, 0),
       };
     })
-    .filter((category) => category.topics.length > 0);
+    .filter((category) => category.subjects.length > 0);
 }
