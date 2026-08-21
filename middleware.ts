@@ -5,8 +5,13 @@ import { ROLE_CACHE_COOKIE } from "@/lib/auth-cookies";
 import { DEV_ROLE_COOKIE, isDevRoleSwitchEnabled } from "@/lib/dev-mode";
 import { isSupabaseConfigured, publicEnv } from "@/lib/env";
 import { dashboardPathFor, roleForPath } from "@/lib/roles";
-import { isUserRole } from "@/lib/types";
-import type { Database, UserRole } from "@/lib/types";
+import { isRoleStatus, isUserRole } from "@/lib/types";
+import type { Database, RoleStatus, UserRole } from "@/lib/types";
+
+/** Rolunu henuz secmemis kullanicinin gonderildigi ekran. */
+const ONBOARDING_PATH = "/hosgeldiniz";
+/** Onay bekleyen veya reddedilen kullanicinin gonderildigi ekran. */
+const PENDING_PATH = "/onay-bekleniyor";
 
 /**
  * Rolun onbelleklendigi cerez.
@@ -65,9 +70,11 @@ export async function middleware(request: NextRequest) {
 
   const isDashboard = pathname.startsWith("/dashboard");
   const isLogin = pathname === "/login";
+  const isOnboarding = pathname === ONBOARDING_PATH;
+  const isPending = pathname === PENDING_PATH;
 
   if (!user) {
-    if (isDashboard) {
+    if (isDashboard || isOnboarding || isPending) {
       const loginUrl = new URL("/login", request.url);
       loginUrl.searchParams.set("next", pathname);
       return NextResponse.redirect(loginUrl);
@@ -88,9 +95,47 @@ export async function middleware(request: NextRequest) {
 
   // Rol yalnizca yonlendirme kararinin gerektigi yerlerde lazim.
   // Tanitim sayfasi, /auth/* gibi yollarda sorgulamaya gerek yok.
-  if (!isDashboard && !isLogin) return response;
+  if (!isDashboard && !isLogin && !isOnboarding && !isPending) return response;
 
-  const actualRole = await resolveRole(request, response, supabase, user.id);
+  const { role: actualRole, status } = await resolveProfile(
+    request,
+    response,
+    supabase,
+    user.id,
+  );
+
+  /**
+   * Rol onay akisi.
+   *
+   * Rolunu secmemis kullanici once "kim oldugunu" soyler; ogrenci disi bir
+   * rol talep ettiyse egitim yoneticisi karar verene kadar bekleme ekraninda
+   * kalir. Onaya kadar etkin rolu 'ogrenci' oldugu icin yetkili alanlara
+   * zaten giremez - bu yonlendirme yalnizca ekrani netlestirir.
+   */
+  if (status === "secilmedi") {
+    return isOnboarding
+      ? response
+      : NextResponse.redirect(new URL(ONBOARDING_PATH, request.url));
+  }
+
+  if (status === "beklemede") {
+    return isPending
+      ? response
+      : NextResponse.redirect(new URL(PENDING_PATH, request.url));
+  }
+
+  // Reddedilen kullanici baska bir rol talep edebilsin diye secim ekranina
+  // da girebilir; aksi halde hesabi kalici olarak kilitlenirdi.
+  if (status === "reddedildi") {
+    return isPending || isOnboarding
+      ? response
+      : NextResponse.redirect(new URL(PENDING_PATH, request.url));
+  }
+
+  // Onayli kullanicinin bu iki ekranda isi yok.
+  if (isOnboarding || isPending) {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
 
   // Gelistirici rol degistiricisi: yalnizca yonlendirme kurallarini etkiler.
   const devRole = request.cookies.get(DEV_ROLE_COOKIE)?.value;
@@ -117,18 +162,22 @@ export async function middleware(request: NextRequest) {
 }
 
 /**
- * Rolu once cerez onbelleginden, yoksa veritabanindan okur ve onbellege yazar.
+ * Rolu ve rol onay durumunu cozer; mumkunse cerez onbelleginden okur.
  *
  * Onbellek degeri "<userId>:<rol>" bicimindedir. Kullanici kimligini de
  * anahtara katmak sart: ayni tarayicida baska bir hesaba gecildiginde eski
  * rolun yapisip yanlis panele yonlendirmesini onler.
+ *
+ * Onbellek YALNIZCA onayli kullanicilar icin yazilir. Onay bekleyen biri
+ * onbellege alinsaydi, yonetici onayladiktan sonra 5 dakika boyunca bekleme
+ * ekraninda kalirdi. Onaylilar hizli yolda, bekleyenler her istekte taze.
  */
-async function resolveRole(
+async function resolveProfile(
   request: NextRequest,
   response: NextResponse,
   supabase: ReturnType<typeof createServerClient<Database>>,
   userId: string,
-): Promise<UserRole> {
+): Promise<{ role: UserRole; status: RoleStatus }> {
   const cached = request.cookies.get(ROLE_CACHE_COOKIE)?.value;
 
   if (cached) {
@@ -136,25 +185,30 @@ async function resolveRole(
     const cachedUserId = cached.slice(0, separator);
     const cachedRole = cached.slice(separator + 1);
 
-    if (cachedUserId === userId && isUserRole(cachedRole)) return cachedRole;
+    if (cachedUserId === userId && isUserRole(cachedRole)) {
+      return { role: cachedRole, status: "onayli" };
+    }
   }
 
   const { data: profile } = await supabase
     .from("users")
-    .select("role")
+    .select("role, role_status")
     .eq("id", userId)
     .maybeSingle();
 
   const role = isUserRole(profile?.role) ? profile.role : "ogrenci";
+  const status = isRoleStatus(profile?.role_status) ? profile.role_status : "onayli";
 
-  response.cookies.set(ROLE_CACHE_COOKIE, `${userId}:${role}`, {
-    httpOnly: true,
-    sameSite: "lax",
-    path: "/",
-    maxAge: ROLE_CACHE_MAX_AGE,
-  });
+  if (status === "onayli") {
+    response.cookies.set(ROLE_CACHE_COOKIE, `${userId}:${role}`, {
+      httpOnly: true,
+      sameSite: "lax",
+      path: "/",
+      maxAge: ROLE_CACHE_MAX_AGE,
+    });
+  }
 
-  return role;
+  return { role, status };
 }
 
 export const config = {

@@ -412,6 +412,26 @@ export async function getUsers(): Promise<UserProfile[]> {
   return data ?? [];
 }
 
+/**
+ * Karara baglanmayi bekleyen rol talepleri.
+ *
+ * Yalnizca egitim yoneticisi anlamli bir sonuc alir; digerlerinde RLS
+ * satirlari zaten filtreler. Demo modunda bos doner - mock veride bekleyen
+ * talep yok.
+ */
+export async function getRoleRequests(): Promise<UserProfile[]> {
+  if (!isSupabaseConfigured) return [];
+
+  const supabase = await createServerSupabaseClient();
+  const { data } = await supabase
+    .from("users")
+    .select("*")
+    .eq("role_status", "beklemede")
+    .order("updated_at", { ascending: true });
+
+  return data ?? [];
+}
+
 /** Id -> tam ad haritasi; tablolarda ogrenci adini gostermek icin. */
 export async function getUserNameMap(): Promise<Record<string, string>> {
   const users = await getUsers();

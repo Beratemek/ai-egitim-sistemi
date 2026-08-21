@@ -23,6 +23,15 @@ begin
     );
   end if;
 
+  if not exists (select 1 from pg_type where typname = 'role_status') then
+    create type public.role_status as enum (
+      'secilmedi',    -- ilk giristen sonra rolunu henuz secmedi
+      'beklemede',    -- rol talep etti, egitim yoneticisi onayi bekliyor
+      'onayli',       -- rolu gecerli
+      'reddedildi'    -- talebi reddedildi; yeni talep acabilir
+    );
+  end if;
+
   if not exists (select 1 from pg_type where typname = 'question_type') then
     create type public.question_type as enum ('test', 'acik_uclu');
   end if;
@@ -72,6 +81,11 @@ $$;
 create table if not exists public.users (
   id          uuid primary key references auth.users (id) on delete cascade,
   role        public.user_role not null default 'ogrenci',
+  -- Rol onay akisi: ogrenci disindaki roller egitim yoneticisi onayi ister.
+  role_status public.role_status not null default 'onayli',
+  requested_role   public.user_role,
+  role_reviewed_by uuid,
+  role_reviewed_at timestamptz,
   full_name   text not null default '',
   email       text,
   created_at  timestamptz not null default now(),
@@ -79,6 +93,16 @@ create table if not exists public.users (
 );
 
 comment on table public.users is 'Kullanici profilleri ve rolleri (auth.users 1-1 uzantisi).';
+comment on column public.users.role_status is 'Rol onay durumu; ogrenci disindaki roller onay ister.';
+comment on column public.users.requested_role is 'Kullanicinin talep ettigi rol; onaylaninca role kopyalanir.';
+
+-- Semayi daha once kurmus veritabanlari icin.
+alter table public.users add column if not exists role_status public.role_status not null default 'onayli';
+alter table public.users add column if not exists requested_role public.user_role;
+alter table public.users add column if not exists role_reviewed_by uuid;
+alter table public.users add column if not exists role_reviewed_at timestamptz;
+
+create index if not exists users_role_status_idx on public.users (role_status);
 
 -- --- learning_outcomes (kazanimlar) ----------------------------------------
 -- Icerik uzmaninin yukledigi kaynak metin + kazanim.
@@ -237,7 +261,13 @@ create trigger submissions_set_updated_at
   for each row execute function public.set_updated_at();
 
 -- Yeni auth.users kaydi olustugunda public.users profilini otomatik ac.
--- Rol, kayit sirasinda gonderilen raw_user_meta_data->>'role' degerinden okunur.
+--
+-- Rol artik dogrudan verilmez, TALEP edilir:
+--   * metadata'da rol yoksa (ornegin Google ile giris) -> 'secilmedi',
+--     kullanici /hosgeldiniz ekraninda kim oldugunu secer.
+--   * ogrenci secilmisse dogrudan onaylanir.
+--   * diger roller egitim yoneticisi onayina dusulur; onaya kadar etkin rol
+--     'ogrenci' kalir, boylece onay beklerken yetkili alanlara giremez.
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
@@ -245,18 +275,29 @@ security definer
 set search_path = public
 as $$
 declare
-  requested_role public.user_role;
+  requested public.user_role;
+  status    public.role_status;
 begin
   begin
-    requested_role := (new.raw_user_meta_data ->> 'role')::public.user_role;
+    requested := (new.raw_user_meta_data ->> 'role')::public.user_role;
   exception when others then
-    requested_role := 'ogrenci';
+    requested := null;
   end;
 
-  insert into public.users (id, role, full_name, email)
+  if requested is null then
+    status := 'secilmedi';
+  elsif requested = 'ogrenci' then
+    status := 'onayli';
+  else
+    status := 'beklemede';
+  end if;
+
+  insert into public.users (id, role, role_status, requested_role, full_name, email)
   values (
     new.id,
-    coalesce(requested_role, 'ogrenci'),
+    'ogrenci',
+    status,
+    requested,
     coalesce(new.raw_user_meta_data ->> 'full_name', ''),
     new.email
   )
@@ -296,6 +337,130 @@ as $$
   select exists (
     select 1 from public.users where id = auth.uid() and role = target
   );
+$$;
+
+-- ---------------------------------------------------------------------------
+-- Rol onay akisi
+--
+-- Rol ve rol durumu kullanicinin KENDI eliyle degistirilemez; aksi halde
+-- herkes kendi satirini guncelleyip yonetici olabilirdi. Iki kapi var:
+--   * request_role()       -> kullanici kendi adina rol TALEP eder
+--   * review_role_request()-> yalnizca egitim yoneticisi karar verir
+-- Ikisi de SECURITY DEFINER; asagidaki tetikleyici dogrudan yazmayi engeller.
+-- ---------------------------------------------------------------------------
+
+/**
+ * Dogrudan rol degisikligini engeller.
+ *
+ * Yalnizca SECURITY DEFINER fonksiyonlarindan gelen degisiklige izin verir;
+ * onlar `public.role_change_allowed` bayragini acar.
+ */
+create or replace function public.guard_role_columns()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if (new.role is distinct from old.role
+      or new.role_status is distinct from old.role_status
+      or new.requested_role is distinct from old.requested_role)
+     and coalesce(current_setting('app.role_change_allowed', true), 'off') <> 'on'
+  then
+    raise exception 'Rol alanlari dogrudan degistirilemez; request_role / review_role_request kullanin.'
+      using errcode = '42501';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists users_guard_role_columns on public.users;
+create trigger users_guard_role_columns
+  before update on public.users
+  for each row execute function public.guard_role_columns();
+
+/**
+ * Kullanicinin kendi adina rol talep etmesi.
+ * Ogrenci dogrudan onaylanir; diger roller egitim yoneticisi onayina duser.
+ */
+create or replace function public.request_role(target public.user_role)
+returns public.role_status
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  result public.role_status;
+begin
+  if auth.uid() is null then
+    raise exception 'Oturum acmaniz gerekiyor.' using errcode = '42501';
+  end if;
+
+  result := case when target = 'ogrenci' then 'onayli' else 'beklemede' end;
+
+  perform set_config('app.role_change_allowed', 'on', true);
+
+  update public.users
+  set role             = case when target = 'ogrenci' then 'ogrenci' else 'ogrenci' end,
+      requested_role   = target,
+      role_status      = result,
+      role_reviewed_by = null,
+      role_reviewed_at = null,
+      updated_at       = now()
+  where id = auth.uid();
+
+  perform set_config('app.role_change_allowed', 'off', true);
+
+  return result;
+end;
+$$;
+
+/**
+ * Egitim yoneticisinin bir rol talebini onaylamasi / reddetmesi.
+ * Onaylanirsa talep edilen rol etkin role kopyalanir.
+ */
+create or replace function public.review_role_request(
+  target_user uuid,
+  approve boolean
+)
+returns public.role_status
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  wanted public.user_role;
+  result public.role_status;
+begin
+  if not public.has_role('egitim_yoneticisi') then
+    raise exception 'Bu islem icin egitim yoneticisi olmaniz gerekiyor.'
+      using errcode = '42501';
+  end if;
+
+  select requested_role into wanted from public.users where id = target_user;
+
+  if wanted is null then
+    raise exception 'Bu kullanicinin bekleyen bir rol talebi yok.'
+      using errcode = '22023';
+  end if;
+
+  result := case when approve then 'onayli' else 'reddedildi' end;
+
+  perform set_config('app.role_change_allowed', 'on', true);
+
+  update public.users
+  set role             = case when approve then wanted else role end,
+      role_status      = result,
+      role_reviewed_by = auth.uid(),
+      role_reviewed_at = now(),
+      updated_at       = now()
+  where id = target_user;
+
+  perform set_config('app.role_change_allowed', 'off', true);
+
+  return result;
+end;
 $$;
 
 -- ===========================================================================

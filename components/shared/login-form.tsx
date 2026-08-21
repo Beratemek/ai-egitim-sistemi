@@ -176,7 +176,9 @@ export function LoginForm({ callbackError = null }: LoginFormProps) {
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              Demo amaclidir. Gercek kurulumda rol atamasi yonetici tarafindan yapilmalidir.
+              {role === "ogrenci"
+                ? "Ogrenci hesabi dogrudan acilir."
+                : "Bu rol yetki tasir: talebiniz egitim yoneticisine iletilir, onaylanana kadar bekleme ekraninda kalirsiniz."}
             </p>
           </div>
         </>
