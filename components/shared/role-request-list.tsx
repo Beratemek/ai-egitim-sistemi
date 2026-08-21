@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Check, Loader2, ShieldCheck, X } from "lucide-react";
 import { toast } from "sonner";
 
-import { reviewRoleRequest } from "@/app/actions/onboarding";
+import { reviewRoleRequest } from "@/app/actions/admin";
 import { RoleBadge } from "@/components/shared/status-badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";

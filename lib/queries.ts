@@ -729,6 +729,38 @@ export async function getRoleRequests(): Promise<UserProfile[]> {
   return data ?? [];
 }
 
+/**
+ * Havuzdaki tekil sinif adlari.
+ *
+ * Ayri bir `classrooms` tablosu yok: sinif ogrencinin profilinde duran serbest
+ * metin. Liste ogrencilerden turetilir, boylece sinifi kalmayan bir derslik
+ * kendiliginden kaybolur.
+ */
+export async function getClassrooms(): Promise<string[]> {
+  const users = await getUsers();
+
+  return [
+    ...new Set(
+      users
+        .filter((user) => user.role === "ogrenci" && user.classroom)
+        .map((user) => user.classroom as string),
+    ),
+  ].sort((a, b) => a.localeCompare(b, "tr"));
+}
+
+/** Bir sinavin atandigi ogrencilerin kimlikleri. */
+export async function getExamAssignedStudentIds(examId: string): Promise<string[]> {
+  if (!isSupabaseConfigured) return [];
+
+  const supabase = await createServerSupabaseClient();
+  const { data } = await supabase
+    .from("exam_assignments")
+    .select("student_id")
+    .eq("exam_id", examId);
+
+  return (data ?? []).map((row) => row.student_id);
+}
+
 /** Id -> tam ad haritasi; tablolarda ogrenci adini gostermek icin. */
 export async function getUserNameMap(): Promise<Record<string, string>> {
   const users = await getUsers();

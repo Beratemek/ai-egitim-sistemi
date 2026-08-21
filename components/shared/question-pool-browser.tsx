@@ -8,6 +8,7 @@ import {
   ArrowRight,
   BookOpen,
   ChevronRight,
+  Eye,
   FileText,
   GraduationCap,
   Layers,
@@ -22,6 +23,7 @@ import {
 import { toast } from "sonner";
 
 import { addExamQuestions } from "@/app/actions/exams";
+import { QuestionPreviewDialog } from "@/components/shared/question-preview-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -48,7 +50,7 @@ import {
   type CategoryGroup,
   type SubjectGroup,
   type TopicGroup,
-} from "@/lib/exam-paper";
+} from "@/lib/question-pool";
 import type { Exam, Question, QuestionType } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -96,6 +98,8 @@ export function QuestionPoolBrowser({
   const [targetCount, setTargetCount] = React.useState("20");
   const [examId, setExamId] = React.useState<string>(exams[0]?.id ?? "");
   const [pending, setPending] = React.useState(false);
+  /** Onizlemesi acik soru; kapaliyken null. */
+  const [preview, setPreview] = React.useState<Question | null>(null);
 
   /** Havuzun tamami: dal -> ders -> konu -> soru. Filtreden etkilenmez. */
   const allCategories = React.useMemo(() => groupByCategory(questions), [questions]);
@@ -384,10 +388,19 @@ export function QuestionPoolBrowser({
               selectedIds={selectedIds}
               onToggleAll={() => toggleMany(idsOfTopic(openTopic))}
               onToggleQuestion={toggleQuestion}
+              onPreview={setPreview}
             />
           </>
         )}
       </div>
+
+      <QuestionPreviewDialog
+        question={preview}
+        open={preview !== null}
+        onOpenChange={(next) => {
+          if (!next) setPreview(null);
+        }}
+      />
     </div>
   );
 }
@@ -661,11 +674,13 @@ function QuestionList({
   selectedIds,
   onToggleAll,
   onToggleQuestion,
+  onPreview,
 }: {
   group: TopicGroup;
   selectedIds: ReadonlySet<string>;
   onToggleAll: () => void;
   onToggleQuestion: (id: string) => void;
+  onPreview: (question: Question) => void;
 }) {
   const selectedCount = countSelected(idsOfTopic(group), selectedIds);
   const allSelected = selectedCount === group.questions.length;
@@ -694,6 +709,7 @@ function QuestionList({
             question={question}
             checked={selectedIds.has(question.id)}
             onToggle={() => onToggleQuestion(question.id)}
+            onPreview={() => onPreview(question)}
           />
         ))}
       </CardContent>
@@ -705,24 +721,40 @@ function QuestionRow({
   question,
   checked,
   onToggle,
+  onPreview,
 }: {
   question: Question;
   checked: boolean;
   onToggle: () => void;
+  onPreview: () => void;
 }) {
   const Icon = question.type === "test" ? ListChecks : FileText;
 
   return (
-    <label
+    <div
       className={cn(
-        "flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors",
-        "hover:bg-accent/50 has-[:checked]:border-primary/50 has-[:checked]:bg-primary/5",
+        "group/row flex items-start gap-3 rounded-lg border p-3 transition-colors",
+        "hover:bg-accent/50 focus-within:border-primary/50",
+        checked && "border-primary/50 bg-primary/5",
       )}
     >
-      <Checkbox className="mt-0.5" checked={checked} onChange={onToggle} />
+      <label className="shrink-0 cursor-pointer p-0.5" title="Sinava eklemek icin sec">
+        <Checkbox
+          checked={checked}
+          onChange={onToggle}
+          aria-label="Soruyu sec"
+        />
+      </label>
 
-      <span className="min-w-0 flex-1">
-        <span className="block text-sm leading-relaxed">{question.text}</span>
+      <button
+        type="button"
+        onClick={onPreview}
+        className="min-w-0 flex-1 text-left focus-visible:outline-none"
+      >
+        <span className="flex items-start gap-2">
+          <span className="block text-sm leading-relaxed">{question.text}</span>
+          <Eye className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover/row:opacity-100" />
+        </span>
 
         <span className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
           <span className="inline-flex items-center gap-1.5 rounded border px-1.5 py-0.5">
@@ -741,8 +773,8 @@ function QuestionRow({
             <span>{question.rubric ? "Rubrik hazır" : "Rubrik tanımsız"}</span>
           )}
         </span>
-      </span>
-    </label>
+      </button>
+    </div>
   );
 }
 

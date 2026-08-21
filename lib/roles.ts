@@ -53,8 +53,8 @@ export const ROLE_DEFINITIONS: Record<UserRole, RoleDefinition> = {
   admin: {
     role: "admin",
     label: "Sistem Yöneticisi",
-    description: "Tüm panellere girer ve her işlemi yapabilir.",
-    path: "/dashboard/yonetici",
+    description: "Rolleri ve sınıfları yönetir; tüm panellere girer.",
+    path: "/dashboard/sistem",
     badgeClass:
       "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-200",
   },

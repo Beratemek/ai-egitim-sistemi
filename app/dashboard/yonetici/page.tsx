@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { CheckCheck, FileText, GraduationCap, Target, UserCog } from "lucide-react";
+import { CheckCheck, FileText, GraduationCap, Target } from "lucide-react";
 
 import {
   ExamAverageChart,
@@ -8,7 +8,6 @@ import {
 } from "@/components/shared/analytics-charts";
 import { PageHeader } from "@/components/shared/page-header";
 import { RoleBadge } from "@/components/shared/status-badge";
-import { RoleRequestList } from "@/components/shared/role-request-list";
 import { StatCard } from "@/components/shared/stat-card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -29,7 +28,6 @@ import {
 import {
   getExamStatistics,
   getQuestions,
-  getRoleRequests,
   getScoreTrend,
   getUsers,
 } from "@/lib/queries";
@@ -38,13 +36,12 @@ import { formatScore } from "@/lib/utils";
 export const metadata: Metadata = { title: "Eğitim Yöneticisi" };
 
 export default async function YoneticiPage() {
-  const [statistics, questions, users, scoreTrend, roleRequests] =
+  const [statistics, questions, users, scoreTrend] =
     await Promise.all([
       getExamStatistics(),
       getQuestions(),
       getUsers(),
       getScoreTrend(),
-      getRoleRequests(),
     ]);
 
   const totalStudents = statistics.reduce(
@@ -88,13 +85,6 @@ export default async function YoneticiPage() {
         />
         <StatCard label="Cevap" value={totalSubmissions} icon={FileText} />
         <StatCard
-          label="Rol onayı bekleyen"
-          value={roleRequests.length}
-          hint="Yeni kullanıcı talebi"
-          icon={UserCog}
-          accent={roleRequests.length > 0 ? "warning" : undefined}
-        />
-        <StatCard
           label="Genel ortalama"
           value={overallAverage === null ? "-" : Math.round(overallAverage * 10) / 10}
           hint="100 üzerinden"
@@ -109,23 +99,6 @@ export default async function YoneticiPage() {
           accent="warning"
         />
       </div>
-
-      {/* ---------- Rol onayları ---------- */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <UserCog className="h-4.5 w-4.5 text-primary" />
-            Rol onayları
-          </CardTitle>
-          <CardDescription>
-            Öğrenci disinda bir rol talep eden kullanicilar onayınızı bekler.
-            Onaylanana kadar yalnızca öğrenci yetkisiyle dolasabilirler.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <RoleRequestList requests={roleRequests} />
-        </CardContent>
-      </Card>
 
       <ScoreTrendChart data={scoreTrend} />
 
