@@ -21,31 +21,31 @@ export interface RoleDefinition {
 export const ROLE_DEFINITIONS: Record<UserRole, RoleDefinition> = {
   icerik_uzmani: {
     role: "icerik_uzmani",
-    label: "Icerik Uzmani",
-    description: "Kaynak metin yukler, AI ile soru uretir, havuza onaylar.",
+    label: "İçerik Uzmanı",
+    description: "Kaynak metin yükler, AI ile soru üretir, havuza onaylar.",
     path: "/dashboard/icerik-uzmani",
     badgeClass: "bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-200",
   },
   egitmen: {
     role: "egitmen",
-    label: "Egitmen",
-    description: "Havuzdan sinav olusturur ve ogrenci puanlarini onaylar.",
+    label: "Eğitmen",
+    description: "Havuzdan sınav oluşturur ve öğrenci puanlarını onaylar.",
     path: "/dashboard/egitmen",
     badgeClass:
       "bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-200",
   },
   ogrenci: {
     role: "ogrenci",
-    label: "Ogrenci",
-    description: "Sinava girer, acik uclu sorulari yanitlar, geri bildirim alir.",
+    label: "Öğrenci",
+    description: "Sınava girer, açık uçlu soruları yanıtlar, geri bildirim alır.",
     path: "/dashboard/ogrenci",
     badgeClass:
       "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200",
   },
   egitim_yoneticisi: {
     role: "egitim_yoneticisi",
-    label: "Egitim Yoneticisi",
-    description: "Sinav ve basari istatistiklerini raporlar.",
+    label: "Eğitim Yöneticisi",
+    description: "Sınav ve başarı istatistiklerini raporlar.",
     path: "/dashboard/yonetici",
     badgeClass:
       "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200",

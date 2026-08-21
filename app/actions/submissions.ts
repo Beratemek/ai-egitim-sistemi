@@ -45,7 +45,7 @@ async function getOwnExamSubmissions(
 export interface SubmitAnswerInput {
   examId: string;
   questionId: string;
-  /** Coktan secmelide sik anahtari ("B"), acik ucluda serbest metin. */
+  /** Coktan secmelide secenek anahtari ("B"), acik ucluda serbest metin. */
   answerText: string;
 }
 

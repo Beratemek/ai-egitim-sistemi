@@ -71,7 +71,7 @@ export type ExamAttemptStatus = (typeof EXAM_ATTEMPT_STATUSES)[number];
 /*  Tablo modelleri                                                           */
 /* -------------------------------------------------------------------------- */
 
-/** Test sorularindaki tek bir sik. `questions.options_json` icinde saklanir. */
+/** Test sorularindaki tek bir secenek. `questions.options_json` icinde saklanir. */
 export type QuestionOption = {
   key: string; // "A" | "B" | "C" | "D"
   text: string;

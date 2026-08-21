@@ -31,57 +31,57 @@ export const ROLE_NAV: Record<UserRole, readonly NavItem[]> = {
   icerik_uzmani: [
     {
       href: "/dashboard/icerik-uzmani",
-      label: "Icerik & Kazanimlar",
+      label: "İçerik & Kazanımlar",
       icon: BookOpen,
-      description: "Metin yukle, AI ile soru uret",
+      description: "Metin yükle, AI ile soru üret",
     },
   ],
   egitmen: [
     {
       href: "/dashboard/egitmen",
-      label: "Genel Bakis",
+      label: "Genel Bakış",
       icon: LayoutDashboard,
-      description: "Sinavlar ve puan onaylari",
+      description: "Sınavlar ve puan onayları",
     },
     {
       href: "/dashboard/egitmen/soru-havuzu",
       label: "Soru Havuzu",
       icon: Library,
-      description: "Dal bazli havuz, sinava soru ekle",
+      description: "Dal bazlı havuz, sınava soru ekle",
     },
     {
       href: "/dashboard/egitmen/sinavlar",
-      label: "Sinavlar",
+      label: "Sınavlar",
       icon: ClipboardList,
-      description: "Sinav olustur, yayina al, PDF indir",
+      description: "Sınav oluştur, yayına al, PDF indir",
     },
   ],
   ogrenci: [
     {
       href: "/dashboard/ogrenci",
-      label: "Sinavlarim",
+      label: "Sınavlarım",
       icon: GraduationCap,
-      description: "Sorulari yanitla",
+      description: "Soruları yanıtla",
     },
     {
       href: "/dashboard/ogrenci/sonuclar",
-      label: "Sonuclarim",
+      label: "Sonuçlarım",
       icon: Trophy,
       description: "Onaylanan puan ve geri bildirimler",
     },
     {
       href: "/dashboard/ogrenci/gelisim",
-      label: "Gelisimim",
+      label: "Gelişimim",
       icon: TrendingUp,
-      description: "Kazanim bazli ilerlemeni izle",
+      description: "Kazanım bazlı ilerlemeni izle",
     },
   ],
   egitim_yoneticisi: [
     {
       href: "/dashboard/yonetici",
-      label: "Istatistikler",
+      label: "İstatistikler",
       icon: BarChart3,
-      description: "Basari ve katilim raporlari",
+      description: "Başarı ve katılım raporları",
     },
   ],
 };

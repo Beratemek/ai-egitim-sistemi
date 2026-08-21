@@ -38,7 +38,7 @@ export interface ExamPaperExportProps {
 }
 
 const DEFAULT_INSTRUCTIONS =
-  "Coktan secmeli sorularda tek dogru sik vardir. Acik uclu sorulari ayrilan bosluga, okunakli yaziniz.";
+  "Çoktan seçmeli sorularda tek doğru şık vardır. Açık uçlu soruları ayrılan boşluğa, okunaklı yazınız.";
 
 export function ExamPaperExport({ exam, questions }: ExamPaperExportProps) {
   const [meta, setMeta] = React.useState<ExamPaperMeta>(() => ({

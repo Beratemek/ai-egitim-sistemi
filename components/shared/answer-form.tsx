@@ -314,7 +314,7 @@ function AnsweredView({
   const isApproved =
     revealResults && submission.status === "egitmen_onayli";
 
-  // Coktan secmelide cevap sik anahtaridir; okunabilir hale getirilir.
+  // Coktan secmelide cevap secenek anahtaridir; okunabilir hale getirilir.
   const chosen = options?.find((option) => option.key === submission.answer_text);
 
   return (
