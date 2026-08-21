@@ -9,7 +9,7 @@ import { requestRole } from "@/app/actions/onboarding";
 import { ROLE_ICONS } from "@/components/shared/role-icons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ROLE_LIST } from "@/lib/roles";
+import { SELECTABLE_ROLES } from "@/lib/roles";
 import type { UserRole } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -84,7 +84,7 @@ export function RoleOnboarding({
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        {ROLE_LIST.map((definition) => {
+        {SELECTABLE_ROLES.map((definition) => {
           const Icon = ROLE_ICONS[definition.role];
           const isSelected = selected === definition.role;
           const instant = definition.role === "ogrenci";

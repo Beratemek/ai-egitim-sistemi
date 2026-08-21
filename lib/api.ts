@@ -43,7 +43,10 @@ export async function requireRole(allowed: readonly UserRole[]): Promise<GuardRe
     return { ok: false, response: jsonError("Oturum acmaniz gerekiyor.", 401) };
   }
 
-  if (!allowed.includes(current.profile.role)) {
+  // `admin` gizli sistem rolu: her uc noktaya erisir. Rol listelerine tek tek
+  // eklemek yerine burada bir kez gecilir, boylece yeni bir uc nokta
+  // eklendiginde admin'i eklemeyi unutmak mumkun olmaz.
+  if (current.profile.role !== "admin" && !allowed.includes(current.profile.role)) {
     return {
       ok: false,
       response: jsonError("Bu islem icin yetkiniz yok.", 403),

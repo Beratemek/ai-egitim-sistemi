@@ -14,6 +14,12 @@ export const USER_ROLES = [
   "egitmen",
   "ogrenci",
   "egitim_yoneticisi",
+  /**
+   * Sistem yoneticisi. GIZLI roldur: kayit ve rol secim ekranlarinda
+   * listelenmez, yalnizca veritabanindan atanir. Sitedeki her panele girer
+   * ve tum yazma islemlerine yetkilidir (bkz. public.is_admin()).
+   */
+  "admin",
 ] as const;
 
 export type UserRole = (typeof USER_ROLES)[number];

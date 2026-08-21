@@ -7,7 +7,13 @@
  * `ROLE_ICONS[role]` sunucuda `undefined` olurdu.
  */
 
-import { BarChart3, ClipboardCheck, FileQuestion, GraduationCap } from "lucide-react";
+import {
+  BarChart3,
+  ClipboardCheck,
+  FileQuestion,
+  GraduationCap,
+  ShieldCheck,
+} from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 import type { UserRole } from "@/lib/types";
@@ -17,4 +23,5 @@ export const ROLE_ICONS: Record<UserRole, LucideIcon> = {
   egitmen: ClipboardCheck,
   ogrenci: GraduationCap,
   egitim_yoneticisi: BarChart3,
+  admin: ShieldCheck,
 };

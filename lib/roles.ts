@@ -50,9 +50,34 @@ export const ROLE_DEFINITIONS: Record<UserRole, RoleDefinition> = {
     badgeClass:
       "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200",
   },
+  admin: {
+    role: "admin",
+    label: "Sistem Yöneticisi",
+    description: "Tüm panellere girer ve her işlemi yapabilir.",
+    path: "/dashboard/yonetici",
+    badgeClass:
+      "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-200",
+  },
 };
 
+/**
+ * Kullanicinin KENDI secebilecegi roller.
+ *
+ * `admin` bilerek disaridadir: gizli bir roldur, kayit ve rol secim
+ * ekranlarinda gorunmez, yalnizca veritabanindan atanir. Rol listeleyen her
+ * arayuz ROLE_LIST degil bunu kullanmalidir.
+ */
+export const SELECTABLE_ROLES: readonly RoleDefinition[] = Object.values(
+  ROLE_DEFINITIONS,
+).filter((definition) => definition.role !== "admin");
+
+/** Tum roller (gizli olanlar dahil). Yalnizca ic kullanim icin. */
 export const ROLE_LIST: readonly RoleDefinition[] = Object.values(ROLE_DEFINITIONS);
+
+/** Sitedeki her sayfaya ve her isleme yetkili mi? */
+export function isAdminRole(role: UserRole): boolean {
+  return role === "admin";
+}
 
 /** Rolun ana panel yolunu dondurur. */
 export function dashboardPathFor(role: UserRole): string {
