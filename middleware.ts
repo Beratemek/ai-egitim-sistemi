@@ -153,6 +153,13 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL(dashboardPathFor(role), request.url));
   }
 
+  /**
+   * `admin` gizli sistem rolu: sitedeki her panele girebilir, kendi paneline
+   * geri gonderilmez. Rol degistirici ile baska bir rolu taklit ediyorsa o
+   * rolun kurallari uygulanir - taklidin anlami budur.
+   */
+  if (role === "admin") return response;
+
   // Baska bir rolun alanina girilmisse kendi paneline geri gonder.
   if (requiredRole && requiredRole !== role) {
     return NextResponse.redirect(new URL(dashboardPathFor(role), request.url));

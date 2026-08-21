@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { isSupabaseConfigured, publicEnv } from "@/lib/env";
-import { ROLE_LIST, dashboardPathFor } from "@/lib/roles";
+import { SELECTABLE_ROLES, dashboardPathFor } from "@/lib/roles";
 import { createClient } from "@/lib/supabase";
 import { isUserRole, type UserRole } from "@/lib/types";
 
@@ -162,7 +162,7 @@ export function LoginForm({ callbackError = null }: LoginFormProps) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {ROLE_LIST.map((definition) => {
+                {SELECTABLE_ROLES.map((definition) => {
                   const Icon = ROLE_ICONS[definition.role];
                   return (
                     <SelectItem key={definition.role} value={definition.role}>
@@ -279,7 +279,7 @@ function DemoModeNotice() {
           Rol secerek devam edin
         </p>
 
-        {ROLE_LIST.map((definition) => {
+        {SELECTABLE_ROLES.map((definition) => {
           const Icon = ROLE_ICONS[definition.role];
 
           return (

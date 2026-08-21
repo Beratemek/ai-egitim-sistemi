@@ -16,7 +16,7 @@ import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { ROLE_LIST } from "@/lib/roles";
+import { SELECTABLE_ROLES } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 
 const PIPELINE: readonly { icon: LucideIcon; title: string; body: string }[] = [
@@ -129,7 +129,7 @@ export default function HomePage() {
           </div>
 
           <div className="mt-8 grid gap-4 sm:grid-cols-2">
-            {ROLE_LIST.map((definition) => {
+            {SELECTABLE_ROLES.map((definition) => {
               const Icon = ROLE_ICONS[definition.role];
 
               return (

@@ -27,7 +27,7 @@ export interface NavItem {
 }
 
 /** Rol basina sol menu ogeleri. */
-export const ROLE_NAV: Record<UserRole, readonly NavItem[]> = {
+const BASE_NAV = {
   icerik_uzmani: [
     {
       href: "/dashboard/icerik-uzmani",
@@ -83,6 +83,23 @@ export const ROLE_NAV: Record<UserRole, readonly NavItem[]> = {
       icon: BarChart3,
       description: "Başarı ve katılım raporları",
     },
+  ],
+} satisfies Record<Exclude<UserRole, "admin">, readonly NavItem[]>;
+
+/**
+ * Rol basina sol menu.
+ *
+ * `admin` gizli bir roldur ve sitedeki her panele girer; menusu de diger tum
+ * rollerin menulerinin birlesimidir. Boylece yeni bir sayfa hangi role
+ * eklenirse eklensin admin otomatik olarak gorur.
+ */
+export const ROLE_NAV: Record<UserRole, readonly NavItem[]> = {
+  ...BASE_NAV,
+  admin: [
+    ...BASE_NAV.egitim_yoneticisi,
+    ...BASE_NAV.icerik_uzmani,
+    ...BASE_NAV.egitmen,
+    ...BASE_NAV.ogrenci,
   ],
 };
 
