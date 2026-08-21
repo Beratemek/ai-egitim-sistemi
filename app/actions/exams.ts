@@ -193,3 +193,62 @@ export async function setExamPublished(
   revalidateExamPaths(examId);
   return { ok: true, data: undefined };
 }
+
+/* -------------------------------------------------------------------------- */
+/*  Sinifa atama                                                             */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Sinavi bir sinifin TUM ogrencilerine atar.
+ *
+ * Ogrenciyi tek tek secmek yerine sinif secilir; veritabani fonksiyonu o
+ * siniftaki onayli ogrencileri bulup atamalari acar. Zaten atanmis ogrenciler
+ * sessizce atlanir, boylece ayni sinif ikinci kez atandiginda hata olmaz.
+ */
+export async function assignExamToClassroom(
+  examId: string,
+  classroom: string,
+  dueAt?: string,
+): Promise<ActionResult<{ assigned: number }>> {
+  if (!isSupabaseConfigured) return demoGuard();
+
+  if (!examId) return { ok: false, error: "Sınav seçilmedi." };
+  if (!classroom.trim()) return { ok: false, error: "Sınıf seçilmedi." };
+
+  const supabase = await createServerSupabaseClient();
+  const { data, error } = await supabase.rpc("assign_exam_to_classroom", {
+    target_exam: examId,
+    target_classroom: classroom.trim(),
+    ...(dueAt ? { due_at: dueAt } : {}),
+  });
+
+  if (error) return { ok: false, error: error.message };
+
+  revalidateExamPaths(examId);
+  return { ok: true, data: { assigned: Number(data ?? 0) } };
+}
+
+/**
+ * Sinifin atamasini kaldirir.
+ * Sinava baslamis ogrencinin atamasi KORUNUR - cevabi ortada kalmasin.
+ */
+export async function unassignExamFromClassroom(
+  examId: string,
+  classroom: string,
+): Promise<ActionResult<{ removed: number }>> {
+  if (!isSupabaseConfigured) return demoGuard();
+
+  if (!examId) return { ok: false, error: "Sınav seçilmedi." };
+  if (!classroom.trim()) return { ok: false, error: "Sınıf seçilmedi." };
+
+  const supabase = await createServerSupabaseClient();
+  const { data, error } = await supabase.rpc("unassign_exam_from_classroom", {
+    target_exam: examId,
+    target_classroom: classroom.trim(),
+  });
+
+  if (error) return { ok: false, error: error.message };
+
+  revalidateExamPaths(examId);
+  return { ok: true, data: { removed: Number(data ?? 0) } };
+}

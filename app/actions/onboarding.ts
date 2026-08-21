@@ -58,31 +58,3 @@ export async function requestRole(
 
   return { ok: true, data: { status: data } };
 }
-
-/** Egitim yoneticisinin bir rol talebini onaylamasi / reddetmesi. */
-export async function reviewRoleRequest(
-  userId: string,
-  approve: boolean,
-): Promise<ActionResult<{ status: RoleStatus }>> {
-  if (!isSupabaseConfigured) return demoGuard();
-
-  if (!userId) return { ok: false, error: "Kullanici secilmedi." };
-
-  const current = await getCurrentUser();
-  if (!current) return { ok: false, error: "Oturum acmaniz gerekiyor." };
-
-  const supabase = await createServerSupabaseClient();
-  const { data, error } = await supabase.rpc("review_role_request", {
-    target_user: userId,
-    approve,
-  });
-
-  if (error) return { ok: false, error: error.message };
-  if (!isRoleStatus(data)) {
-    return { ok: false, error: "Karar kaydedilemedi." };
-  }
-
-  revalidatePath("/dashboard/yonetici");
-
-  return { ok: true, data: { status: data } };
-}

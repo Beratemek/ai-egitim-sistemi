@@ -9,6 +9,7 @@ import {
   GraduationCap,
   LayoutDashboard,
   Library,
+  ShieldCheck,
   TrendingUp,
   Trophy,
 } from "lucide-react";
@@ -96,6 +97,12 @@ const BASE_NAV = {
 export const ROLE_NAV: Record<UserRole, readonly NavItem[]> = {
   ...BASE_NAV,
   admin: [
+    {
+      href: "/dashboard/sistem",
+      label: "Sistem Yönetimi",
+      icon: ShieldCheck,
+      description: "Roller, kullanıcılar ve sınıflar",
+    },
     ...BASE_NAV.egitim_yoneticisi,
     ...BASE_NAV.icerik_uzmani,
     ...BASE_NAV.egitmen,

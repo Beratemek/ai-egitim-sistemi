@@ -92,6 +92,8 @@ export type UserProfile = {
   requested_role: UserRole | null;
   role_reviewed_by: string | null;
   role_reviewed_at: string | null;
+  /** Ogrencinin sinifi/derslik adi. Sistem yoneticisi atar. */
+  classroom: string | null;
   full_name: string;
   email: string | null;
   created_at: string;
@@ -444,6 +446,26 @@ export interface Database {
       review_role_request: {
         Args: { target_user: string; approve: boolean };
         Returns: RoleStatus;
+      };
+      set_user_role: {
+        Args: { target_user: string; new_role: UserRole };
+        Returns: UserRole;
+      };
+      set_user_classroom: {
+        Args: { target_user: string; new_classroom: string | null };
+        Returns: string | null;
+      };
+      assign_exam_to_classroom: {
+        Args: {
+          target_exam: string;
+          target_classroom: string;
+          due_at?: string | null;
+        };
+        Returns: number;
+      };
+      unassign_exam_from_classroom: {
+        Args: { target_exam: string; target_classroom: string };
+        Returns: number;
       };
       start_exam_attempt: {
         Args: { target_exam: string };

@@ -1,11 +1,7 @@
 /**
- * Sinav kagidi duzeni ve havuz kirilimi - saf yardimcilar (React'ten bagimsiz).
+ * Soru havuzunun kirilimi - saf yardimcilar (React'ten bagimsiz).
  *
- * Kagit olcusu klasik lise sinav kagidindan alindi: bir A4 yaprakta iki sutun,
- * her sutunda bes soru. 20 soruluk bir sinav boylece tam iki yuze oturur:
- * on yuzde 5 + 5, arka yuzde 5 + 5.
- *
- * Havuz kirilimi "atolye dali -> ders -> konu -> soru" seklindedir. Dal kimligi
+ * Havuz "atolye dali -> ders -> konu -> soru" seklinde kirilir. Dal kimligi
  * `lib/deneyap.ts` icindeki DENEYAP enum'u, ders ise `questions.subject`
  * serbest metnidir - icerik uzmani soruyu uretirken ikisini de belirler.
  */
@@ -13,11 +9,6 @@
 import { categoryLabel } from "@/lib/deneyap";
 import type { DeneyapCategory } from "@/lib/deneyap";
 import type { Question } from "@/lib/types";
-
-export const QUESTIONS_PER_COLUMN = 5;
-export const COLUMNS_PER_PAGE = 2;
-/** Bir yaprakta gosterilen soru sayisi (5 + 5). */
-export const QUESTIONS_PER_PAGE = QUESTIONS_PER_COLUMN * COLUMNS_PER_PAGE;
 
 /** Turkce siralama; "Cografya" < "Cebir" hatasina dusmemek icin. */
 const collator = new Intl.Collator("tr", { sensitivity: "base" });
@@ -182,68 +173,4 @@ export function pickBalanced(groups: readonly TopicGroup[], count: number): stri
   }
 
   return picked;
-}
-
-/* -------------------------------------------------------------------------- */
-/*  Kagit duzeni                                                              */
-/* -------------------------------------------------------------------------- */
-
-/** Kagida basilmaya hazir soru: sira numarasi ve puani islenmis. */
-export type NumberedQuestion = Question & { number: number; points: number };
-
-export interface PaperPage {
-  /** 0 tabanli yaprak sirasi. */
-  index: number;
-  /** Her biri en fazla QUESTIONS_PER_COLUMN soru tasiyan iki sutun. */
-  columns: NumberedQuestion[][];
-}
-
-/**
- * Sinavdaki sorulara sira numarasi isler.
- *
- * Puan uydurulmaz: `exam_questions.points` ne diyorsa kagitta o yazar,
- * boylece ogrencinin gordugu puan ile sistemin puanladigi deger ayrismaz.
- */
-export function numberExamQuestions(
-  questions: readonly (Question & { points: number })[],
-): NumberedQuestion[] {
-  return questions.map((question, index) => ({
-    ...question,
-    number: index + 1,
-    points: question.points,
-  }));
-}
-
-/**
- * Sorulari yapraklara, yapraklari iki sutuna boler.
- * Dolu bir yaprakta dagilim 5 + 5'tir; son yaprakta soru azsa iki sutuna
- * dengeli dagitilir (3 soru -> 2 + 1), tek sutun uzayip sayfa cirkinlesmesin.
- */
-export function paginate(questions: readonly NumberedQuestion[]): PaperPage[] {
-  const pages: PaperPage[] = [];
-
-  for (let start = 0; start < questions.length; start += QUESTIONS_PER_PAGE) {
-    const slice = questions.slice(start, start + QUESTIONS_PER_PAGE);
-    const perColumn = Math.max(1, Math.ceil(slice.length / COLUMNS_PER_PAGE));
-
-    pages.push({
-      index: pages.length,
-      columns: Array.from({ length: COLUMNS_PER_PAGE }, (_, column) =>
-        slice.slice(column * perColumn, (column + 1) * perColumn),
-      ),
-    });
-  }
-
-  return pages;
-}
-
-/** Dosya adinda kullanilamayacak karakterleri temizler. */
-export function toFileName(title: string, fallback = "sinav"): string {
-  const cleaned = title
-    .trim()
-    .replace(/[\\/:*?"<>|]+/g, "")
-    .replace(/\s+/g, "-")
-    .toLocaleLowerCase("tr");
-
-  return cleaned.length > 0 ? cleaned : fallback;
 }

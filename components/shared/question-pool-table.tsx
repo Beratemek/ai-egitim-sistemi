@@ -42,7 +42,7 @@ import {
   categoryLabel,
   type DeneyapCategory,
 } from "@/lib/deneyap";
-import { UNASSIGNED_SUBJECT } from "@/lib/exam-paper";
+import { UNASSIGNED_SUBJECT } from "@/lib/question-pool";
 import { cn, formatDateTime } from "@/lib/utils";
 import {
   QUESTION_TYPES,

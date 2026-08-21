@@ -79,7 +79,7 @@ export function DashboardShell({
   return (
     <div className="min-h-screen bg-background">
       {/* ---------- Masaustu sol menu ---------- */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[264px] flex-col border-r bg-card lg:flex print:hidden">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[264px] flex-col border-r bg-card lg:flex">
         <div className="flex h-16 items-center border-b px-5">
           <BrandMark />
         </div>
@@ -97,9 +97,9 @@ export function DashboardShell({
       </aside>
 
       {/* ---------- İçerik sutunu ---------- */}
-      <div className="lg:pl-[264px] print:pl-0">
+      <div className="lg:pl-[264px]">
         {/* ---------- Üst cubuk ---------- */}
-        <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b bg-background/80 px-4 backdrop-blur-md sm:px-6 print:hidden">
+        <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b bg-background/80 px-4 backdrop-blur-md sm:px-6">
           {/* Mobil cekmece */}
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
             <SheetTrigger asChild>
@@ -207,7 +207,7 @@ export function DashboardShell({
           </div>
         </header>
 
-        <main className="mx-auto w-full max-w-[1400px] space-y-6 px-4 py-6 sm:px-6 sm:py-8 print:max-w-none print:space-y-0 print:p-0">
+        <main className="mx-auto w-full max-w-[1400px] space-y-6 px-4 py-6 sm:px-6 sm:py-8">
           {children}
         </main>
       </div>
