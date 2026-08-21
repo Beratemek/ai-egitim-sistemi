@@ -179,11 +179,24 @@ end;
 $$;
 
 -- 7. ILK EGITIM YONETICISI --------------------------------------------------
--- Onaylayacak kimse yoksa her talep sonsuza kadar bekler. Asagidaki satiri
--- kendi e-postanizla doldurup calistirin (tetikleyiciyi gecici olarak asar).
+-- Onaylayacak kimse yoksa her talep sonsuza kadar bekler.
 --
--- select set_config('app.role_change_allowed', 'on', true);
--- update public.users
---   set role = 'egitim_yoneticisi', role_status = 'onayli', requested_role = null
---   where email = 'admin@t3.com';
--- select set_config('app.role_change_allowed', 'off', true);
+-- YUKARIDAKI 1-6 ADIMLARI CALISTIKTAN SONRA, asagidaki blogun yorumunu kaldirip
+-- e-postayi kendi hesabinizla degistirerek calistirin.
+--
+-- Tek bir DO blogu olmasi onemli: `set_config(..., true)` islem (transaction)
+-- kapsaminda gecerlidir. Ayri ifadeler halinde calistirilirsa bayrak UPDATE'e
+-- ulasmaz ve koruma tetikleyicisi guncellemeyi reddeder.
+--
+-- do $$
+-- begin
+--   perform set_config('app.role_change_allowed', 'on', true);
+--
+--   update public.users
+--      set role           = 'egitim_yoneticisi',
+--          role_status    = 'onayli',
+--          requested_role = null
+--    where email = 'admin@t3.com';
+--
+--   perform set_config('app.role_change_allowed', 'off', true);
+-- end $$;
