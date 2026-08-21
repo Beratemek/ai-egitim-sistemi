@@ -93,3 +93,29 @@
     background-size: 56px 56px;
   }
 }
+
+/* --------------------------------------------------------------------------
+ * Yazdirma / PDF
+ *
+ * Sinav kagidi (components/shared/exam-paper.tsx) ekranda 210x297mm bir
+ * yaprak olarak durur. Yazdirmada yaprak kendi ic bosluklarini birakir ve
+ * sayfa kenar bosluklarini `@page` ustlenir; boylece cikti gercek A4 olur.
+ * Panel kabugu ve kagit disindaki denetimler `print:hidden` ile ciktida yer
+ * almaz.
+ * -------------------------------------------------------------------------- */
+@media print {
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+
+  html,
+  body {
+    background: #fff;
+  }
+
+  /* Koyu temada bile kagit beyaz kalir. */
+  .exam-sheet {
+    color-scheme: light;
+  }
+}

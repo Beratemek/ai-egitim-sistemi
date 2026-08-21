@@ -343,10 +343,17 @@ create policy "questions_insert" on public.questions
     public.has_role('egitmen') or public.has_role('icerik_uzmani')
   );
 
+-- Onay / red icerik uzmaninin isidir; egitmen de yazim duzeltmesi
+-- yapabilsin diye ikisine birden acik.
 drop policy if exists "questions_update_egitmen" on public.questions;
-create policy "questions_update_egitmen" on public.questions
-  for update using (public.has_role('egitmen'))
-  with check (public.has_role('egitmen'));
+drop policy if exists "questions_update" on public.questions;
+create policy "questions_update" on public.questions
+  for update using (
+    public.has_role('icerik_uzmani') or public.has_role('egitmen')
+  )
+  with check (
+    public.has_role('icerik_uzmani') or public.has_role('egitmen')
+  );
 
 drop policy if exists "questions_delete_egitmen" on public.questions;
 create policy "questions_delete_egitmen" on public.questions
