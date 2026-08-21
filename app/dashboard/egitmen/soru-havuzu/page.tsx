@@ -1,32 +1,43 @@
 import type { Metadata } from "next";
 
 import { PageHeader } from "@/components/shared/page-header";
-import { QuestionPoolTable } from "@/components/shared/question-pool-table";
+import { QuestionPoolBrowser } from "@/components/shared/question-pool-browser";
 import { Badge } from "@/components/ui/badge";
 import { isSupabaseConfigured } from "@/lib/env";
-import { getQuestions } from "@/lib/queries";
+import { getExams, getQuestions } from "@/lib/queries";
 
 export const metadata: Metadata = { title: "Soru Havuzu" };
 
 /**
- * Soru havuzu. Veriler `lib/queries.ts` uzerinden gelir; Supabase
- * yapilandirilmamissa demo verisine duser ve onay/red kalici olmaz.
+ * Egitmenin soru havuzu.
+ *
+ * Yalnizca ONAYLI sorular gosterilir - taslak inceleme ve onay/red icerik
+ * uzmaninin ekranindadir. Egitmen havuzu atolye dali -> konu -> soru olarak
+ * gezer, isaretledigi sorulari bir sinava ekler.
  */
 export default async function SoruHavuzuPage() {
-  const questions = await getQuestions();
+  const [questions, exams] = await Promise.all([
+    getQuestions({ status: "onayli" }),
+    getExams(),
+  ]);
 
   return (
     <>
       <PageHeader
         title="Soru Havuzu"
-        description="AI tarafindan uretilen taslaklari inceleyin; onaylayarak havuza ekleyin."
+        description="Havuz atolye dali, konu ve soru olarak kirilir. Dala girin, konuyu acin, sorulari isaretleyip sinaviniza ekleyin."
         actions={
           isSupabaseConfigured ? null : (
             <Badge variant="warning">Demo — degisiklikler kaydedilmez</Badge>
           )
         }
       />
-      <QuestionPoolTable questions={questions} persist={isSupabaseConfigured} />
+
+      <QuestionPoolBrowser
+        questions={questions}
+        exams={exams}
+        canPersist={isSupabaseConfigured}
+      />
     </>
   );
 }

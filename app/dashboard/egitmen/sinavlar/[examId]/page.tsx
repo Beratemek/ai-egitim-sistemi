@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 
 import { ExamBuilder } from "@/components/shared/exam-builder";
+import { ExamPaperExport } from "@/components/shared/exam-paper-export";
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
 import { isSupabaseConfigured } from "@/lib/env";
@@ -34,13 +35,14 @@ export default async function SinavDetayPage({
     <>
       <Link
         href="/dashboard/egitmen/sinavlar"
-        className="flex w-fit items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+        className="flex w-fit items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground print:hidden"
       >
         <ArrowLeft className="h-4 w-4" />
         Sinavlar
       </Link>
 
       <PageHeader
+        className="print:hidden"
         title={detail.exam.title}
         description={
           detail.exam.description || "Havuzdan soru ekleyip sinavi yayina alin."
@@ -52,13 +54,17 @@ export default async function SinavDetayPage({
         }
       />
 
-      <ExamBuilder
-        exam={detail.exam}
-        examQuestions={detail.questions}
-        pool={pool}
-        hasSubmissions={submissions.length > 0}
-        canPersist={isSupabaseConfigured}
-      />
+      <div className="print:hidden">
+        <ExamBuilder
+          exam={detail.exam}
+          examQuestions={detail.questions}
+          pool={pool}
+          hasSubmissions={submissions.length > 0}
+          canPersist={isSupabaseConfigured}
+        />
+      </div>
+
+      <ExamPaperExport exam={detail.exam} questions={detail.questions} />
     </>
   );
 }

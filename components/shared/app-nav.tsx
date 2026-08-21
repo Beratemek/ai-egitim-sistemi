@@ -45,13 +45,13 @@ export const ROLE_NAV: Record<UserRole, readonly NavItem[]> = {
       href: "/dashboard/egitmen/soru-havuzu",
       label: "Soru Havuzu",
       icon: Library,
-      description: "Taslaklari incele ve onayla",
+      description: "Dal bazli havuz, sinava soru ekle",
     },
     {
       href: "/dashboard/egitmen/sinavlar",
       label: "Sinavlar",
       icon: ClipboardList,
-      description: "Sinav olustur ve yayina al",
+      description: "Sinav olustur, yayina al, PDF indir",
     },
   ],
   ogrenci: [
