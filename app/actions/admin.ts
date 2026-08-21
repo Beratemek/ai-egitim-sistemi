@@ -6,8 +6,12 @@ import { revalidatePath } from "next/cache";
 import { ROLE_CACHE_COOKIE } from "@/lib/auth-cookies";
 
 import { demoGuard, type ActionResult } from "@/app/actions/shared";
-import { isSupabaseConfigured } from "@/lib/env";
-import { createServerSupabaseClient, getCurrentUser } from "@/lib/supabase-server";
+import { isSupabaseConfigured, publicEnv, serverEnv } from "@/lib/env";
+import {
+  createAdminSupabaseClient,
+  createServerSupabaseClient,
+  getCurrentUser,
+} from "@/lib/supabase-server";
 import { isRoleStatus, type RoleStatus, type UserRole } from "@/lib/types";
 
 /**
@@ -30,7 +34,7 @@ function revalidateUserPaths(): void {
 export async function reviewRoleRequest(
   userId: string,
   approve: boolean,
-): Promise<ActionResult<{ status: RoleStatus }>> {
+): Promise<ActionResult<{ status: RoleStatus; mailSent: boolean }>> {
   if (!isSupabaseConfigured) return demoGuard();
   if (!userId) return { ok: false, error: "Kullanıcı seçilmedi." };
 
@@ -46,8 +50,45 @@ export async function reviewRoleRequest(
   if (error) return { ok: false, error: error.message };
   if (!isRoleStatus(data)) return { ok: false, error: "Karar kaydedilemedi." };
 
+  let mailSent = false;
+  if (approve) mailSent = await sendVerificationMail(userId);
+
   revalidateUserPaths();
-  return { ok: true, data: { status: data } };
+  return { ok: true, data: { status: data, mailSent } };
+}
+
+/**
+ * Onaylanan kullaniciya e-posta dogrulama baglantisi yollar.
+ *
+ * Yalnizca e-postasi HENUZ DOGRULANMAMIS hesaplara gonderilir; Google ile
+ * giren kullanicinin adresi zaten Google tarafindan dogrulanmistir, ona
+ * gereksiz mail atmayiz.
+ *
+ * Gonderim Supabase'in kendi mailer'i uzerinden yapilir. Basarisiz olursa
+ * onay islemi geri alinmaz - rol verilmistir, yalnizca mail gitmemistir;
+ * cagiran taraf `mailSent` ile bunu kullaniciya soyler.
+ */
+async function sendVerificationMail(userId: string): Promise<boolean> {
+  if (!serverEnv.supabaseServiceRoleKey) return false;
+
+  try {
+    const admin = createAdminSupabaseClient();
+    const { data: found } = await admin.auth.admin.getUserById(userId);
+
+    const email = found?.user?.email;
+    if (!email || found?.user?.email_confirmed_at) return false;
+
+    const supabase = await createServerSupabaseClient();
+    const { error } = await supabase.auth.resend({
+      type: "signup",
+      email,
+      options: { emailRedirectTo: `${publicEnv.siteUrl}/auth/callback` },
+    });
+
+    return !error;
+  } catch {
+    return false;
+  }
 }
 
 /**

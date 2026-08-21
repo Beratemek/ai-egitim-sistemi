@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Check, Loader2, ShieldCheck, Zap } from "lucide-react";
+import { ArrowRight, Check, Loader2, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 
 import { requestRole } from "@/app/actions/onboarding";
@@ -39,7 +39,8 @@ export function RoleOnboarding({
   const [selected, setSelected] = React.useState<UserRole | null>(previousRole);
   const [pending, setPending] = React.useState(false);
 
-  const needsApproval = selected !== null && selected !== "ogrenci";
+  // Artik DORT ROL de sistem yoneticisi onayindan geciyor.
+  const needsApproval = selected !== null;
 
   async function handleSubmit() {
     if (!selected) return;
@@ -87,7 +88,6 @@ export function RoleOnboarding({
         {SELECTABLE_ROLES.map((definition) => {
           const Icon = ROLE_ICONS[definition.role];
           const isSelected = selected === definition.role;
-          const instant = definition.role === "ogrenci";
 
           return (
             <button
@@ -118,21 +118,9 @@ export function RoleOnboarding({
                   )}
                 </span>
 
-                <Badge
-                  variant={instant ? "success" : "soft"}
-                  className="gap-1 font-normal"
-                >
-                  {instant ? (
-                    <>
-                      <Zap className="h-3 w-3" />
-                      Doğrudan giriş
-                    </>
-                  ) : (
-                    <>
-                      <ShieldCheck className="h-3 w-3" />
-                      Onay gerekir
-                    </>
-                  )}
+                <Badge variant="soft" className="gap-1 font-normal">
+                  <ShieldCheck className="h-3 w-3" />
+                  Onay gerekir
                 </Badge>
               </div>
 
