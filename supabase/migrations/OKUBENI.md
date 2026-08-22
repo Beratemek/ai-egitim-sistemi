@@ -40,9 +40,15 @@ Atlanan bir adım "function does not exist" hatası verir.
 
 ## Şu an bekleyenler
 
-| Dosya | Ne yapar | Neden önemli |
-|---|---|---|
-| `BEKLEYEN-1-sinav-suresi.sql` | `exams.duration_minutes` + süre kısıtının sunucuda zorlanması | Bunsuz süre alanı kaydedilemez; ayrıca süre yalnızca sayaçta kalırsa istemciden süresiz cevap gönderilebilir |
-| `BEKLEYEN-2-varsayilan-sure-ve-puan.sql` | Varsayılan 60 dk + puanların 100 üzerinden otomatik dağıtılması | Bunsuz her soru 10 puan kalır ve toplam soru sayısına göre değişir |
+Klasördeki dosya adına bakma — **veritabanına sor:**
 
-Çalıştırıp çalıştırmadığından emin değilsen tekrar çalıştır — zararı yok.
+```
+npm run migration:durum
+```
+
+Bu komut her migration'ın bıraktığı izi (bir sütun ya da fonksiyon) tek tek
+kontrol eder ve eksik olanı söyler. Dosyanın `uygulandi/` klasörüne taşınmış
+olup olmaması yalnızca bir defter kaydıdır; SQL'i çalıştırdığında dosya
+kendiliğinden taşınmaz. Tek doğru ölçüt şemanın kendisi.
+
+Şu an: **bekleyen yok.**

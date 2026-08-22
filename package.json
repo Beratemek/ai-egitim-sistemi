@@ -10,7 +10,8 @@
     "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test tests/*.test.ts",
     "typecheck": "tsc --noEmit",
     "seed": "node scripts/test-verisi.mjs",
-    "seed:sorular": "node scripts/soru-havuzu.mjs"
+    "seed:sorular": "node scripts/soru-havuzu.mjs",
+    "migration:durum": "node scripts/migration-durumu.mjs"
   },
   "dependencies": {
     "@ai-sdk/google": "^1.2.22",
