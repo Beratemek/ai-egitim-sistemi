@@ -7,6 +7,11 @@
  * gerçek bir raf tahtası. Yükseklik farkı ve yatık ciltler olmadan sıra
  * hâlâ "çubuk" gibi okunuyordu.
  *
+ * Raflar ekranın TAMAMINI kaplar, altta birkaç raf kalıp üstü boş kalmaz -
+ * yarım kalan bir kitaplık dekor değil eksik iş gibi duruyordu. Yeterli
+ * sayıda raf üretilip taşanı kırpılıyor; üst kenarda maske ile silikleşiyor
+ * ki başlık çubuğuyla yarışmasın.
+ *
  * Tamamı dekoratif: `aria-hidden`, `pointer-events-none` ve yalnızca xl ve
  * üzeri ekranlarda görünür. Dar ekranda içerik için yer bırakmak süslemeden
  * önce gelir.
@@ -54,6 +59,15 @@ const YATIK: readonly { raf: number; w: number; h: number; book: number }[] = [
   { raf: 2, w: 28, h: 8, book: 3 },
 ];
 
+/**
+ * Uretilecek raf sayisi.
+ *
+ * Bir raf yaklasik 105 piksel (ciltler + tahta + bosluk). 14 raf ~1470
+ * pikseli kapliyor; bugunku en uzun ekranlarda bile alt kenardan uste kadar
+ * doluyor, tasan kisim `overflow-hidden` ile kirpiliyor.
+ */
+const RAF_SAYISI = 14;
+
 export function SideBooks({ side, className }: SideBooksProps) {
   const sol = side === "left";
 
@@ -61,14 +75,31 @@ export function SideBooks({ side, className }: SideBooksProps) {
     <div
       aria-hidden
       className={[
-        "pointer-events-none fixed bottom-0 z-0 hidden select-none xl:block",
+        "pointer-events-none fixed inset-y-0 z-0 hidden select-none overflow-hidden xl:block",
         sol ? "left-0" : "right-0",
         className ?? "",
       ].join(" ")}
+      style={{
+        // Ust kenarda silikleserek bitsin: baslik cubugunun altinda keskin
+        // bir kesik olusmasin.
+        maskImage:
+          "linear-gradient(to bottom, transparent 0, black 22%, black 100%)",
+        WebkitMaskImage:
+          "linear-gradient(to bottom, transparent 0, black 22%, black 100%)",
+      }}
     >
-      <div className="flex flex-col justify-end gap-5 px-4 pb-8">
-        {RAFLAR.map((raf, rafIndex) => {
-          const yatik = YATIK.find((item) => item.raf === rafIndex);
+      <div className="flex h-full flex-col justify-end gap-5 px-4 pb-8">
+        {Array.from({ length: RAF_SAYISI }, (_, sira) => {
+          // Desenler donerken renkler de kayiyor; ust uste ayni raf
+          // tekrarlanmis gibi gorunmesin.
+          const desen = RAFLAR[sira % RAFLAR.length] ?? [];
+          const kayma = Math.floor(sira / RAFLAR.length);
+          const raf = desen.map((cilt) => ({
+            ...cilt,
+            book: ((cilt.book - 1 + kayma * 3) % 8) + 1,
+          }));
+          const rafIndex = sira;
+          const yatik = YATIK.find((item) => item.raf === sira % RAFLAR.length);
 
           return (
             <div key={rafIndex} className="flex flex-col items-start">
