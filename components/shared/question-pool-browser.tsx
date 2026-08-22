@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import {
   ArrowLeft,
   ArrowRight,
@@ -17,11 +16,12 @@ import {
   Plus,
   RotateCcw,
   Search,
-  Wand2,
+  Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 
 import { addExamQuestions } from "@/app/actions/exams";
+import { ExamComposeDialog } from "@/components/shared/exam-compose-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
 import {
   Select,
   SelectContent,
@@ -39,7 +40,6 @@ import {
 } from "@/components/ui/select";
 import {
   groupBySubject,
-  pickBalanced,
   type SubjectGroup,
   type TopicGroup,
 } from "@/lib/question-pool";
@@ -92,11 +92,12 @@ export function QuestionPoolBrowser({
   );
   const [search, setSearch] = React.useState("");
   const [typeFilter, setTypeFilter] = React.useState<TypeFilter>("hepsi");
-  const [targetCount, setTargetCount] = React.useState("20");
   const [examId, setExamId] = React.useState<string>(exams[0]?.id ?? "");
   const [pending, setPending] = React.useState(false);
   /** Onizlemesi acik olan sorunun kimligi; kapaliyken null. */
   const [openQuestionId, setOpenQuestionId] = React.useState<string | null>(null);
+  /** Yeni sinav penceresi acik mi? */
+  const [composeOpen, setComposeOpen] = React.useState(false);
 
   /** Havuzun tamami: ders -> konu -> soru. Filtreden etkilenmez. */
   const allSubjects = React.useMemo(() => groupBySubject(questions), [questions]);
@@ -124,6 +125,26 @@ export function QuestionPoolBrowser({
   );
 
   /* ------------------------------ gezinme -------------------------------- */
+
+  /**
+   * Otomatik secimin kapsami: bulunulan kademe.
+   * Konudayken o konu, derste o dersin konulari, en ustte gorunen her sey.
+   */
+  const scopeTopics = React.useMemo(
+    () =>
+      openTopic
+        ? [openTopic]
+        : openSubject
+          ? openSubject.topics
+          : visibleSubjects.flatMap((group) => group.topics),
+    [openTopic, openSubject, visibleSubjects],
+  );
+
+  const scopeLabel = openTopic
+    ? `${openTopic.topic} konusu`
+    : openSubject
+      ? `${openSubject.subject} dersi`
+      : "görünen tüm dersler";
 
   function backToSubjects() {
     setActiveSubject(null);
@@ -153,40 +174,6 @@ export function QuestionPoolBrowser({
       }
       return next;
     });
-  }
-
-  /**
-   * Konular arasında sirayla gezerek istenen sayida soru secer.
-   * Kapsam bulundugun kademedir: konudayken o konudan, derste o dersin
-   * konularindan, en ustte görünen tüm derslerden.
-   */
-  function autoSelect() {
-    const source = openTopic
-      ? [openTopic]
-      : openSubject
-        ? openSubject.topics
-        : visibleSubjects.flatMap((group) => group.topics);
-
-    const available = source.reduce((total, group) => total + group.questions.length, 0);
-    const requested = Number.parseInt(targetCount, 10);
-
-    if (!Number.isFinite(requested) || requested < 1) {
-      toast.error("Geçerli bir soru sayısı girin.");
-      return;
-    }
-
-    const picked = pickBalanced(source, Math.min(requested, available));
-    setSelectedIds(new Set(picked));
-
-    if (picked.length < requested) {
-      toast.warning(`Bu kapsamda ${picked.length} uygun soru var`, {
-        description: "Üst kademeye çıkın, filtreyi genişletin veya daha az soru isteyin.",
-      });
-    } else {
-      toast.success(`${picked.length} soru secildi`, {
-        description: `${source.length} konudan dengeli dagitildi.`,
-      });
-    }
   }
 
   async function handleAddToExam() {
@@ -230,19 +217,6 @@ export function QuestionPoolBrowser({
         onSearchChange={setSearch}
         typeFilter={typeFilter}
         onTypeFilterChange={setTypeFilter}
-        exams={exams}
-        examId={examId}
-        onExamChange={setExamId}
-        targetCount={targetCount}
-        onTargetCountChange={setTargetCount}
-        onAutoSelect={autoSelect}
-        autoSelectScope={
-          openTopic
-            ? `${openTopic.topic} konusundan`
-            : openSubject
-              ? `${openSubject.subject} dersinin konularindan`
-              : "görünen tüm derslerden"
-        }
       />
 
         {openSubject === null ? (
@@ -322,11 +296,24 @@ export function QuestionPoolBrowser({
       {/* ---------- Secim bari ---------- */}
       <SelectionBar
         selectedCount={selectedIds.size}
-        examTitle={exams.find((exam) => exam.id === examId)?.title ?? null}
+        exams={exams}
+        examId={examId}
+        onExamChange={setExamId}
         canPersist={canPersist}
         pending={pending}
         onAdd={() => void handleAddToExam()}
+        onCreate={() => setComposeOpen(true)}
         onClear={() => setSelectedIds(new Set())}
+      />
+
+      <ExamComposeDialog
+        open={composeOpen}
+        onOpenChange={setComposeOpen}
+        selectedIds={[...selectedIds]}
+        scopeTopics={scopeTopics}
+        scopeLabel={scopeLabel}
+        subject={openSubject?.subject ?? null}
+        onCreated={() => setSelectedIds(new Set())}
       />
     </div>
   );
@@ -810,103 +797,39 @@ function PoolToolbar({
   onSearchChange,
   typeFilter,
   onTypeFilterChange,
-  exams,
-  examId,
-  onExamChange,
-  targetCount,
-  onTargetCountChange,
-  onAutoSelect,
-  autoSelectScope,
 }: {
   search: string;
   onSearchChange: (value: string) => void;
   typeFilter: TypeFilter;
   onTypeFilterChange: (value: TypeFilter) => void;
-  exams: readonly Exam[];
-  examId: string;
-  onExamChange: (value: string) => void;
-  targetCount: string;
-  onTargetCountChange: (value: string) => void;
-  onAutoSelect: () => void;
-  autoSelectScope: string;
 }) {
   return (
-    <div className="space-y-2">
-      <div className="flex flex-col gap-2 lg:flex-row">
-        <div className="relative min-w-0 flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            type="search"
-            value={search}
-            onChange={(event) => onSearchChange(event.target.value)}
-            placeholder="Ders, konu veya soru ara..."
-            aria-label="Havuzda ara"
-            className="pl-9"
-          />
-        </div>
-
-        <Select
-          value={typeFilter}
-          onValueChange={(value) => onTypeFilterChange(value as TypeFilter)}
-        >
-          <SelectTrigger className="lg:w-44" aria-label="Tipe gore filtrele">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="hepsi">Tüm soru tipleri</SelectItem>
-            <SelectItem value="test">Çoktan seçmeli</SelectItem>
-            <SelectItem value="acik_uclu">Açık uçlu</SelectItem>
-          </SelectContent>
-        </Select>
-
-        {exams.length > 0 ? (
-          <Select value={examId} onValueChange={onExamChange}>
-            <SelectTrigger className="lg:w-56" aria-label="Hedef sınav">
-              <SelectValue placeholder="Hedef sınav" />
-            </SelectTrigger>
-            <SelectContent>
-              {exams.map((exam) => (
-                <SelectItem key={exam.id} value={exam.id}>
-                  {exam.title}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        ) : null}
-
-        <div className="flex gap-2">
-          <Input
-            type="number"
-            min={1}
-            value={targetCount}
-            onChange={(event) => onTargetCountChange(event.target.value)}
-            aria-label="Otomatik seçilecek soru sayısı"
-            className="w-20"
-          />
-          <Button
-            variant="outline"
-            className="gap-2 whitespace-nowrap"
-            onClick={onAutoSelect}
-            title={`Bulunduğunuz kademeden seçer: ${autoSelectScope}`}
-          >
-            <Wand2 className="h-4 w-4" />
-            Dengeli seç
-          </Button>
-        </div>
+    <div className="flex flex-col gap-2 sm:flex-row">
+      <div className="relative min-w-0 flex-1">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          type="search"
+          value={search}
+          onChange={(event) => onSearchChange(event.target.value)}
+          placeholder="Ders, konu veya soru ara..."
+          aria-label="Havuzda ara"
+          className="pl-9"
+        />
       </div>
 
-      {exams.length === 0 ? (
-        <p className="text-xs leading-relaxed text-muted-foreground">
-          Henüz sınavınız yok. Önce{" "}
-          <Link
-            href="/dashboard/egitmen/sinavlar"
-            className="font-medium text-primary underline-offset-4 hover:underline"
-          >
-            Sınavlar
-          </Link>{" "}
-          ekranından bir sınav oluşturun, sonra buradan soru ekleyin.
-        </p>
-      ) : null}
+      <Select
+        value={typeFilter}
+        onValueChange={(value) => onTypeFilterChange(value as TypeFilter)}
+      >
+        <SelectTrigger className="sm:w-52" aria-label="Tipe gore filtrele">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="hepsi">Tüm soru tipleri</SelectItem>
+          <SelectItem value="test">Çoktan seçmeli</SelectItem>
+          <SelectItem value="acik_uclu">Açık uçlu</SelectItem>
+        </SelectContent>
+      </Select>
     </div>
   );
 }
@@ -925,32 +848,32 @@ function PoolToolbar({
  */
 function SelectionBar({
   selectedCount,
-  examTitle,
+  exams,
+  examId,
+  onExamChange,
   canPersist,
   pending,
   onAdd,
+  onCreate,
   onClear,
 }: {
   selectedCount: number;
-  examTitle: string | null;
+  exams: readonly Exam[];
+  examId: string;
+  onExamChange: (value: string) => void;
   canPersist: boolean;
   pending: boolean;
   onAdd: () => void;
+  onCreate: () => void;
   onClear: () => void;
 }) {
   if (selectedCount === 0) return null;
 
   return (
     <div className="sticky bottom-4 z-20 mx-auto w-fit max-w-full">
-      <div className="flex flex-wrap items-center gap-3 rounded-full border bg-card/95 px-4 py-2.5 shadow-lg backdrop-blur">
-        <span className="text-sm font-medium">
+      <div className="flex flex-wrap items-center gap-2 rounded-2xl border bg-card/95 px-3 py-2.5 shadow-lg backdrop-blur">
+        <span className="px-1 text-sm font-medium">
           {selectedCount} soru seçili
-          {examTitle ? (
-            <span className="font-normal text-muted-foreground">
-              {" "}
-              → {examTitle}
-            </span>
-          ) : null}
         </span>
 
         <Button
@@ -963,18 +886,45 @@ function SelectionBar({
           Temizle
         </Button>
 
-        <Button
-          size="sm"
-          className="gap-1.5"
-          disabled={pending || !examTitle || !canPersist}
-          onClick={onAdd}
-        >
-          {pending ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          ) : (
-            <Plus className="h-3.5 w-3.5" />
-          )}
-          Sınava ekle
+        <Separator orientation="vertical" className="mx-1 h-6" />
+
+        {/* Var olan sinava ekle: sinav secimi burada, cunku karar ancak
+            secim yapildiktan sonra anlamli. */}
+        {exams.length > 0 ? (
+          <div className="flex items-center gap-1.5">
+            <Select value={examId} onValueChange={onExamChange}>
+              <SelectTrigger className="h-9 w-44" aria-label="Var olan sınav">
+                <SelectValue placeholder="Sınav seçin" />
+              </SelectTrigger>
+              <SelectContent>
+                {exams.map((exam) => (
+                  <SelectItem key={exam.id} value={exam.id}>
+                    {exam.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5"
+              disabled={pending || !examId || !canPersist}
+              onClick={onAdd}
+            >
+              {pending ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Plus className="h-3.5 w-3.5" />
+              )}
+              Ekle
+            </Button>
+          </div>
+        ) : null}
+
+        <Button size="sm" className="gap-1.5" onClick={onCreate}>
+          <Sparkles className="h-3.5 w-3.5" />
+          Yeni sınav oluştur
         </Button>
       </div>
     </div>

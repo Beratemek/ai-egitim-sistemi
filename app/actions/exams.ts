@@ -469,3 +469,77 @@ export async function resetExamPoints(
   revalidateExamPaths(examId);
   return { ok: true, data: { total: (data as number | null) ?? 0 } };
 }
+
+export interface CreateExamWithQuestionsInput {
+  title: string;
+  description?: string;
+  subject?: string;
+  /** Ogrenci basina sure (dakika). Verilmezse sutun varsayilani (60) uygulanir. */
+  durationMinutes?: number;
+  /** Sinava eklenecek soru kimlikleri. */
+  questionIds: readonly string[];
+}
+
+/**
+ * Sinavi olusturur ve secilen sorulari TEK ADIMDA ekler.
+ *
+ * Ayri ayri cagrilsa arada bir hata olustugunda ortada sorusuz bir sinav
+ * kalirdi; egitmen de onu bulup silmek zorunda kalirdi. Soru ekleme
+ * basarisiz olursa olusturulan sinav geri alinir.
+ */
+export async function createExamWithQuestions(
+  input: CreateExamWithQuestionsInput,
+): Promise<ActionResult<{ id: string; added: number }>> {
+  if (!isSupabaseConfigured) return demoGuard();
+
+  const title = input.title.trim();
+  if (!title) return { ok: false, error: "Sinav basligi zorunludur." };
+
+  const ids = [...new Set(input.questionIds)].filter(Boolean);
+  if (ids.length === 0) return { ok: false, error: "En az bir soru secmelisiniz." };
+
+  if (
+    input.durationMinutes !== undefined &&
+    (!Number.isInteger(input.durationMinutes) ||
+      input.durationMinutes < 1 ||
+      input.durationMinutes > 600)
+  ) {
+    return { ok: false, error: "Sure 1 ile 600 dakika arasinda olmalidir." };
+  }
+
+  const current = await getCurrentUser();
+  if (!current) return { ok: false, error: "Oturum acmaniz gerekiyor." };
+
+  const subject = input.subject
+    ? canonicalizeSubject(input.subject, await getSubjectOptions())
+    : "";
+
+  const supabase = await createServerSupabaseClient();
+
+  const { data: exam, error } = await supabase
+    .from("exams")
+    .insert({
+      title,
+      description: input.description?.trim() ?? "",
+      subject: subject || null,
+      instructor_id: current.user.id,
+      ...(input.durationMinutes === undefined
+        ? {}
+        : { duration_minutes: input.durationMinutes }),
+    })
+    .select("id")
+    .single();
+
+  if (error) return { ok: false, error: error.message };
+
+  const added = await addExamQuestions(exam.id, ids);
+
+  if (!added.ok) {
+    // Sorusuz sinav birakma: olusturulani geri al.
+    await supabase.from("exams").delete().eq("id", exam.id);
+    return { ok: false, error: added.error };
+  }
+
+  revalidateExamPaths(exam.id);
+  return { ok: true, data: { id: exam.id, added: added.data.added } };
+}

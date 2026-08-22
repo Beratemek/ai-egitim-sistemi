@@ -203,3 +203,51 @@ export function pickBalanced(groups: readonly TopicGroup[], count: number): stri
 
   return picked;
 }
+
+export interface TypeQuota {
+  /** Istenen coktan secmeli soru sayisi. */
+  test: number;
+  /** Istenen acik uclu soru sayisi. */
+  acikUclu: number;
+}
+
+export interface PickByTypeResult {
+  ids: string[];
+  /** Havuzda yeterli soru olmadigi icin karsilanamayan sayilar. */
+  eksik: TypeQuota;
+}
+
+/**
+ * Tipe gore kotali, konular arasinda dengeli secim.
+ *
+ * `pickBalanced` toplam sayiya bakiyordu; sinav kurarken egitmen "10 test +
+ * 5 klasik" gibi dusunuyor. Iki tip AYRI havuzlardan cekilir, her biri kendi
+ * icinde konular arasinda sirayla dagitilir - boylece 10 testin hepsi tek
+ * konudan gelmez.
+ *
+ * Havuz yetmezse eksik kalan sayi geri bildirilir; sessizce az soru dondurup
+ * egitmene "istedigin sinav kuruldu" demek yanlis olurdu.
+ */
+export function pickBalancedByType(
+  groups: readonly TopicGroup[],
+  quota: TypeQuota,
+): PickByTypeResult {
+  const sadece = (type: Question["type"]): TopicGroup[] =>
+    groups
+      .map((group) => ({
+        topic: group.topic,
+        questions: group.questions.filter((question) => question.type === type),
+      }))
+      .filter((group) => group.questions.length > 0);
+
+  const testIds = pickBalanced(sadece("test"), quota.test);
+  const acikIds = pickBalanced(sadece("acik_uclu"), quota.acikUclu);
+
+  return {
+    ids: [...testIds, ...acikIds],
+    eksik: {
+      test: Math.max(0, quota.test - testIds.length),
+      acikUclu: Math.max(0, quota.acikUclu - acikIds.length),
+    },
+  };
+}
