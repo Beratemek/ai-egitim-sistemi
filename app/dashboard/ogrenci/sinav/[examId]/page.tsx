@@ -211,9 +211,28 @@ export default async function OgrenciSinavPage({
 
       {/* ---------- Sorular ---------- */}
       {requiresStart ? null : questions.length === 0 ? (
+        /*
+          Bos liste iki ayri sebepten olabilir ve ikisini ayirmak sart:
+          sinavda gercekten soru yoksa ogrencinin yapacagi bir sey yok, ama
+          soru VARKEN liste bossa sorun ogrencinin oturumundadir. Onceden
+          her iki durumda da "bu sinava henuz soru eklenmemis" yaziyordu -
+          50 soruluk bir sinavda bu duz yanlis bir bilgiydi.
+        */
         <Card className="border-dashed">
           <CardContent className="py-16 text-center text-sm text-muted-foreground">
-            Bu sınava henüz soru eklenmemis.
+            {questionCount > 0 ? (
+              <>
+                <p className="font-medium text-foreground">
+                  Sorular yüklenemedi
+                </p>
+                <p className="mx-auto mt-1.5 max-w-sm">
+                  Bu sınavda {questionCount} soru var ama size gösterilemedi.
+                  Sayfayı yenileyin; sorun sürerse eğitmeninize bildirin.
+                </p>
+              </>
+            ) : (
+              "Bu sınava henüz soru eklenmemiş."
+            )}
           </CardContent>
         </Card>
       ) : (
