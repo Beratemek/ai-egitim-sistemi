@@ -6,9 +6,11 @@
  * serbest metnidir - icerik uzmani soruyu uretirken ikisini de belirler.
  */
 
-import { categoryLabel } from "@/lib/deneyap";
-import type { DeneyapCategory } from "@/lib/deneyap";
-import type { Question } from "@/lib/types";
+// Goreli yol: bu modul birim testinden dogrudan cagriliyor ve Node test
+// calistiricisi tsconfig yol takma adlarini ("@/lib/...") cozemiyor.
+import { categoryLabel } from "./deneyap.ts";
+import type { DeneyapCategory } from "./deneyap.ts";
+import type { Question } from "./types.ts";
 
 /** Turkce siralama; "Cografya" < "Cebir" hatasina dusmemek icin. */
 const collator = new Intl.Collator("tr", { sensitivity: "base" });
@@ -61,9 +63,27 @@ export interface SubjectGroup {
   topics: TopicGroup[];
   /** Derse bagli toplam soru sayisi - kartta gostermek icin. */
   questionCount: number;
+  /**
+   * Dersin sorularinin ait oldugu atolye dallari.
+   *
+   * Ders artik havuzun UST kademesi; dal ise gezinilen bir kademe degil,
+   * kartta gosterilen bir etiket. Bir ders birden fazla dalda soru
+   * tasiyabilir (or. eski kayitlarin dali bos, yenilerinki dolu), bu yuzden
+   * tekil bir alan degil liste.
+   */
+  categoryLabels: string[];
 }
 
-function groupBySubject(questions: readonly Question[]): SubjectGroup[] {
+/**
+ * Havuzu "ders -> konu -> soru" olarak kirar.
+ *
+ * Gruplar sorulardan TURETILIR: altinda sorusu olmayan bir ders ya da konu
+ * hic olusmaz. Ayni ders adini tasiyan sorular, DALLARI FARKLI OLSA BILE
+ * tek kutuda birlesir - egitmen "Robotik ve Kodlama" derken tek bir ders
+ * kastediyor; o dersin bir kisminin dali girilmemis olmasi onun ayri bir
+ * ders olmasi anlamina gelmez.
+ */
+export function groupBySubject(questions: readonly Question[]): SubjectGroup[] {
   const buckets = new Map<string, Question[]>();
 
   for (const question of questions) {
@@ -74,11 +94,17 @@ function groupBySubject(questions: readonly Question[]): SubjectGroup[] {
   }
 
   return [...buckets.entries()]
-    .map(([subject, items]) => ({
-      subject,
-      topics: groupByTopic(items),
-      questionCount: items.length,
-    }))
+    .map(([subject, items]) => {
+      const daller = new Set<string>();
+      for (const item of items) daller.add(categoryLabel(item.category));
+
+      return {
+        subject,
+        topics: groupByTopic(items),
+        questionCount: items.length,
+        categoryLabels: [...daller].sort(collator.compare),
+      };
+    })
     .sort((a, b) => {
       // Dersi atanmamislar her zaman en sonda dursun.
       if (a.subject === UNASSIGNED_SUBJECT) return 1;
@@ -104,6 +130,9 @@ export interface CategoryGroup {
 
 /**
  * Havuzu "atolye dali -> ders -> konu -> soru" olarak kirar.
+ *
+ * NOT: egitmenin havuz ekrani artik DERSTEN baslar (bkz. groupBySubject);
+ * bu fonksiyon dal bazli bir gorunum gerektiginde kullanilir.
  *
  * Gruplar sorulardan TURETILIR: altinda sorusu olmayan bir dal, ders ya da
  * konu hic olusmaz; son sorusu kalkarsa grup kendiliginden kaybolur. Dali ya

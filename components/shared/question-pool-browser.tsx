@@ -6,7 +6,6 @@ import Link from "next/link";
 import {
   ArrowLeft,
   ArrowRight,
-  BookOpen,
   ChevronRight,
   ChevronDown,
   FileText,
@@ -45,9 +44,8 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import {
-  groupByCategory,
+  groupBySubject,
   pickBalanced,
-  type CategoryGroup,
   type SubjectGroup,
   type TopicGroup,
 } from "@/lib/question-pool";
@@ -57,10 +55,16 @@ import { cn } from "@/lib/utils";
 /**
  * Eğitmenin soru havuzu.
  *
- * Havuz dort kademe halinde, her kademede kutucuklarla gezilir:
- *   Atölye dalı  ->  Ders  ->  Konu  ->  Soru listesi (isaretlenebilir)
+ * Havuz uc kademe halinde, her kademede kutucuklarla gezilir:
+ *   Ders  ->  Konu  ->  Soru listesi (isaretlenebilir)
  *
- * Kutucuklar sorulardan turetilir; altinda sorusu olmayan dal, ders veya konu
+ * UST KADEME DERSTIR. Atolye dali gezilen bir kademe degil, ders kartinda
+ * gosterilen bir etikettir: egitmen sinav hazirlarken "hangi ders" diye
+ * dusunuyor, "hangi atolye dali" diye degil. Dal ust kademe oldugunda dali
+ * girilmemis sorular ayri bir "Kategori yok" kutusuna dusuyor ve ayni ders
+ * ikiye bolunuyordu.
+ *
+ * Kutucuklar sorulardan turetilir; altinda sorusu olmayan ders veya konu
  * kutucugu hic olusmaz. İçerik uzmanı yeni bir derse soru onayladigi anda o
  * dersin kutucugu kendiliginden belirir.
  *
@@ -87,7 +91,6 @@ export function QuestionPoolBrowser({
 }: QuestionPoolBrowserProps) {
   const router = useRouter();
 
-  const [activeCategory, setActiveCategory] = React.useState<string | null>(null);
   const [activeSubject, setActiveSubject] = React.useState<string | null>(null);
   const [activeTopic, setActiveTopic] = React.useState<string | null>(null);
   const [selectedIds, setSelectedIds] = React.useState<ReadonlySet<string>>(
@@ -101,30 +104,21 @@ export function QuestionPoolBrowser({
   /** Onizlemesi acik olan sorunun kimligi; kapaliyken null. */
   const [openQuestionId, setOpenQuestionId] = React.useState<string | null>(null);
 
-  /** Havuzun tamami: dal -> ders -> konu -> soru. Filtreden etkilenmez. */
-  const allCategories = React.useMemo(() => groupByCategory(questions), [questions]);
+  /** Havuzun tamami: ders -> konu -> soru. Filtreden etkilenmez. */
+  const allSubjects = React.useMemo(() => groupBySubject(questions), [questions]);
 
   /** Arama / tip filtresinden geçmiş hali. */
-  const visibleCategories = React.useMemo(
-    () => filterCategories(allCategories, search, typeFilter),
-    [allCategories, search, typeFilter],
-  );
-
-  const openCategory = React.useMemo(
-    () =>
-      activeCategory === null
-        ? null
-        : (visibleCategories.find((group) => keyOf(group) === activeCategory) ?? null),
-    [visibleCategories, activeCategory],
+  const visibleSubjects = React.useMemo(
+    () => filterSubjects(allSubjects, search, typeFilter),
+    [allSubjects, search, typeFilter],
   );
 
   const openSubject = React.useMemo(
     () =>
-      openCategory === null || activeSubject === null
+      activeSubject === null
         ? null
-        : (openCategory.subjects.find((group) => group.subject === activeSubject) ??
-          null),
-    [openCategory, activeSubject],
+        : (visibleSubjects.find((group) => group.subject === activeSubject) ?? null),
+    [visibleSubjects, activeSubject],
   );
 
   const openTopic = React.useMemo(
@@ -136,12 +130,6 @@ export function QuestionPoolBrowser({
   );
 
   /* ------------------------------ gezinme -------------------------------- */
-
-  function backToCategories() {
-    setActiveCategory(null);
-    setActiveSubject(null);
-    setActiveTopic(null);
-  }
 
   function backToSubjects() {
     setActiveSubject(null);
@@ -176,16 +164,14 @@ export function QuestionPoolBrowser({
   /**
    * Konular arasında sirayla gezerek istenen sayida soru secer.
    * Kapsam bulundugun kademedir: konudayken o konudan, derste o dersin
-   * konularindan, dalda o dalin tüm derslerinden, en ustte görünen her seyden.
+   * konularindan, en ustte görünen tüm derslerden.
    */
   function autoSelect() {
     const source = openTopic
       ? [openTopic]
       : openSubject
         ? openSubject.topics
-        : openCategory
-          ? topicsOfCategory(openCategory)
-          : visibleCategories.flatMap(topicsOfCategory);
+        : visibleSubjects.flatMap((group) => group.topics);
 
     const available = source.reduce((total, group) => total + group.questions.length, 0);
     const requested = Number.parseInt(targetCount, 10);
@@ -257,9 +243,7 @@ export function QuestionPoolBrowser({
             ? `${openTopic.topic} konusundan`
             : openSubject
               ? `${openSubject.subject} dersinin konularindan`
-              : openCategory
-                ? `${openCategory.label} dalinin tüm derslerinden`
-                : "görünen tüm dallardan"
+              : "görünen tüm derslerden"
         }
         canPersist={canPersist}
         pending={pending}
@@ -296,64 +280,39 @@ export function QuestionPoolBrowser({
           </Select>
         </div>
 
-        {openCategory === null ? (
-          /* ------------- 1. kademe: atölye dalı kutucuklari -------------- */
-          visibleCategories.length === 0 ? (
+        {openSubject === null ? (
+          /* ------------- 1. kademe: ders kutucuklari --------------------- */
+          visibleSubjects.length === 0 ? (
             <NoMatch />
           ) : (
             <>
               <p className="text-sm text-muted-foreground">
-                {visibleCategories.length} dal ·{" "}
-                {visibleCategories.reduce((sum, g) => sum + g.subjects.length, 0)} ders ·{" "}
-                {visibleCategories.reduce((sum, g) => sum + g.topicCount, 0)} konu ·{" "}
-                {visibleCategories.reduce((sum, g) => sum + g.questionCount, 0)} soru
+                {visibleSubjects.length} ders ·{" "}
+                {visibleSubjects.reduce((sum, g) => sum + g.topics.length, 0)} konu ·{" "}
+                {visibleSubjects.reduce((sum, g) => sum + g.questionCount, 0)} soru
               </p>
 
               <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-3">
-                {visibleCategories.map((group) => (
-                  <CategoryCard
-                    key={keyOf(group)}
-                    group={group}
+                {visibleSubjects.map((subject) => (
+                  <SubjectCard
+                    key={subject.subject}
+                    group={subject}
                     selectedIds={selectedIds}
                     onOpen={() => {
-                      setActiveCategory(keyOf(group));
-                      setActiveSubject(null);
+                      setActiveSubject(subject.subject);
                       setActiveTopic(null);
                     }}
+                    onToggleAll={() => toggleMany(idsOfSubject(subject))}
                   />
                 ))}
               </div>
             </>
           )
-        ) : openSubject === null ? (
-          /* ------------- 2. kademe: ders kutucuklari --------------------- */
-          <>
-            <Breadcrumb
-              trail={[{ label: "Atölye dalları", onClick: backToCategories }]}
-              current={openCategory.label}
-              meta={`${openCategory.subjects.length} ders · ${openCategory.questionCount} soru`}
-            />
-
-            <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-3">
-              {openCategory.subjects.map((subject) => (
-                <SubjectCard
-                  key={subject.subject}
-                  group={subject}
-                  selectedIds={selectedIds}
-                  onOpen={() => setActiveSubject(subject.subject)}
-                  onToggleAll={() => toggleMany(idsOfSubject(subject))}
-                />
-              ))}
-            </div>
-          </>
         ) : openTopic === null ? (
-          /* ------------- 3. kademe: konu kutucuklari --------------------- */
+          /* ------------- 2. kademe: konu kutucuklari --------------------- */
           <>
             <Breadcrumb
-              trail={[
-                { label: "Atölye dalları", onClick: backToCategories },
-                { label: openCategory.label, onClick: backToSubjects },
-              ]}
+              trail={[{ label: "Dersler", onClick: backToSubjects }]}
               current={openSubject.subject}
               meta={`${openSubject.topics.length} konu · ${openSubject.questionCount} soru`}
             />
@@ -371,12 +330,11 @@ export function QuestionPoolBrowser({
             </div>
           </>
         ) : (
-          /* ------------- 4. kademe: sorular ------------------------------ */
+          /* ------------- 3. kademe: sorular ------------------------------ */
           <>
             <Breadcrumb
               trail={[
-                { label: "Atölye dalları", onClick: backToCategories },
-                { label: openCategory.label, onClick: backToSubjects },
+                { label: "Dersler", onClick: backToSubjects },
                 { label: openSubject.subject, onClick: () => setActiveTopic(null) },
               ]}
               current={openTopic.topic}
@@ -402,64 +360,7 @@ export function QuestionPoolBrowser({
 }
 
 /* -------------------------------------------------------------------------- */
-/*  1. kademe - atölye dalı kutucugu                                          */
-/* -------------------------------------------------------------------------- */
-
-function CategoryCard({
-  group,
-  selectedIds,
-  onOpen,
-}: {
-  group: CategoryGroup;
-  selectedIds: ReadonlySet<string>;
-  onOpen: () => void;
-}) {
-  const selectedCount = countSelected(idsOfCategory(group), selectedIds);
-  const preview = group.subjects.slice(0, 3);
-  const rest = group.subjects.length - preview.length;
-
-  return (
-    <button
-      type="button"
-      onClick={onOpen}
-      className={cn(
-        "group flex flex-col gap-3 rounded-xl border bg-card p-5 text-left shadow-sm transition-colors",
-        "hover:border-primary/50 hover:bg-accent/40",
-        "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-        selectedCount > 0 && "border-primary/40",
-      )}
-    >
-      <div className="flex items-start justify-between gap-3">
-        <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-          <BookOpen className="h-5 w-5" />
-        </span>
-
-        {selectedCount > 0 ? (
-          <Badge variant="success">{selectedCount} seçili</Badge>
-        ) : null}
-      </div>
-
-      <div className="min-w-0">
-        <p className="font-semibold leading-snug">{group.label}</p>
-        <p className="mt-0.5 text-sm text-muted-foreground">
-          {group.subjects.length} ders · {group.topicCount} konu ·{" "}
-          {group.questionCount} soru
-        </p>
-      </div>
-
-      <ChipRow
-        items={preview.map((subject) => subject.subject)}
-        rest={rest}
-        restLabel="ders"
-      />
-
-      <CardAction label="Dersleri ac" />
-    </button>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
-/*  2. kademe - ders kutucugu                                                 */
+/*  1. kademe - ders kutucugu                                                 */
 /* -------------------------------------------------------------------------- */
 
 function SubjectCard({
@@ -490,6 +391,12 @@ function SubjectCard({
       subtitle={`${group.topics.length} konu · ${group.questionCount} soru`}
       action="Konuları ac"
     >
+      {/* Atolye dali gezilen bir kademe degil; dersin hangi dala ait
+          oldugunu burada etiket olarak gosteriyoruz. */}
+      <p className="text-xs text-muted-foreground">
+        {group.categoryLabels.join(" · ")}
+      </p>
+
       <ChipRow
         items={preview.map((topic) => topic.topic)}
         rest={rest}
@@ -500,7 +407,7 @@ function SubjectCard({
 }
 
 /* -------------------------------------------------------------------------- */
-/*  3. kademe - konu kutucugu                                                 */
+/*  2. kademe - konu kutucugu                                                 */
 /* -------------------------------------------------------------------------- */
 
 function TopicCard({
@@ -662,7 +569,7 @@ function ChipRow({
 }
 
 /* -------------------------------------------------------------------------- */
-/*  4. kademe - soru listesi                                                  */
+/*  3. kademe - soru listesi                                                  */
 /* -------------------------------------------------------------------------- */
 
 function QuestionList({
@@ -1018,15 +925,6 @@ function NoMatch() {
 /*  Yardimcilar                                                               */
 /* -------------------------------------------------------------------------- */
 
-/** Dalı atanmamış grubun da kararli bir anahtarı olmali. */
-function keyOf(group: CategoryGroup): string {
-  return group.category ?? "__kategorisiz__";
-}
-
-function topicsOfCategory(group: CategoryGroup): TopicGroup[] {
-  return group.subjects.flatMap((subject) => subject.topics);
-}
-
 function idsOfTopic(group: TopicGroup): string[] {
   return group.questions.map((question) => question.id);
 }
@@ -1035,72 +933,55 @@ function idsOfSubject(group: SubjectGroup): string[] {
   return group.topics.flatMap(idsOfTopic);
 }
 
-function idsOfCategory(group: CategoryGroup): string[] {
-  return group.subjects.flatMap(idsOfSubject);
-}
-
 function countSelected(ids: readonly string[], selected: ReadonlySet<string>): number {
   return ids.reduce((total, id) => (selected.has(id) ? total + 1 : total), 0);
 }
 
 /**
- * Arama ve tip filtresini dal -> ders -> konu -> soru agacina uygular.
- * Üst kademenin adi aramayla eslesiyorsa altindakiler kirpilmaz; boylece
- * "İleri Robotik" yazinca dalin tamami gorulebilir.
+ * Arama ve tip filtresini ders -> konu -> soru agacina uygular.
+ *
+ * Ust kademenin adi aramayla eslesiyorsa altindakiler kirpilmaz; boylece
+ * "Siber Guvenlik" yazinca dersin tamami gorulebilir. Dal adi da aranabilir:
+ * gezinilen bir kademe olmasa da ders kartinda etiket olarak duruyor.
  */
-function filterCategories(
-  categories: readonly CategoryGroup[],
+function filterSubjects(
+  subjects: readonly SubjectGroup[],
   search: string,
   typeFilter: TypeFilter,
-): CategoryGroup[] {
+): SubjectGroup[] {
   const needle = search.trim().toLocaleLowerCase("tr");
 
-  return categories
-    .map((category) => {
-      const categoryMatches =
-        !needle || category.label.toLocaleLowerCase("tr").includes(needle);
+  return subjects
+    .map((subject) => {
+      const subjectMatches =
+        !needle ||
+        subject.subject.toLocaleLowerCase("tr").includes(needle) ||
+        subject.categoryLabels.some((label) =>
+          label.toLocaleLowerCase("tr").includes(needle),
+        );
 
-      const subjects = category.subjects
-        .map((subject) => {
-          const subjectMatches =
-            categoryMatches || subject.subject.toLocaleLowerCase("tr").includes(needle);
-
-          const topics = subject.topics
-            .map((topic) => {
-              const topicMatches =
-                subjectMatches || topic.topic.toLocaleLowerCase("tr").includes(needle);
-
-              return {
-                topic: topic.topic,
-                questions: topic.questions.filter((question) => {
-                  if (typeFilter !== "hepsi" && question.type !== typeFilter) {
-                    return false;
-                  }
-                  if (topicMatches) return true;
-                  return question.text.toLocaleLowerCase("tr").includes(needle);
-                }),
-              };
-            })
-            .filter((topic) => topic.questions.length > 0);
+      const topics = subject.topics
+        .map((topic) => {
+          const topicMatches =
+            subjectMatches || topic.topic.toLocaleLowerCase("tr").includes(needle);
 
           return {
-            subject: subject.subject,
-            topics,
-            questionCount: topics.reduce(
-              (total, topic) => total + topic.questions.length,
-              0,
-            ),
+            topic: topic.topic,
+            questions: topic.questions.filter((question) => {
+              if (typeFilter !== "hepsi" && question.type !== typeFilter) return false;
+              if (topicMatches) return true;
+              return question.text.toLocaleLowerCase("tr").includes(needle);
+            }),
           };
         })
-        .filter((subject) => subject.topics.length > 0);
+        .filter((topic) => topic.questions.length > 0);
 
       return {
-        category: category.category,
-        label: category.label,
-        subjects,
-        topicCount: subjects.reduce((total, s) => total + s.topics.length, 0),
-        questionCount: subjects.reduce((total, s) => total + s.questionCount, 0),
+        subject: subject.subject,
+        topics,
+        questionCount: topics.reduce((total, topic) => total + topic.questions.length, 0),
+        categoryLabels: subject.categoryLabels,
       };
     })
-    .filter((category) => category.subjects.length > 0);
+    .filter((subject) => subject.topics.length > 0);
 }
