@@ -418,6 +418,17 @@ export async function setExamQuestionPoints(
 
   if (error) return { ok: false, error: error.message };
 
+  /**
+   * Elle puan verildigi anda otomatik dagitim kapanir.
+   *
+   * Aksi halde egitmen puanlari ayarladiktan sonra sinava bir soru eklese
+   * butun emegi silinir, puanlar yeniden esit dagitilirdi. Geri acmak icin
+   * "Eşit dağıt" var.
+   */
+  if (updated && updated.length > 0) {
+    await supabase.from("exams").update({ points_auto: false }).eq("id", examId);
+  }
+
   if (!updated || updated.length === 0) {
     return {
       ok: false,
@@ -428,4 +439,33 @@ export async function setExamQuestionPoints(
 
   revalidateExamPaths(examId);
   return { ok: true, data: { points: updated[0]?.points ?? points } };
+}
+
+/**
+ * Puanlari soru sayisina gore yeniden esit dagitir (toplam 100).
+ *
+ * Otomatik dagitimi da yeniden ACAR: egitmen bundan sonra soru ekleyip
+ * cikardikca puanlar kendiliginden guncellenir. Elle bir puana dokundugu
+ * anda tekrar kapanir.
+ */
+export async function resetExamPoints(
+  examId: string,
+): Promise<ActionResult<{ total: number }>> {
+  if (!isSupabaseConfigured) return demoGuard();
+  if (!examId) return { ok: false, error: "Sinav secilmedi." };
+
+  const supabase = await createServerSupabaseClient();
+  const { data, error } = await supabase.rpc("reset_exam_points", {
+    target_exam: examId,
+  });
+
+  if (error) {
+    if (error.code === "42501") {
+      return { ok: false, error: "Bu sinavin puanlarini degistirme yetkiniz yok." };
+    }
+    return { ok: false, error: error.message };
+  }
+
+  revalidateExamPaths(examId);
+  return { ok: true, data: { total: (data as number | null) ?? 0 } };
 }

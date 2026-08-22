@@ -97,6 +97,7 @@ export default async function SinavDetayPage({
         subjectOptions={subjectOptions}
         questionCount={detail.questions.length}
         totalPoints={detail.questions.reduce((sum, q) => sum + q.points, 0)}
+        pointsAuto={detail.exam.points_auto}
         canPersist={isSupabaseConfigured}
       />
 

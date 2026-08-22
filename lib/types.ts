@@ -168,6 +168,14 @@ export type Exam = {
    * taninan sureyi tanimlar. Bos ise yalnizca pencere gecerlidir.
    */
   duration_minutes: number | null;
+  /**
+   * Puanlar soru sayisina gore kendiliginden mi dagitilsin?
+   *
+   * Egitmen bir soruya elle puan verdigi anda false olur; boylece sonradan
+   * soru eklendiginde elle yapilan duzenleme silinmez. "Esit dagit" ile
+   * yeniden acilabilir.
+   */
+  points_auto: boolean;
   instructor_id: string;
   is_published: boolean;
   starts_at: string | null;
@@ -409,6 +417,7 @@ export interface Database {
           | "subject"
           | "proctored"
           | "duration_minutes"
+          | "points_auto"
         >
       >;
       exam_questions: TableDefinition<
@@ -511,6 +520,10 @@ export interface Database {
       set_instructor_subjects: {
         Args: { target_user: string; subjects: string[] };
         Returns: string[];
+      };
+      reset_exam_points: {
+        Args: { target_exam: string };
+        Returns: number;
       };
       exam_attempt_deadline: {
         Args: { target_exam: string; target_student: string };

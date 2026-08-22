@@ -43,5 +43,6 @@ Atlanan bir adım "function does not exist" hatası verir.
 | Dosya | Ne yapar | Neden önemli |
 |---|---|---|
 | `BEKLEYEN-1-sinav-suresi.sql` | `exams.duration_minutes` + süre kısıtının sunucuda zorlanması | Bunsuz süre alanı kaydedilemez; ayrıca süre yalnızca sayaçta kalırsa istemciden süresiz cevap gönderilebilir |
+| `BEKLEYEN-2-varsayilan-sure-ve-puan.sql` | Varsayılan 60 dk + puanların 100 üzerinden otomatik dağıtılması | Bunsuz her soru 10 puan kalır ve toplam soru sayısına göre değişir |
 
 Çalıştırıp çalıştırmadığından emin değilsen tekrar çalıştır — zararı yok.

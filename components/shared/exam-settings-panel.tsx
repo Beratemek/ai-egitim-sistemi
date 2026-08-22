@@ -8,12 +8,17 @@ import {
   Check,
   Clock3,
   Loader2,
+  Scale,
   Settings2,
   TriangleAlert,
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { setExamSubject, updateExamSettings } from "@/app/actions/exams";
+import {
+  resetExamPoints,
+  setExamSubject,
+  updateExamSettings,
+} from "@/app/actions/exams";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -50,6 +55,8 @@ export interface ExamSettingsPanelProps {
   /** Sinavdaki toplam puan; sure alaninin yaninda ozet olarak gosterilir. */
   totalPoints?: number;
   questionCount?: number;
+  /** Puanlar soru sayisina gore kendiliginden mi dagitiliyor? */
+  pointsAuto?: boolean;
   canPersist?: boolean;
 }
 
@@ -61,6 +68,7 @@ export function ExamSettingsPanel({
   subjectOptions = [],
   totalPoints = 0,
   questionCount = 0,
+  pointsAuto = true,
   canPersist = true,
 }: ExamSettingsPanelProps) {
   const router = useRouter();
@@ -138,6 +146,28 @@ export function ExamSettingsPanel({
       router.refresh();
     } catch (caught) {
       toast.error("Süre kaydedilemedi", {
+        description: caught instanceof Error ? caught.message : "Tekrar deneyin.",
+      });
+    } finally {
+      setPending(null);
+    }
+  }
+
+  async function puanlariEsitle() {
+    if (!canPersist) return demoUyarisi();
+
+    setPending("puan");
+
+    try {
+      const result = await resetExamPoints(examId);
+      if (!result.ok) throw new Error(result.error);
+
+      toast.success("Puanlar eşit dağıtıldı", {
+        description: `Toplam ${result.data.total} puan.`,
+      });
+      router.refresh();
+    } catch (caught) {
+      toast.error("Puanlar dağıtılamadı", {
         description: caught instanceof Error ? caught.message : "Tekrar deneyin.",
       });
     } finally {
@@ -295,22 +325,61 @@ export function ExamSettingsPanel({
         </label>
 
         {/* ---------- Puan özeti ---------- */}
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-muted/40 px-3 py-2.5">
-          <span className="text-sm text-muted-foreground">
-            {questionCount} soru · toplam{" "}
-            <span className="font-semibold text-foreground">{totalPoints}</span> puan
-          </span>
-
-          {questionCount > 0 && totalPoints === 0 ? (
-            <Badge variant="warning" className="gap-1.5">
-              <TriangleAlert className="h-3.5 w-3.5" />
-              Puanlar tanımsız
-            </Badge>
-          ) : (
-            <span className="text-xs text-muted-foreground">
-              Puanlar aşağıdaki soru listesinden ayarlanır.
+        <div className="space-y-2 rounded-lg border bg-muted/40 px-3 py-2.5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span className="text-sm text-muted-foreground">
+              {questionCount} soru · toplam{" "}
+              <span
+                className={cn(
+                  "font-semibold",
+                  totalPoints === 100 ? "text-foreground" : "text-amber-600 dark:text-amber-500",
+                )}
+              >
+                {totalPoints}
+              </span>{" "}
+              puan
             </span>
-          )}
+
+            <div className="flex items-center gap-2">
+              <Badge variant={pointsAuto ? "soft" : "warning"}>
+                {pointsAuto ? "Otomatik dağıtım" : "Elle ayarlandı"}
+              </Badge>
+
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5"
+                disabled={pending !== null || questionCount === 0}
+                onClick={() => void puanlariEsitle()}
+              >
+                {pending === "puan" ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Scale className="h-3.5 w-3.5" />
+                )}
+                Eşit dağıt
+              </Button>
+            </div>
+          </div>
+
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            {questionCount === 0 ? (
+              "Sınava soru ekleyince puanlar 100 üzerinden kendiliğinden dağıtılır."
+            ) : pointsAuto ? (
+              <>
+                Puanlar soru sayısına göre kendiliğinden dağıtılıyor; soru
+                ekleyip çıkardıkça güncellenir. Bir soruya elle puan verirseniz
+                otomatik dağıtım kapanır.
+              </>
+            ) : (
+              <span className="flex items-start gap-1.5">
+                <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                Puanları elle ayarladınız; soru ekleyip çıkarmak puanları
+                değiştirmez. Otomatik dağıtıma dönmek için &quot;Eşit
+                dağıt&quot;a basın.
+              </span>
+            )}
+          </p>
         </div>
       </CardContent>
     </Card>
