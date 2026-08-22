@@ -39,11 +39,24 @@ export default async function LoginPage({
         />
 
         <div className="relative">
+          {/*
+            Burada elle yazilmis bir "A" harfi vardi; sitede iki farkli logo
+            dolasiyordu. Marka isareti tek yerden gelmeli.
+          */}
           <Link href="/" className="flex items-center gap-2.5">
-            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/15 backdrop-blur">
-              <span className="text-lg font-semibold">A</span>
+            <span className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-white/15 backdrop-blur">
+              <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" aria-hidden>
+                <path
+                  d="M4 4.6A1.6 1.6 0 0 1 5.6 3H10a2.5 2.5 0 0 1 2 1 2.5 2.5 0 0 1 2-1h4.4A1.6 1.6 0 0 1 20 4.6v12.8a1.6 1.6 0 0 1-1.6 1.6H14a2.5 2.5 0 0 0-2 1 2.5 2.5 0 0 0-2-1H5.6A1.6 1.6 0 0 1 4 17.4Z"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.7"
+                  strokeLinejoin="round"
+                />
+                <path d="M12 5.6v13.4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+              </svg>
             </span>
-            <span className="text-sm font-semibold tracking-tight">
+            <span className="font-display text-[15px] font-semibold">
               AI Destekli Eğitim Sistemi
             </span>
           </Link>

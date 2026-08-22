@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
+import { BookshelfBackdrop } from "@/components/shared/bookshelf-backdrop";
 import { BrandMark } from "@/components/shared/brand-mark";
 import { RoleOnboarding } from "@/components/shared/role-onboarding";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
@@ -20,14 +21,16 @@ export default async function HosGeldinizPage() {
   if (!current) redirect("/login");
 
   return (
-    <main className="flex min-h-screen flex-col bg-background">
-      <header className="flex h-16 items-center justify-between px-4 sm:px-6">
+    <main className="bg-study relative flex min-h-screen flex-col overflow-hidden bg-background">
+      <BookshelfBackdrop className="opacity-70" />
+
+      <header className="relative z-10 flex h-16 items-center justify-between px-4 sm:px-6">
         <BrandMark />
         <ThemeToggle />
       </header>
 
-      <div className="flex flex-1 items-center justify-center px-4 pb-16">
-        <div className="w-full max-w-2xl">
+      <div className="relative z-10 flex flex-1 items-center justify-center px-4 pb-40">
+        <div className="animate-kitap-yukselir w-full max-w-2xl">
           <RoleOnboarding
             fullName={current.profile.full_name}
             email={current.profile.email ?? current.user.email ?? ""}

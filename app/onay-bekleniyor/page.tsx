@@ -27,13 +27,16 @@ export default async function OnayBekleniyorPage() {
   const wanted = profile.requested_role ? roleLabel(profile.requested_role) : "-";
 
   return (
-    <main className="flex min-h-screen flex-col bg-background">
-      <header className="flex h-16 items-center justify-between px-4 sm:px-6">
+    <main className="bg-study relative flex min-h-screen flex-col overflow-hidden bg-background">
+      {/* Bekleme ekrani kullanicinin gunlerce gorebilecegi tek sayfa
+          olabiliyor; ciplak bir zemin yerine ayni kitap dili. */}
+      <div className="bg-shelf pointer-events-none absolute inset-x-0 bottom-0 h-52 opacity-[0.4]" aria-hidden />
+      <header className="relative z-10 flex h-16 items-center justify-between px-4 sm:px-6">
         <BrandMark />
         <ThemeToggle />
       </header>
 
-      <div className="flex flex-1 items-center justify-center px-4 pb-16">
+      <div className="relative z-10 flex flex-1 items-center justify-center px-4 pb-16">
         <div className="w-full max-w-lg rounded-2xl border bg-card p-8 text-center shadow-sm">
           <span
             className={cn(

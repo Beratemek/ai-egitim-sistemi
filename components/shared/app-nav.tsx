@@ -191,13 +191,18 @@ export function RoleCard({ role }: { role: UserRole }) {
   const definition = ROLE_DEFINITIONS[role];
   const Icon = ROLE_ICONS[role];
 
+  /*
+    Rol karti her rolde ayni gorunuyordu; bes panel birbirinden ayirt
+    edilemiyordu. Rolun kendi rengi (ROLE_DEFINITIONS.badgeClass) zaten
+    tanimliydi ama yalnizca rozette kullaniliyordu.
+  */
   return (
-    <div className="rounded-lg border bg-card p-3">
+    <div className={cn("rounded-lg border p-3", definition.badgeClass)}>
       <div className="flex items-center gap-2">
-        <Icon className="h-4 w-4 text-primary" />
-        <p className="text-sm font-medium">{definition.label}</p>
+        <Icon className="h-4 w-4" />
+        <p className="text-sm font-semibold">{definition.label}</p>
       </div>
-      <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+      <p className="mt-1.5 text-xs leading-relaxed opacity-80">
         {definition.description}
       </p>
     </div>

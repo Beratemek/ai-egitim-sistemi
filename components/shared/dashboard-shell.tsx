@@ -5,6 +5,7 @@ import Link from "next/link";
 import { LogOut, Menu, UserRound } from "lucide-react";
 
 import { NavLinks, RoleCard } from "@/components/shared/app-nav";
+import { SideBooks } from "@/components/shared/side-books";
 import { ActiveRoleSwitcher } from "@/components/shared/active-role-switcher";
 import { BrandMark } from "@/components/shared/brand-mark";
 import { ROLE_ICONS } from "@/components/shared/role-icons";
@@ -62,7 +63,12 @@ export function DashboardShell({
     .join("");
 
   return (
-    <div className="bg-paper min-h-screen bg-background">
+    <div className="bg-study min-h-screen bg-background">
+      {/* Genis ekranlarda icerik sutununun iki yanindaki bos seritleri
+          kitap yiginlariyla dolduruyoruz; bkz. SideBooks. */}
+      <SideBooks side="left" />
+      <SideBooks side="right" />
+
       {/* ---------- Masaustu sol menu ---------- */}
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-[264px] flex-col border-r bg-card lg:flex">
         {/* Menunun dibinde ince bir kitap rafi: bos kalan alani urunun
@@ -88,7 +94,7 @@ export function DashboardShell({
       </aside>
 
       {/* ---------- İçerik sutunu ---------- */}
-      <div className="lg:pl-[264px]">
+      <div className="relative z-10 lg:pl-[264px]">
         {/* ---------- Üst cubuk ---------- */}
         <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b bg-background/80 px-4 backdrop-blur-md sm:px-6">
           {/* Mobil cekmece */}
@@ -201,7 +207,7 @@ export function DashboardShell({
           </div>
         </header>
 
-        <main className="mx-auto w-full max-w-[1400px] space-y-6 px-4 py-6 sm:px-6 sm:py-8">
+        <main className="animate-kitap-yukselir mx-auto w-full max-w-[1400px] space-y-6 px-4 py-6 sm:px-6 sm:py-8">
           {children}
         </main>
       </div>

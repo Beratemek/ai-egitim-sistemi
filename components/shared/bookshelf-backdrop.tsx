@@ -16,20 +16,36 @@ export interface BookshelfBackdropProps {
   className?: string;
 }
 
-/** Rafa dizili kitapların genişlik / yükseklik / eğim düzeni. */
-const KITAPLAR: readonly { w: number; h: number; tilt: number; band: boolean }[] = [
-  { w: 26, h: 132, tilt: 0, band: true },
-  { w: 18, h: 118, tilt: 0, band: false },
-  { w: 34, h: 146, tilt: 0, band: true },
-  { w: 14, h: 104, tilt: 0, band: false },
-  { w: 22, h: 138, tilt: -6, band: true },
-  { w: 30, h: 122, tilt: 0, band: false },
-  { w: 16, h: 150, tilt: 0, band: true },
-  { w: 24, h: 112, tilt: 0, band: false },
-  { w: 20, h: 140, tilt: 4, band: true },
-  { w: 32, h: 126, tilt: 0, band: false },
-  { w: 15, h: 108, tilt: 0, band: true },
-  { w: 28, h: 144, tilt: 0, band: false },
+/**
+ * Rafa dizili kitaplar: genişlik / yükseklik / eğim / cilt rengi.
+ *
+ * Renkler tek tek verildi çünkü gerçek bir raf ritimsizdir; sırayla dönen
+ * bir palet "desen" gibi durur, kitap gibi durmaz. Yükseklikler de bilerek
+ * düzensiz.
+ */
+const KITAPLAR: readonly {
+  w: number;
+  h: number;
+  tilt: number;
+  band: boolean;
+  book: number;
+}[] = [
+  { w: 26, h: 132, tilt: 0, band: true, book: 4 },
+  { w: 18, h: 118, tilt: 0, band: false, book: 1 },
+  { w: 34, h: 146, tilt: 0, band: true, book: 3 },
+  { w: 14, h: 104, tilt: 0, band: false, book: 8 },
+  { w: 22, h: 138, tilt: -6, band: true, book: 5 },
+  { w: 30, h: 122, tilt: 0, band: false, book: 2 },
+  { w: 16, h: 150, tilt: 0, band: true, book: 7 },
+  { w: 24, h: 112, tilt: 0, band: false, book: 6 },
+  { w: 20, h: 140, tilt: 4, band: true, book: 1 },
+  { w: 32, h: 126, tilt: 0, band: false, book: 4 },
+  { w: 15, h: 108, tilt: 0, band: true, book: 2 },
+  { w: 28, h: 144, tilt: 0, band: false, book: 3 },
+  { w: 21, h: 130, tilt: 0, band: true, book: 8 },
+  { w: 36, h: 116, tilt: 0, band: false, book: 5 },
+  { w: 17, h: 148, tilt: -3, band: true, book: 6 },
+  { w: 27, h: 124, tilt: 0, band: false, book: 7 },
 ];
 
 export function BookshelfBackdrop({
@@ -60,7 +76,7 @@ export function BookshelfBackdrop({
       <svg
         viewBox={`0 0 ${genislik} ${TABAN + 12}`}
         preserveAspectRatio="xMidYMax slice"
-        className="h-[180px] w-full text-foreground/[0.07] sm:h-[220px]"
+        className="h-[190px] w-full sm:h-[240px]"
         role="presentation"
       >
         {/* Rafın kendisi */}
@@ -69,8 +85,9 @@ export function BookshelfBackdrop({
           y={TABAN}
           width={genislik}
           height="6"
-          fill="currentColor"
-          opacity="0.9"
+          rx="2"
+          fill="hsl(var(--foreground))"
+          opacity="0.28"
         />
 
         {raflar.map((kitap, index) => {
@@ -79,6 +96,8 @@ export function BookshelfBackdrop({
           return (
             <g
               key={index}
+              className="animate-kitap-yukselir"
+              style={{ animationDelay: `${index * 45}ms` }}
               transform={
                 kitap.tilt
                   ? `rotate(${kitap.tilt} ${kitap.x + kitap.w / 2} ${TABAN})`
@@ -92,8 +111,8 @@ export function BookshelfBackdrop({
                 width={kitap.w}
                 height={kitap.h}
                 rx="2"
-                fill="currentColor"
-                opacity={0.55 + ((index % 4) * 0.12)}
+                fill={`hsl(var(--book-${kitap.book}))`}
+                opacity="0.42"
               />
 
               {/* Sırttaki iki şerit: kitabı "kutu"dan ayıran ayrıntı */}
@@ -105,7 +124,7 @@ export function BookshelfBackdrop({
                     width={kitap.w - 6}
                     height="3"
                     fill="hsl(var(--background))"
-                    opacity="0.55"
+                    opacity="0.7"
                   />
                   <rect
                     x={kitap.x + 3}
@@ -113,7 +132,7 @@ export function BookshelfBackdrop({
                     width={kitap.w - 6}
                     height="3"
                     fill="hsl(var(--background))"
-                    opacity="0.55"
+                    opacity="0.7"
                   />
                 </>
               ) : null}
@@ -126,7 +145,7 @@ export function BookshelfBackdrop({
                   width="2"
                   height={kitap.h - 58}
                   fill="hsl(var(--background))"
-                  opacity="0.35"
+                  opacity="0.5"
                 />
               ) : null}
             </g>
