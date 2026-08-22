@@ -99,6 +99,7 @@ export default async function SinavDetayPage({
       <ExamClassroomAssign
         examId={examId}
         classrooms={classrooms}
+        proctored={detail.exam.proctored}
         canPersist={isSupabaseConfigured}
       />
 

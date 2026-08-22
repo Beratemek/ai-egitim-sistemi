@@ -153,6 +153,13 @@ export type Exam = {
    * tum egitmenlere aciktir.
    */
   subject: string | null;
+  /**
+   * Sinav kamera+mikrofon acikken mi cozulecek?
+   *
+   * Egitmen belirler. Acikken ogrenci once kamera kontrolunden gecer ve
+   * sinav boyunca akis kapanirsa cevap veremez.
+   */
+  proctored: boolean;
   instructor_id: string;
   is_published: boolean;
   starts_at: string | null;
@@ -392,6 +399,7 @@ export interface Database {
           | "starts_at"
           | "ends_at"
           | "subject"
+          | "proctored"
         >
       >;
       exam_questions: TableDefinition<

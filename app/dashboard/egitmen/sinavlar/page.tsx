@@ -4,6 +4,7 @@ import {
   ArrowRight,
   BookMarked,
   CalendarClock,
+  Camera,
   FileText,
   Library,
 } from "lucide-react";
@@ -90,6 +91,12 @@ export default async function SinavlarPage() {
                       <span className="flex items-center gap-1.5">
                         <BookMarked className="h-3.5 w-3.5" />
                         {exam.subject}
+                      </span>
+                    ) : null}
+                    {exam.proctored ? (
+                      <span className="flex items-center gap-1.5 text-amber-600 dark:text-amber-500">
+                        <Camera className="h-3.5 w-3.5" />
+                        Kamera zorunlu
                       </span>
                     ) : null}
                     <span className="flex items-center gap-1.5">

@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import {
   ArrowLeft,
   CalendarClock,
+  Camera,
   CheckCircle2,
   Clock3,
   Hourglass,
@@ -15,6 +16,7 @@ import { ExamCountdown } from "@/components/shared/exam-countdown";
 import { ExamFinalizePanel } from "@/components/shared/exam-finalize-panel";
 import { ExamStartPanel } from "@/components/shared/exam-start-panel";
 import { PageHeader } from "@/components/shared/page-header";
+import { ProctoringGate } from "@/components/shared/proctoring-gate";
 import { StudentExamQuestions } from "@/components/shared/student-exam-questions";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -104,7 +106,17 @@ export default async function OgrenciSinavPage({
       <PageHeader
         title={exam.title}
         description={exam.description || "Soruları yanıtlayın."}
-        actions={<ExamStatusBadge status={status} />}
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            {exam.proctored ? (
+              <Badge variant="warning" className="gap-1.5">
+                <Camera className="h-3.5 w-3.5" />
+                Kamera zorunlu
+              </Badge>
+            ) : null}
+            <ExamStatusBadge status={status} />
+          </div>
+        }
       />
 
       {lockReason ? <ExamAvailabilityNotice status={status} message={lockReason} /> : null}
@@ -187,14 +199,17 @@ export default async function OgrenciSinavPage({
           </CardContent>
         </Card>
       ) : (
-        <StudentExamQuestions
-          examId={exam.id}
-          studentId={current.user.id}
-          questions={questions}
-          submissions={submissions}
-          disabledReason={canAnswer ? null : lockReason}
-          revealResults={status === "sonuclandi"}
-        />
+        withProctoring(
+          exam.proctored,
+          <StudentExamQuestions
+            examId={exam.id}
+            studentId={current.user.id}
+            questions={questions}
+            submissions={submissions}
+            disabledReason={canAnswer ? null : lockReason}
+            revealResults={status === "sonuclandi"}
+          />,
+        )
       )}
     </>
   );
@@ -296,4 +311,14 @@ function ExamAvailabilityNotice({
       <p className="text-sm leading-relaxed">{message}</p>
     </div>
   );
+}
+
+/**
+ * Kamera zorunlu sinavlari denetim kapisinin arkasina alir.
+ *
+ * Zorunlu degilse ekran oldugu gibi kalir; sarmalayici yalnizca gerektiginde
+ * devreye girer, boylece kamerasiz sinavlar hicbir ek adim gormez.
+ */
+function withProctoring(proctored: boolean, exam: React.ReactNode) {
+  return proctored ? <ProctoringGate>{exam}</ProctoringGate> : exam;
 }

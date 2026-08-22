@@ -312,3 +312,43 @@ export async function setExamSubject(
   revalidateExamPaths(examId);
   return { ok: true, data: { subject: updated[0]?.subject ?? null } };
 }
+
+/**
+ * Sinavda kamera+mikrofon zorunlulugunu belirler.
+ *
+ * Ayar sinav basinadir, atama basina degil: ayni sinavin bir derslikte
+ * kamerali, digerinde kamerasiz cozulmesi hem denetimi anlamsizlastirir hem
+ * de ayni kagidin iki farkli kosulda cozulmesi demektir.
+ */
+export async function setExamProctored(
+  examId: string,
+  proctored: boolean,
+): Promise<ActionResult<{ proctored: boolean }>> {
+  if (!isSupabaseConfigured) return demoGuard();
+  if (!examId) return { ok: false, error: "Sinav secilmedi." };
+
+  const supabase = await createServerSupabaseClient();
+
+  // `.select()` sart: RLS eslesmezse PostgREST hata dondurmez, sessizce
+  // 0 satir gunceller ve egitmen "kaydedildi" sanir.
+  const { data: updated, error } = await supabase
+    .from("exams")
+    .update({ proctored })
+    .eq("id", examId)
+    .select("id, proctored");
+
+  if (error) return { ok: false, error: error.message };
+
+  if (!updated || updated.length === 0) {
+    return {
+      ok: false,
+      error:
+        "Ayar kaydedilemedi: bu sinav uzerinde yetkiniz yok ya da sinav artik mevcut degil.",
+    };
+  }
+
+  revalidateExamPaths(examId);
+  revalidatePath("/dashboard/ogrenci", "layout");
+
+  return { ok: true, data: { proctored: updated[0]?.proctored ?? proctored } };
+}

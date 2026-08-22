@@ -44,5 +44,6 @@ Atlanan bir adım "function does not exist" hatası verir.
 |---|---|---|
 | `BEKLEYEN-1-tum-dersler-yetkisi.sql` | Eğitmene "Tüm dersler" yetkisi verilebilir | Bunsuz seçenek arayüzde görünür ama işe yaramaz |
 | `BEKLEYEN-2-sinifsiz-ogrenci-sinav-cozemez.sql` | Sınıfı olmayan öğrenciye sınav atanamaz ve sınava giremez | Bunsuz eski atamalar duruyor ve sınıfsız öğrenci sınav çözebiliyor |
+| `BEKLEYEN-3-kamera-zorunlulugu.sql` | `exams.proctored` sütunu | Bunsuz kamera anahtarı kaydedilemez (sütun yok) |
 
 Çalıştırıp çalıştırmadığından emin değilsen tekrar çalıştır — zararı yok.
