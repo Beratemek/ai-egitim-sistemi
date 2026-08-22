@@ -51,4 +51,4 @@ kontrol eder ve eksik olanı söyler. Dosyanın `uygulandi/` klasörüne taşın
 olup olmaması yalnızca bir defter kaydıdır; SQL'i çalıştırdığında dosya
 kendiliğinden taşınmaz. Tek doğru ölçüt şemanın kendisi.
 
-Şu an: **bekleyen yok** (15/15 uygulanmış).
+Şu an: **bekleyen yok** (17/17 uygulanmış).

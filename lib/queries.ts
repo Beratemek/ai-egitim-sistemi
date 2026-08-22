@@ -10,6 +10,8 @@ import { cache } from "react";
 
 import { isSupabaseConfigured } from "@/lib/env";
 import { ALL_SUBJECTS, subjectKey } from "@/lib/subjects";
+import { selectStyleScope, type StyleScopeInput } from "@/lib/style-scope";
+import { analyzeOutcomes, type OutcomeAnalysisRow } from "@/lib/outcome-analysis";
 import {
   MOCK_EXAMS,
   MOCK_OUTCOMES,
@@ -31,6 +33,7 @@ import type {
   ExamAttempt,
   ExamStatistics,
   LearningOutcome,
+  PreferenceStats,
   Question,
   QuestionOption,
   QuestionStatus,
@@ -39,6 +42,7 @@ import type {
   Submission,
   UserProfile,
 } from "@/lib/types";
+import type { QuestionVisual } from "@/lib/visual";
 
 /**
  * Ogrencinin cevaplarini sonuc gorunurluk kurallarindan geciren RPC'den okur.
@@ -374,6 +378,13 @@ export interface StudentQuestion {
   text: string;
   type: QuestionType;
   options_json: QuestionOption[] | null;
+  /**
+   * Soru gorseli.
+   *
+   * Guvenli RPC bu alani ancak gorsel migration'i uygulandiktan sonra
+   * donduruyor; oncesinde undefined gelir ve `?? null` ile bosaltilir.
+   */
+  visual_json: QuestionVisual | null;
   position: number;
   points: number;
 }
@@ -405,6 +416,7 @@ export async function getStudentExamDetail(
           text: question.text,
           type: question.type,
           options_json: question.options_json,
+          visual_json: question.visual_json,
           position: index,
           points: 10,
         }),
@@ -494,7 +506,7 @@ export async function getStudentExamDetail(
   const legacyQuestionsResult = safeQuestionsResult.error
     ? await supabase
         .from("questions")
-        .select("id, topic, text, type, options_json")
+        .select("id, topic, text, type, options_json, visual_json")
         .in("id", questionIds)
     : null;
   const questions = safeQuestionsResult.error
@@ -513,6 +525,7 @@ export async function getStudentExamDetail(
         text: question.text,
         type: question.type,
         options_json: question.options_json,
+        visual_json: question.visual_json ?? null,
         position: link.position,
         points: link.points,
       };
@@ -894,50 +907,97 @@ export async function getScoreTrend(): Promise<ScoreTrendPoint[]> {
  * Modele few-shot olarak verilecegi icin sayi bilincli olarak sinirlidir -
  * cok fazla ornek baglami sisirir ve maliyeti artirir.
  */
-export async function getStyleGuide(limit = 6): Promise<StyleGuide> {
-  if (!isSupabaseConfigured) return { liked: [], disliked: [] };
+/** En fazla kac gecmis kayit taranir. Tek sorgu, bellekte kapsama ayrilir. */
+const TARAMA_SINIRI = 200;
+
+/**
+ * Icerik uzmaninin tarz hafizasini KAPSAMA GORE getirir.
+ *
+ * Onceden hicbir filtre yoktu: son 6 begeni + son 6 red, ders ayrimi olmadan
+ * modele gidiyordu. Sonuc, tarih dersinde "sozel olsun" diye verilen geri
+ * bildirimin matematik uretimini de sekillendirmesiydi - iki dersin soru
+ * tarzi ayni olmadigi icin bu bir kusurdu.
+ *
+ * Kademeli daralma:
+ *
+ *   1. AYNI DERS + AYNI KONU  - en az 2 ornek varsa yalnizca bunlar
+ *   2. AYNI DERS              - en az 1 ornek varsa yalnizca bunlar
+ *   3. GENEL                  - ders hakkinda hic geri bildirim yoksa
+ *
+ * 3. adima yalnizca ders TAMAMEN bossa dusuluyor: o derste tek bir ornek bile
+ * varsa baska derslerin tarzi karismiyor. Hicbir ornek olmamasi, yanlis
+ * dersin ornegini almaktan iyi degil - bu yuzden son basamak duruyor.
+ */
+export async function getStyleGuide(
+  scope: StyleScopeInput = {},
+  limit = 6,
+): Promise<StyleGuide> {
+  if (!isSupabaseConfigured) return { liked: [], disliked: [], scope: "genel" };
 
   const supabase = await createServerSupabaseClient();
 
-  const [liked, disliked] = await Promise.all([
-    supabase
-      .from("question_preferences")
-      .select("*")
-      .eq("verdict", "begendi")
-      .order("created_at", { ascending: false })
-      .limit(limit),
-    supabase
-      .from("question_preferences")
-      .select("*")
-      .eq("verdict", "begenmedi")
-      .order("created_at", { ascending: false })
-      .limit(limit),
-  ]);
+  // Tek sorgu: kapsam ayrimi bellekte yapiliyor. Tablo kullaniciya ozel
+  // (RLS user_id = auth.uid()), bu yuzden satir sayisi kucuk kaliyor.
+  const { data } = await supabase
+    .from("question_preferences")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(TARAMA_SINIRI);
 
-  return { liked: liked.data ?? [], disliked: disliked.data ?? [] };
+  const { rows, scope: resolvedScope } = selectStyleScope(data ?? [], scope);
+
+  return {
+    liked: rows.filter((row) => row.verdict === "begendi").slice(0, limit),
+    disliked: rows.filter((row) => row.verdict === "begenmedi").slice(0, limit),
+    scope: resolvedScope,
+  };
 }
 
 /** Tercih istatistikleri - arayuzde "AI su kadar ornekten ogrendi" gostergesi. */
-export async function getPreferenceStats(): Promise<{
-  liked: number;
-  disliked: number;
-}> {
-  if (!isSupabaseConfigured) return { liked: 0, disliked: 0 };
+export async function getPreferenceStats(): Promise<PreferenceStats> {
+  if (!isSupabaseConfigured) return { liked: 0, disliked: 0, bySubject: {} };
 
   const supabase = await createServerSupabaseClient();
 
-  const [liked, disliked] = await Promise.all([
-    supabase
-      .from("question_preferences")
-      .select("*", { count: "exact", head: true })
-      .eq("verdict", "begendi"),
-    supabase
-      .from("question_preferences")
-      .select("*", { count: "exact", head: true })
-      .eq("verdict", "begenmedi"),
-  ]);
+  // Kirilim gerektigi icin sayac sorgusu (head: true) yetmiyor; ders ve
+  // karar sutunlari okunup bellekte toplaniyor.
+  const { data, error } = await supabase
+    .from("question_preferences")
+    .select("subject, verdict");
 
-  return { liked: liked.count ?? 0, disliked: disliked.count ?? 0 };
+  /*
+    `subject` sutunu migration ile geliyor. SQL henuz calistirilmadiysa
+    PostgREST "column does not exist" dondurur ve bu sayfa tumuyle patlardi.
+    O durumda kirilimsiz sayima dusuluyor: arayuz "ders bazli ornek yok" der,
+    calismaya devam eder.
+  */
+  if (error) {
+    const { data: fallback } = await supabase
+      .from("question_preferences")
+      .select("verdict");
+
+    return (fallback ?? []).reduce<PreferenceStats>(
+      (stats, row) => {
+        stats[row.verdict === "begendi" ? "liked" : "disliked"] += 1;
+        return stats;
+      },
+      { liked: 0, disliked: 0, bySubject: {} },
+    );
+  }
+
+  const stats: PreferenceStats = { liked: 0, disliked: 0, bySubject: {} };
+
+  for (const row of data ?? []) {
+    const field = row.verdict === "begendi" ? "liked" : "disliked";
+    stats[field] += 1;
+
+    if (!row.subject) continue;
+    const key = subjectKey(row.subject);
+    const bucket = (stats.bySubject[key] ??= { liked: 0, disliked: 0 });
+    bucket[field] += 1;
+  }
+
+  return stats;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -1319,4 +1379,29 @@ export async function getInstructorSubjectMap(): Promise<Record<string, string[]
   }
 
   return map;
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Kazanim bazli analiz                                                      */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Kazanim bazli basari tablosu.
+ *
+ * Uc kaynak birlestiriliyor: kazanimlar, sorular (kazanim baglantisi icin) ve
+ * cevaplar. Uc ayri sorgu yerine mevcut okuma fonksiyonlari kullaniliyor;
+ * `getQuestions` React `cache()` ile sarilmis oldugu icin ayni istekte ikinci
+ * kez cagrilirsa veritabanina gitmiyor.
+ *
+ * Gruplama mantigi `lib/outcome-analysis.ts` icinde ve saf - burada yalnizca
+ * veri toplaniyor.
+ */
+export async function getOutcomeAnalysis(): Promise<OutcomeAnalysisRow[]> {
+  const [outcomes, questions, submissions] = await Promise.all([
+    getOutcomes(),
+    getQuestions(),
+    getSubmissions(),
+  ]);
+
+  return analyzeOutcomes(outcomes, questions, submissions);
 }

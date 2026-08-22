@@ -3,7 +3,7 @@
  * `supabase/schema.sql` ile birebir hizali tutulmalidir.
  */
 
-import type { DeneyapCategory } from "@/lib/deneyap";
+import type { QuestionVisual } from "@/lib/visual";
 
 /* -------------------------------------------------------------------------- */
 /*  Roller                                                                    */
@@ -81,6 +81,14 @@ export type ExamAttemptStatus = (typeof EXAM_ATTEMPT_STATUSES)[number];
 export type QuestionOption = {
   key: string; // "A" | "B" | "C" | "D"
   text: string;
+  /**
+   * Sikkin kendi gorseli.
+   *
+   * "Soru sozel, siklar gorsel olabilir" durumunu karsilar: soru metni
+   * yazili, siklar birer sema ya da grafik. `options_json` zaten jsonb
+   * oldugu icin ayri bir sutun gerekmiyor.
+   */
+  visual?: QuestionVisual | null;
 };
 
 export type UserProfile = {
@@ -110,8 +118,20 @@ export type UserProfile = {
 
 export type LearningOutcome = {
   id: string;
-  /** DENEYAP atolye dali. */
-  category: DeneyapCategory | null;
+  /**
+   * ESKI SUTUN - artik yazilmiyor.
+   *
+   * Once "atolye dali" diye DENEYAP'a ozel bir kademe vardi. Urun tek bir
+   * kuruma bagli olmadigi icin kaldirildi; kirilim ders -> konu oldu. Sutun
+   * eski kayitlarin degerini korumak icin duruyor, arayuzde hicbir yerde
+   * gosterilmiyor ve yeni kayitlarda null.
+   */
+  category: string | null;
+  /**
+   * Kazanimin ait oldugu ders. Uretim formunda kazanim listesi bununla
+   * suzuluyor. Eski kayitlarda null olabilir.
+   */
+  subject: string | null;
   topic: string;
   outcome_text: string;
   source_text: string;
@@ -121,9 +141,9 @@ export type LearningOutcome = {
 
 export type Question = {
   id: string;
-  /** DENEYAP atolye dali (bkz. lib/deneyap.ts). Eski kayitlarda null olabilir. */
-  category: DeneyapCategory | null;
-  /** Ders adi. Havuz "dal -> ders -> konu -> soru" olarak kirilir. */
+  /** ESKI SUTUN - artik yazilmiyor, arayuzde gosterilmiyor. */
+  category: string | null;
+  /** Ders adi. Havuz "ders -> konu -> soru" olarak kirilir. */
   subject: string;
   topic: string;
   text: string;
@@ -134,6 +154,12 @@ export type Question = {
   correct_answer: string | null;
   /** Sadece `type === "acik_uclu"` icin dolu. */
   rubric: string | null;
+  /**
+   * Soru govdesine eklenen gorsel (grafik / sema / fotograf).
+   * Bicim: `lib/visual.ts` icindeki `QuestionVisual`. Gorseli olmayan
+   * sorularda null.
+   */
+  visual_json: QuestionVisual | null;
   status: QuestionStatus;
   outcome_id: string | null;
   created_by: string | null;
@@ -263,6 +289,13 @@ export type QuestionPreference = {
   verdict: PreferenceVerdict;
   question_text: string;
   question_type: QuestionType;
+  /**
+   * Geri bildirimin verildigi ders. `getStyleGuide()` once AYNI DERSIN
+   * orneklerini modele verir; eski kayitlarda null olabilir.
+   */
+  subject: string | null;
+  /** ESKI SUTUN - artik yazilmiyor. */
+  category: string | null;
   topic: string;
   difficulty: string;
   options_json: QuestionOption[] | null;
@@ -272,10 +305,45 @@ export type QuestionPreference = {
   created_at: string;
 };
 
+/**
+ * Tarz rehberinin hangi kapsamdan toplandigi.
+ *
+ * `getStyleGuide()` kademeli olarak daraltir: once ayni ders + ayni konu,
+ * yeterli ornek yoksa ayni ders, o da yoksa genel. Model promptunda hangi
+ * kapsamin kullanildigi yaziliyor - "bu ornekler ayni konudan" bilgisi
+ * modelin ornege ne kadar yaklasmasi gerektigini belirliyor.
+ */
+export type StyleScope = "konu" | "ders" | "genel";
+
+/** Tek bir kapsamdaki begeni/red sayilari. */
+export interface PreferenceCount {
+  liked: number;
+  disliked: number;
+}
+
+/**
+ * Tercih istatistikleri.
+ *
+ * Tipler burada duruyor cunku uretim formu (istemci bileseni) bunlari
+ * kullaniyor; `lib/queries.ts` sunucu tarafli ve istemciye alinamaz.
+ */
+export interface PreferenceStats extends PreferenceCount {
+  /**
+   * Ders adina gore kirilim. Uretim formu yazilan derse gore "bu derste N
+   * ornekten ogrenildi" yazabilmek icin bunu kullanir; canli sorgu yerine
+   * tek seferde gonderiliyor.
+   *
+   * Anahtar `subjectKey()` ile normalize edilmis ders adi.
+   */
+  bySubject: Record<string, PreferenceCount>;
+}
+
 /** Modele few-shot olarak verilecek ornek kumesi. */
 export interface StyleGuide {
   liked: QuestionPreference[];
   disliked: QuestionPreference[];
+  /** Orneklerin toplandigi kapsam; prompt'a ve arayuze yazilir. */
+  scope: StyleScope;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -292,6 +360,11 @@ export interface GeneratedQuestion {
   rubric: string | null;
   /** Modelin kendi zorluk tahmini. */
   difficulty: "kolay" | "orta" | "zor";
+  /**
+   * Soruya eklenecek gorsel; model uretmediyse ya da urettigi gorsel
+   * dogrulamayi gecemediyse null.
+   */
+  visual: QuestionVisual | null;
 }
 
 /** `gradeAnswer` ciktisi. */
@@ -317,14 +390,25 @@ export type ApiResponse<T> =
   | { ok: true; data: T }
   | { ok: false; error: string };
 
+/**
+ * Istenen zorluk seviyesi.
+ *
+ * "karisik" -> model kolay/orta/zor dengesi kurar. Brief'in 2. maddesi
+ * seviyeyi EGITMENIN tanimlamasini istiyor; onceden yalnizca modelin kendi
+ * tahmini vardi ve talep edilemiyordu.
+ */
+export type DifficultyChoice = "kolay" | "orta" | "zor" | "karisik";
+
 export interface GenerateQuestionsRequest {
   context: string;
   kazanim: string;
-  /** DENEYAP atolye dali. */
-  category?: DeneyapCategory;
+  /** Ders adi. Tarz hafizasi bu dersin orneklerinden secilir. */
+  subject?: string;
   topic?: string;
   count?: number;
   type?: QuestionType | "karisik";
+  /** Talep edilen zorluk. Verilmezse "karisik". */
+  difficulty?: DifficultyChoice;
 }
 
 export interface ReviseQuestionRequest {
@@ -338,8 +422,6 @@ export interface ReviseQuestionRequest {
   kazanim?: string;
   /** Kaynak metin - model bilgi uydurmasin. */
   context?: string;
-  /** DENEYAP atolye dali. */
-  category?: DeneyapCategory;
 }
 
 export interface GradeAnswerRequest {
@@ -382,7 +464,7 @@ export interface Database {
         LearningOutcome,
         Insertable<
           LearningOutcome,
-          "id" | "created_at" | "created_by" | "source_text" | "category"
+          "id" | "created_at" | "created_by" | "source_text" | "category" | "subject"
         >
       >;
       questions: TableDefinition<
@@ -402,6 +484,7 @@ export interface Database {
           | "options_json"
           | "correct_answer"
           | "rubric"
+          | "visual_json"
         >
       >;
       exams: TableDefinition<
@@ -472,6 +555,8 @@ export interface Database {
           QuestionPreference,
           | "id"
           | "created_at"
+          | "subject"
+          | "category"
           | "topic"
           | "difficulty"
           | "options_json"
@@ -570,6 +655,7 @@ export interface Database {
           text: string;
           type: QuestionType;
           options_json: QuestionOption[] | null;
+          visual_json: QuestionVisual | null;
           outcome_id: string | null;
           position: number;
           points: number;
@@ -581,7 +667,12 @@ export interface Database {
       };
     };
     Enums: {
-      deneyap_category: DeneyapCategory;
+      /**
+       * ESKI ENUM - `questions.category` bu tipte, ama artik hicbir yere
+       * yazilmiyor. Veritabaninda duruyor cunku eski kayitlar degerini
+       * tasiyor; TypeScript tarafinda dar bir birlesim tutmanin faydasi yok.
+       */
+      deneyap_category: string;
       user_role: UserRole;
       role_status: RoleStatus;
       question_type: QuestionType;

@@ -31,7 +31,6 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import { categoryLabel } from "@/lib/deneyap";
 import { cn } from "@/lib/utils";
 import type { Exam, Question } from "@/lib/types";
 
@@ -216,7 +215,6 @@ export function ExamBuilder({
                   <p className="text-sm font-medium leading-relaxed">{question.text}</p>
                   <div className="flex flex-wrap items-center gap-2">
                     <QuestionTypeBadge type={question.type} />
-                    <Badge variant="soft">{categoryLabel(question.category)}</Badge>
                     <span className="text-xs text-muted-foreground">
                       {question.topic}
                     </span>
@@ -345,7 +343,6 @@ export function ExamBuilder({
                         </span>
                         <span className="flex flex-wrap items-center gap-2">
                           <QuestionTypeBadge type={question.type} />
-                          <Badge variant="soft">{categoryLabel(question.category)}</Badge>
                           <span className="text-xs text-muted-foreground">
                             {question.topic}
                           </span>

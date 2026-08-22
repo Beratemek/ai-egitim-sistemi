@@ -81,6 +81,7 @@ export const MOCK_OUTCOMES: readonly LearningOutcome[] = [
   {
     id: "10000000-0000-4000-8000-000000000001",
     category: null,
+    subject: "Biyoloji",
     topic: "Fotosentez",
     outcome_text: "Ogrenci fotosentezin isik ve karanlik evrelerini aciklar.",
     source_text:
@@ -91,6 +92,7 @@ export const MOCK_OUTCOMES: readonly LearningOutcome[] = [
   {
     id: "10000000-0000-4000-8000-000000000002",
     category: null,
+    subject: "Fizik",
     topic: "Newton Yasalari",
     outcome_text: "Ogrenci Newton'un hareket yasalarini ornekle aciklar.",
     source_text:
@@ -116,6 +118,7 @@ export const MOCK_QUESTIONS: readonly Question[] = [
     ],
     correct_answer: "B",
     rubric: null,
+    visual_json: null,
     status: "onayli",
     outcome_id: "10000000-0000-4000-8000-000000000001",
     created_by: "00000000-0000-4000-8000-000000000001",
@@ -138,6 +141,7 @@ export const MOCK_QUESTIONS: readonly Question[] = [
       "2. CO2 tutulmasi ve karbon indirgenmesini aciklar (40 puan)",
       "3. ATP ve NADPH kullanimina deginir (30 puan)",
     ].join("\n"),
+    visual_json: null,
     status: "taslak",
     outcome_id: "10000000-0000-4000-8000-000000000001",
     created_by: "00000000-0000-4000-8000-000000000001",
@@ -161,6 +165,7 @@ export const MOCK_QUESTIONS: readonly Question[] = [
     ],
     correct_answer: "B",
     rubric: null,
+    visual_json: null,
     status: "taslak",
     outcome_id: "10000000-0000-4000-8000-000000000002",
     created_by: "00000000-0000-4000-8000-000000000001",
@@ -183,6 +188,7 @@ export const MOCK_QUESTIONS: readonly Question[] = [
       "2. Kuvvetlerin farkli cisimlere etki ettigini vurgular (30 puan)",
       "3. Gecerli bir gunluk hayat ornegi verir (20 puan)",
     ].join("\n"),
+    visual_json: null,
     status: "onayli",
     outcome_id: "10000000-0000-4000-8000-000000000002",
     created_by: "00000000-0000-4000-8000-000000000001",
@@ -206,6 +212,7 @@ export const MOCK_QUESTIONS: readonly Question[] = [
     ],
     correct_answer: "C",
     rubric: null,
+    visual_json: null,
     status: "reddedildi",
     outcome_id: "10000000-0000-4000-8000-000000000001",
     created_by: "00000000-0000-4000-8000-000000000001",

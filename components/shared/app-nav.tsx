@@ -50,7 +50,7 @@ const BASE_NAV = {
       href: "/dashboard/egitmen/soru-havuzu",
       label: "Soru Havuzu",
       icon: Library,
-      description: "Dal bazlı havuz, sınava soru ekle",
+      description: "Ders bazlı havuz, sınava soru ekle",
     },
     {
       href: "/dashboard/egitmen/kontrol",

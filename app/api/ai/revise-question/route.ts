@@ -6,7 +6,6 @@ import {
 } from "@/lib/ai";
 import { describeAiError } from "@/lib/ai";
 import { jsonError, jsonOk, readJson, requireRole } from "@/lib/api";
-import { categoryLabel, isDeneyapCategory } from "@/lib/deneyap";
 import type { GeneratedQuestion, ReviseQuestionRequest } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -18,7 +17,7 @@ const MAX_INSTRUCTION = 500;
 /**
  * POST /api/ai/revise-question
  *
- * Govde: { question, preset? | instruction?, kazanim?, context?, category? }
+ * Govde: { question, preset? | instruction?, kazanim?, context? }
  * Yanit: { ok: true, data: GeneratedQuestion }
  *
  * `preset` hazir talimatlardan birini (zorlastir, kolaylastir, kisalt,
@@ -71,9 +70,6 @@ export async function POST(request: Request) {
       {
         ...(body.kazanim ? { kazanim: body.kazanim } : {}),
         ...(body.context ? { context: body.context } : {}),
-        ...(isDeneyapCategory(body.category)
-          ? { categoryLabel: categoryLabel(body.category) }
-          : {}),
       },
     );
 

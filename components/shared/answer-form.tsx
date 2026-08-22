@@ -11,6 +11,7 @@ import {
 import { toast } from "sonner";
 
 import { submitAnswer, type SubmitAnswerResult } from "@/app/actions/submissions";
+import { QuestionVisual } from "@/components/shared/question-visual";
 import { SubmissionStatusBadge } from "@/components/shared/status-badge";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
@@ -241,7 +242,16 @@ export function AnswerForm({
                   >
                     {option.key}
                   </span>
-                  <span className="min-w-0 flex-1">{option.text}</span>
+                  <span className="min-w-0 flex-1">
+                    {option.text}
+                    {option.visual ? (
+                      <QuestionVisual
+                        visual={option.visual}
+                        compact
+                        className="mt-2"
+                      />
+                    ) : null}
+                  </span>
                 </button>
               );
             })}

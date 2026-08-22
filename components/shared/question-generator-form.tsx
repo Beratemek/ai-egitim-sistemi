@@ -5,6 +5,7 @@ import {
   Brain,
   Loader2,
   Sparkles,
+  Target,
   TriangleAlert,
   UploadCloud,
   Wand2,
@@ -12,11 +13,7 @@ import {
 import { toast } from "sonner";
 
 import { saveGeneratedQuestions } from "@/app/actions/questions";
-import {
-  DENEYAP_CATEGORY_OPTIONS,
-  categoryLabel,
-  type DeneyapCategory,
-} from "@/lib/deneyap";
+import { subjectKey } from "@/lib/subjects";
 import { GeneratedQuestionCard } from "@/components/shared/generated-question-card";
 import { SourceTextField } from "@/components/shared/source-text-field";
 import { Badge } from "@/components/ui/badge";
@@ -40,12 +37,33 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import type {
   ApiResponse,
+  DifficultyChoice,
   GenerateQuestionsRequest,
   GeneratedQuestion,
+  LearningOutcome,
+  PreferenceStats,
   QuestionType,
 } from "@/lib/types";
 
 type TypeChoice = QuestionType | "karisik";
+
+/**
+ * Kazanim secicisinde "kayitli kazanim kullanmiyorum" secenegi.
+ *
+ * Select bileseni bos dizeyi deger olarak kabul etmedigi icin ayri bir
+ * anahtar kullaniliyor.
+ */
+const SERBEST_KAZANIM = "__serbest__";
+
+/** "Daha fazla goster" ile her tiklamada kac taslak daha acilir (2 satir). */
+const BATCH_SIZE = 4;
+
+const DIFFICULTY_OPTIONS: readonly { value: DifficultyChoice; label: string }[] = [
+  { value: "karisik", label: "Karisik" },
+  { value: "kolay", label: "Kolay" },
+  { value: "orta", label: "Orta" },
+  { value: "zor", label: "Zor" },
+];
 
 /**
  * Toplu revizyon dugmeleri. Serbest metin bilincli olarak Yok: "sunu sunu
@@ -62,10 +80,21 @@ const BULK_PRESETS: readonly { key: string; label: string }[] = [
 export interface QuestionGeneratorFormProps {
   /** Havuzda halihazirda kullanılan ders adlari; öneri olarak sunulur. */
   subjects?: readonly string[];
-  /** AI'in bugune kadar ogrendigi örnek sayilari. */
-  preferenceStats: { liked: number; disliked: number };
+  /** Tanimli kazanimlar; uretimin olcme hedefi buradan secilir. */
+  outcomes?: readonly LearningOutcome[];
+  /** AI'in bugune kadar ogrendigi örnek sayilari (ders kirilimiyla). */
+  preferenceStats: PreferenceStats;
   /** Supabase yoksa kaydetme kapali olur. */
   canPersist: boolean;
+  /**
+   * Baslangicta secili gelecek kazanim.
+   *
+   * Egitmen panelindeki kazanim analizinden "bu kazanima tekrar sorusu uret"
+   * baglantisiyla geliniyor; hoca listede kazanimi tekrar aramak zorunda
+   * kalmasin. Analiz -> uretim -> olcme -> analiz dongusunun kapandigi yer
+   * burasi.
+   */
+  initialOutcomeId?: string;
 }
 
 /**
@@ -73,19 +102,30 @@ export interface QuestionGeneratorFormProps {
  * uretmesini saglar.
  *
  * Üretilen her taslak begenilebilir/reddedilebilir; bu geri bildirim
- * `question_preferences` tablosuna yazilir ve bir sonraki üretimde modele
- * örnek olarak verilir. Begenilen taslaklar tek tikla havuza gönderilir.
+ * `question_preferences` tablosuna yazilir ve bir sonraki üretimde AYNI
+ * DERSIN uretiminde modele örnek olarak verilir. Begenilen taslaklar tek
+ * tikla havuza gönderilir.
  */
 export function QuestionGeneratorForm({
   subjects = [],
+  outcomes = [],
   preferenceStats,
   canPersist,
+  initialOutcomeId,
 }: QuestionGeneratorFormProps) {
-  /** DENEYAP atölye dalı - üretilen sorular bu dala baglanir. */
-  const [category, setCategory] = React.useState<DeneyapCategory | "">("");
-  const [subject, setSubject] = React.useState("");
-  const [topic, setTopic] = React.useState("");
-  const [kazanim, setKazanim] = React.useState("");
+  /**
+   * Adres satirindan gelen kazanim. Gecersiz kimlik sessizce yok sayilir -
+   * eski bir baglanti ya da silinmis bir kazanim formu kilitlememeli.
+   */
+  const initialOutcome = initialOutcomeId
+    ? outcomes.find((outcome) => outcome.id === initialOutcomeId)
+    : undefined;
+
+  const [subject, setSubject] = React.useState(initialOutcome?.subject ?? "");
+  const [topic, setTopic] = React.useState(initialOutcome?.topic ?? "");
+  /** Secili kazanim kaydi. Bos ise serbest metin kullanılıyor. */
+  const [outcomeId, setOutcomeId] = React.useState(initialOutcome?.id ?? "");
+  const [kazanim, setKazanim] = React.useState(initialOutcome?.outcome_text ?? "");
   const [context, setContext] = React.useState("");
   /**
    * Soru adedi Metin olarak tutulur: `Number(value) || 1` kalibi alanı
@@ -94,20 +134,131 @@ export function QuestionGeneratorForm({
    */
   const [count, setCount] = React.useState("5");
   const [type, setType] = React.useState<TypeChoice>("karisik");
+  const [difficulty, setDifficulty] = React.useState<DifficultyChoice>("karisik");
 
   const [pending, setPending] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [results, setResults] = React.useState<GeneratedQuestion[]>([]);
   const [selected, setSelected] = React.useState<Set<number>>(new Set());
+  /**
+   * Kac taslak GORUNUR - hepsi degil.
+   *
+   * Once tum liste TEK SEFERDE, ic ice iki ayri kaydirma alaniyla
+   * (sayfanin kendisi + sabit boylu bir kutu) gosteriliyordu. Iki bagimsiz
+   * kaydirma alani ayni anda calisinca fare tekerlegi hangisine gittigini
+   * karistiriyor, kartlar yari kesilmis gibi cakisik gorunuyordu - "bozuk"
+   * hissi tam olarak buradan geliyordu.
+   *
+   * SONSUZ KAYDIRMA ile NESTED SCROLL BOX AYNI SEY DEGIL: buradaki "sonsuz
+   * kaydirma", asagida bir gozlemci (IntersectionObserver) ile GORUNTU
+   * ALANINA yaklasildikca otomatik daha fazla taslak acmak - kaydiran hep
+   * SAYFANIN KENDISI, ayri bir kutu yok. Bu yuzden onceki "cift kaydirma"
+   * sorunu geri gelmiyor.
+   */
+  const [visibleCount, setVisibleCount] = React.useState(BATCH_SIZE);
+  /** Sayfanin sonuna yaklasildigini yakalayan gorunmez isaretci. */
+  const sentinelRef = React.useRef<HTMLDivElement | null>(null);
   /** Toplu revizyon sırasında hangi talimat çalışıyor ve kacinci soruda. */
   const [bulkPreset, setBulkPreset] = React.useState<string | null>(null);
   const [bulkDone, setBulkDone] = React.useState(0);
 
-  const learnedTotal = preferenceStats.liked + preferenceStats.disliked;
+  /**
+   * Bu derste kac ornekten ogrenildi?
+   *
+   * Tarz hafizasi ders bazinda okunuyor; kullanıcının hangi havuzun
+   * kullanılacağını üretimden ÖNCE görmesi gerekiyor. Sayilar sunucudan
+   * ders kirilimiyla geldigi için ek istek yapilmiyor.
+   */
+  const scopedStats = subject.trim()
+    ? preferenceStats.bySubject[subjectKey(subject)]
+    : undefined;
+  const globalTotal = preferenceStats.liked + preferenceStats.disliked;
+  const scopedTotal = scopedStats ? scopedStats.liked + scopedStats.disliked : 0;
 
   /** Alan boş veya gecersizse 5'e düşer; her zaman 1-20 araliginda. */
   const resolvedCount = Math.min(Math.max(Number.parseInt(count, 10) || 5, 1), 20);
+
+  /**
+   * Kazanim listesi yazilan DERSE gore suzulur.
+   *
+   * Veritabaninda yuzlerce kazanim olabiliyor; hepsini tek bir acilir listeye
+   * dizmek onu kullanilamaz kiliyordu. Iki koruma var:
+   *
+   *   - O derste hic kazanim yoksa suzme yapilmaz (liste bos kalmasin).
+   *   - Secili kazanim her zaman listede tutulur. Kazanim secmek dersi de
+   *     degistirdigi icin, suzme secili ogeyi listeden dusurebilir ve Select
+   *     bos gorunurdu.
+   */
+  const visibleOutcomes = React.useMemo(() => {
+    const key = subject.trim() ? subjectKey(subject) : null;
+    if (!key) return outcomes;
+
+    const matching = outcomes.filter(
+      (outcome) => outcome.subject && subjectKey(outcome.subject) === key,
+    );
+    if (matching.length === 0) return outcomes;
+
+    const hasSelected = matching.some((outcome) => outcome.id === outcomeId);
+    if (hasSelected || !outcomeId) return matching;
+
+    const selectedOutcome = outcomes.find((outcome) => outcome.id === outcomeId);
+    return selectedOutcome ? [selectedOutcome, ...matching] : matching;
+  }, [outcomes, subject, outcomeId]);
+
+  /**
+   * SONSUZ KAYDIRMA: asagidaki gorunmez isaretci EKRANA YAKLASINCA
+   * (rootMargin sayesinde tam dibe gelmeden ONCEDEN) bir sonraki grup
+   * acilir. Gozlemci HER ZAMAN sayfanin kendi kaydirmasini izler (varsayilan
+   * `root: null`) - ayri bir kutu YOK, bu yuzden onceki cift kaydirma
+   * sorunu geri gelmez.
+   *
+   * `visibleCount >= results.length` iken isaretci render edilmiyor
+   * (asagida), o yuzden bu efekt de o durumda hicbir seye baglanmaz.
+   */
+  React.useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || visibleCount >= results.length) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) {
+          setVisibleCount((count) => Math.min(count + BATCH_SIZE, results.length));
+        }
+      },
+      // 150px: kullanici gercekten yaklasirken (tam dibe varmadan biraz
+      // once) tetiklensin. Daha buyuk bir deger (or. 600px) sayfa ilk
+      // acildiginda bile - hic kaydirilmadan - tum listeyi birden acabiliyor,
+      // bu da "kademeli" hissi yok ediyor.
+      { rootMargin: "150px" },
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [visibleCount, results.length]);
+
+  /**
+   * Kazanim secildiginde ders ve konu KAZANIMDAN alinir.
+   *
+   * Kazanim kaydi bu ikisinin sahibi: elle yazilana izin verilirse havuzda
+   * "Matematik kazanimi, Fizik dersine yazilmis" gibi tutarsiz satirlar
+   * olusabilir. Secim geri alinirsa alanlar dokunulmadan kalir - kullanıcı
+   * yazdigini kaybetmesin.
+   */
+  function handleOutcomeChange(value: string) {
+    if (value === SERBEST_KAZANIM) {
+      setOutcomeId("");
+      return;
+    }
+
+    const outcome = outcomes.find((item) => item.id === value);
+    if (!outcome) return;
+
+    setOutcomeId(outcome.id);
+    setKazanim(outcome.outcome_text);
+    setTopic(outcome.topic);
+    if (outcome.subject) setSubject(outcome.subject);
+  }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -121,6 +272,14 @@ export function QuestionGeneratorForm({
       return;
     }
 
+    if (kazanim.trim().length === 0) {
+      const message =
+        "Kazanım zorunlu. Listeden bir kazanım seçin ya da serbest metin olarak yazın.";
+      setError(message);
+      toast.error("Kazanım eksik", { description: message });
+      return;
+    }
+
     setPending(true);
     setError(null);
 
@@ -128,9 +287,11 @@ export function QuestionGeneratorForm({
       context,
       kazanim,
       topic: topic || undefined,
-      ...(category ? { category } : {}),
+      // Ders gonderiliyor: tarz hafizasi bu dersin orneklerinden seciliyor.
+      subject: subject || undefined,
       count: resolvedCount,
       type,
+      difficulty,
     };
 
     try {
@@ -145,11 +306,16 @@ export function QuestionGeneratorForm({
 
       setResults(body.data);
       setSelected(new Set());
+      // Yeni parti geldi: onceki partiden acilmis kalan goruntu sayisi yeni
+      // partiye tasinmasin, bastan basla.
+      setVisibleCount(BATCH_SIZE);
       toast.success(`${body.data.length} soru taslağı üretildi`, {
         description:
-          learnedTotal > 0
-            ? `${preferenceStats.liked} beğeni ve ${preferenceStats.disliked} red örneği dikkate alındı.`
-            : "Taslakları beğenerek AI'a tarzınızı öğretebilirsiniz.",
+          scopedTotal > 0
+            ? `${subject} dersindeki ${scopedTotal} örnek dikkate alındı.`
+            : globalTotal > 0
+              ? "Bu derste örnek yok; genel örnekler kullanıldı."
+              : "Taslakları beğenerek AI'a tarzınızı öğretebilirsiniz.",
       });
     } catch (caught) {
       const message =
@@ -177,7 +343,8 @@ export function QuestionGeneratorForm({
       questions: chosen,
       subject,
       topic,
-      ...(category ? { category } : {}),
+      // Kazanim baglantisi: ogrencinin gelisim ekrani basariyi bununla kirar.
+      ...(outcomeId ? { outcomeId } : {}),
     });
     setSaving(false);
 
@@ -187,12 +354,37 @@ export function QuestionGeneratorForm({
     }
 
     toast.success(`${result.data.saved} soru havuza gönderildi`, {
-      description: "Eğitmen onayından sonra sınavlarda kullanılabilir.",
+      description: outcomeId
+        ? "Kazanıma bağlandı; eğitmen onayından sonra sınavlarda kullanılabilir."
+        : "Eğitmen onayından sonra sınavlarda kullanılabilir.",
     });
 
-    // Kaydedilenleri listeden dus
-    setResults((current) => current.filter((_, index) => !selected.has(index)));
+    // Kaydedilenleri listeden dus. Kalan sayi disaridan okunabilsin diye
+    // fonksiyonel guncelleyicinin SONUCU disaridaki degiskene yaziliyor -
+    // `results`'a dogrudan bakmak escik bir kapanis olurdu (bu handler
+    // baslarken yakalandigi icin await sirasinda degismis olabilirdi).
+    let remainingCount = 0;
+    setResults((current) => {
+      const remaining = current.filter((_, index) => !selected.has(index));
+      remainingCount = remaining.length;
+      return remaining;
+    });
     setSelected(new Set());
+
+    /*
+      TUM TASLAKLAR ISLENDIYSE FORMU SIFIRLA.
+      Onceden kaynak metin, kazanim ve konu kaydettikten sonra da ekranda
+      kaliyordu; bir sonraki konuya gecmek icin hepsini elle silmek
+      gerekiyordu. Ders BILEREK korunuyor - ayni derste ust uste birkac
+      konu uretmek yaygin bir akis, sadece bu partiye ozgu alanlar
+      sifirlaniyor.
+    */
+    if (remainingCount === 0) {
+      setTopic("");
+      setKazanim("");
+      setOutcomeId("");
+      setContext("");
+    }
   }
 
   /** Duzenlenen ya da revize edilen taslağı listede yerine koyar. */
@@ -231,7 +423,6 @@ export function QuestionGeneratorForm({
             preset,
             ...(kazanim ? { kazanim } : {}),
             ...(context ? { context } : {}),
-            ...(category ? { category } : {}),
           }),
         });
 
@@ -278,35 +469,13 @@ export function QuestionGeneratorForm({
               Kazanımdan soru üret
             </CardTitle>
             <CardDescription>
-              Konu ve kazanımı yazın, kaynak metni girin.
+              Ölçülecek kazanımı seçin, kaynak metni girin.
             </CardDescription>
           </CardHeader>
 
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="category">Atölye dalı</Label>
-                <Select
-                  value={category}
-                  onValueChange={(value) => setCategory(value as DeneyapCategory)}
-                >
-                  <SelectTrigger id="category">
-                    <SelectValue placeholder="DENEYAP dalı seçin" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {DENEYAP_CATEGORY_OPTIONS.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Üretilen sorular bu dala kaydedilir; havuz dal bazinda filtrelenir.
-                </p>
-              </div>
-
-              <div className="grid gap-4 sm:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="subject">Ders</Label>
                   <Input
@@ -334,7 +503,74 @@ export function QuestionGeneratorForm({
                     placeholder="Trigonometri"
                   />
                 </div>
+              </div>
 
+              {/* ---------- Kazanım ---------- */}
+              <div className="space-y-2">
+                <Label htmlFor="outcome">Kazanım</Label>
+
+                {visibleOutcomes.length > 0 ? (
+                  <Select
+                    value={outcomeId || SERBEST_KAZANIM}
+                    onValueChange={handleOutcomeChange}
+                  >
+                    <SelectTrigger id="outcome">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={SERBEST_KAZANIM}>
+                        Serbest metin yaz
+                      </SelectItem>
+                      {visibleOutcomes.map((outcome) => (
+                        <SelectItem key={outcome.id} value={outcome.id}>
+                          {outcome.subject ? `${outcome.subject} · ` : ""}
+                          {outcome.topic} — {outcome.outcome_text}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : null}
+
+                {/*
+                  Serbest metin alanı kayitli kazanim SECILMEDIGINDE gorunur.
+                  Tumuyle kaldirilmadi: henuz kazanim tanimlamamis bir uzman
+                  da soru uretebilmeli, aksi halde ilk kullanim kilitlenir.
+                */}
+                {outcomeId ? (
+                  <p className="flex items-start gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2.5 text-xs leading-relaxed">
+                    <Target className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
+                    <span>
+                      <span className="font-medium">{kazanim}</span>
+                      <br />
+                      Üretilen sorular bu kazanıma bağlanacak; ders ve konu
+                      kazanımdan alındı.
+                    </span>
+                  </p>
+                ) : (
+                  <>
+                    <Input
+                      id="kazanim"
+                      value={kazanim}
+                      onChange={(event) => setKazanim(event.target.value)}
+                      placeholder="Öğrenci fotosentezin evrelerini açıklar."
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Serbest metin kazanıma <strong>bağlanmaz</strong> - gelişim
+                      raporunda kazanım kırılımı çıkmaz. Kalıcı ölçüm için
+                      aşağıdan kazanım tanımlayın.
+                    </p>
+                  </>
+                )}
+              </div>
+
+              <SourceTextField
+                value={context}
+                onChange={setContext}
+                disabled={pending}
+              />
+
+              {/* ---------- Üretim ayarları ---------- */}
+              <div className="grid gap-4 sm:grid-cols-3">
                 <div className="space-y-2">
                   <Label htmlFor="count">Soru adedi</Label>
                   <Input
@@ -348,37 +584,44 @@ export function QuestionGeneratorForm({
                     onBlur={() => setCount(String(resolvedCount))}
                   />
                 </div>
-              </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="kazanim">Kazanım</Label>
-                <Input
-                  id="kazanim"
-                  required
-                  value={kazanim}
-                  onChange={(event) => setKazanim(event.target.value)}
-                  placeholder="Öğrenci fotosentezin evrelerini açıklar."
-                />
-              </div>
+                <div className="space-y-2">
+                  <Label htmlFor="type">Soru tipi</Label>
+                  <Select
+                    value={type}
+                    onValueChange={(value) => setType(value as TypeChoice)}
+                  >
+                    <SelectTrigger id="type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="karisik">Karisik</SelectItem>
+                      <SelectItem value="test">Çoktan seçmeli</SelectItem>
+                      <SelectItem value="acik_uclu">Açık uçlu</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
 
-              <SourceTextField
-                value={context}
-                onChange={setContext}
-                disabled={pending}
-              />
-
-              <div className="space-y-2">
-                <Label htmlFor="type">Soru tipi</Label>
-                <Select value={type} onValueChange={(value) => setType(value as TypeChoice)}>
-                  <SelectTrigger id="type">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="karisik">Karisik</SelectItem>
-                    <SelectItem value="test">Çoktan seçmeli</SelectItem>
-                    <SelectItem value="acik_uclu">Açık uçlu</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="space-y-2">
+                  <Label htmlFor="difficulty">Seviye</Label>
+                  <Select
+                    value={difficulty}
+                    onValueChange={(value) =>
+                      setDifficulty(value as DifficultyChoice)
+                    }
+                  >
+                    <SelectTrigger id="difficulty">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DIFFICULTY_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               {error ? (
@@ -409,7 +652,7 @@ export function QuestionGeneratorForm({
         </Card>
 
         {/* ---------- Ogrenme durumu ---------- */}
-        <Card className={learnedTotal > 0 ? "border-primary/30" : undefined}>
+        <Card className={scopedTotal > 0 ? "border-primary/30" : undefined}>
           <CardContent className="p-4">
             <div className="flex items-start gap-3">
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
@@ -417,21 +660,37 @@ export function QuestionGeneratorForm({
               </span>
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium">AI tarz hafizasi</p>
-                {learnedTotal === 0 ? (
+
+                {globalTotal === 0 ? (
                   <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                     Henüz örnek yok. Üretilen taslakları begenip reddettikce AI
                     sizin soru tarzınızı ogrenir ve sonraki uretimlerde ona yaklasir.
                   </p>
-                ) : (
+                ) : !subject.trim() ? (
+                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                    Hafiza <strong>ders bazlı</strong> tutuluyor. Ders adını
+                    yazınca o dersteki örnek sayısı burada görünür. Toplam{" "}
+                    {globalTotal} örnek var.
+                  </p>
+                ) : scopedTotal > 0 ? (
                   <>
                     <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                      Bir sonraki üretimde bu ornekler modele veriliyor.
+                      <strong>{subject}</strong> dersindeki örnekler bir sonraki
+                      üretimde modele veriliyor. Diğer derslerin geri bildirimi
+                      karışmaz.
                     </p>
                     <div className="mt-2 flex flex-wrap gap-2">
-                      <Badge variant="success">{preferenceStats.liked} beğeni</Badge>
-                      <Badge variant="danger">{preferenceStats.disliked} red</Badge>
+                      <Badge variant="success">{scopedStats?.liked} beğeni</Badge>
+                      <Badge variant="danger">{scopedStats?.disliked} red</Badge>
                     </div>
                   </>
+                ) : (
+                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                    <strong>{subject}</strong> dersinde henüz örnek yok; bu
+                    üretimde genel örnekler (toplam {globalTotal}) yalnızca dil
+                    tonu için kullanılacak. Bu dersteki ilk beğeniden sonra
+                    yalnızca bu dersin örnekleri kullanılır.
+                  </p>
                 )}
               </div>
             </div>
@@ -470,9 +729,11 @@ export function QuestionGeneratorForm({
         </div>
 
         {pending ? (
-          <div className="space-y-3">
-            {Array.from({ length: 3 }, (_, index) => (
-              <Card key={index}>
+          <div className="grid items-start gap-3 sm:grid-cols-2">
+            {Array.from({ length: BATCH_SIZE }, (_, index) => (
+              // exam-paper HER KARTIN KENDISINE uygulanir, ortak sarmalayiciya
+              // degil - asagidaki asil listedeki gerekce burada da gecerli.
+              <Card key={index} className="exam-paper">
                 <CardContent className="space-y-3 p-4">
                   <Skeleton className="h-5 w-40" />
                   <Skeleton className="h-4 w-full" />
@@ -492,22 +753,71 @@ export function QuestionGeneratorForm({
             </CardContent>
           </Card>
         ) : (
-          <ul className="space-y-3">
-            {results.map((question, index) => (
-              <li key={`${question.text}-${index}`}>
-                <GeneratedQuestionCard
-                  question={question}
-                  index={index}
-                  selected={selected.has(index)}
-                  onToggleSelected={(value) => toggleSelected(index, value)}
-                  onReplace={(revised) => replaceResult(index, revised)}
-                  {...(kazanim ? { kazanim } : {})}
-                  {...(context ? { context } : {})}
-                  {...(category ? { category, categoryName: categoryLabel(category) } : {})}
-                />
-              </li>
-            ))}
-          </ul>
+          <>
+            {/*
+              IKI SUTUN, KADEMELI ACILAN LISTE.
+              Once sinirli yukseklikte KENDI ICINDE kayan bir kutu vardi
+              ("dosya gezgini gibi"). Bu, sayfanin kendi kaydirmasi ile
+              kutunun ic kaydirmasi AYNI ANDA calisinca kafa karistirdi -
+              fare tekerlegi hangisine gidiyor belli olmuyordu ve kartlar
+              yari kesilmis/cakismis gibi gorunuyordu.
+
+              Tek kaydirma alani (sayfanin kendisi) + kademeli acilan liste
+              ayni sorunu (yirmiye kadar soru sayfayi "evrenin sonuna
+              kadar" uzatiyordu) ic ice kaydirma OLMADAN cozer: varsayilan
+              olarak yalnizca ilk `BATCH_SIZE` taslak gorunur, gerisi
+              asagidaki isaretciye gore OTOMATIK acilir (bkz. yukaridaki
+              IntersectionObserver efekti) - sayfa normal sekilde uzar, tek
+              ve tanidik bir kaydirma davranisi olur.
+
+              `items-start` + `min-h`: grid varsayilan olarak ayni satirdaki
+              kartlari birbirine esitleyip KISA karti UZUN kartin (grafikli)
+              boyuna kadar geriyordu - kisa kartin altinda bos, cirkin bir
+              alan kaliyordu. `items-start` bu zorlamayi kaldirir; `min-h`
+              ise TERS yonde asiriliga (bir metin karti bir grafik kartinin
+              yaninda "cok kucuk" durmasi) karsi TABAN olusturur - kart
+              icerigi tabani asarsa (grafik gibi) buyumeye devam eder, kisa
+              bir kart ise en az bu boyda gorunur. Ikisi celismiyor: biri
+              UST siniri kaldirir, digeri ALT siniri koyar.
+
+              BEYAZ ZEMIN HER KARTIN KENDISINDE, ORTAK SARMALAYICIDA DEGIL.
+              `.exam-paper` `<Card>`'in KENDISINE geciyor (cardClassName) -
+              kartlar koyu zemin uzerinde ayri ayri duran beyaz adacıklar;
+              aralardaki bosluk ve dis cerceve normal (koyu) arayuz
+              renginde kalir.
+            */}
+            <ul className="grid items-start gap-3 sm:grid-cols-2">
+              {results.slice(0, visibleCount).map((question, index) => (
+                <li key={`${question.text}-${index}`}>
+                  <GeneratedQuestionCard
+                    question={question}
+                    index={index}
+                    selected={selected.has(index)}
+                    onToggleSelected={(value) => toggleSelected(index, value)}
+                    onReplace={(revised) => replaceResult(index, revised)}
+                    cardClassName="exam-paper min-h-[19rem]"
+                    {...(kazanim ? { kazanim } : {})}
+                    {...(context ? { context } : {})}
+                    {...(outcomeId ? { outcomeId } : {})}
+                    {...(subject ? { subject } : {})}
+                  />
+                </li>
+              ))}
+            </ul>
+
+            {visibleCount < results.length ? (
+              <>
+                {/* Gozle gorunur bir yukleniyor gostergesi yok: veri zaten
+                    istemcide, ekleme aninda oluyor - bir spinner goze
+                    carpip hemen kaybolurdu. */}
+                <p className="text-center text-xs text-muted-foreground">
+                  {results.length - visibleCount} soru daha var, aşağı
+                  kaydırdıkça yüklenecek.
+                </p>
+                <div ref={sentinelRef} aria-hidden className="h-1" />
+              </>
+            ) : null}
+          </>
         )}
 
         {/*

@@ -82,6 +82,48 @@
     --radius: 0.6rem;
   }
 
+  /*
+   * Sinav kagidi kapsami ("exam-paper").
+   *
+   * Uretilen soru taslaklari, karanlik temada bile SINAV KAGIDI gibi acik
+   * zeminde okunmali - hem gercek sinav kagidina yakin bir hisse hem grafik
+   * renklerinin ayirt edilebilirligine hizmet ediyor. Ayni renk degiskenleri
+   * :root'ta zaten aydinlik degerlerle tanimli; bu sinif onlari AYNEN
+   * tekrar tanimlayarak .dark'in cascade'ini bu alt agacta durduruyor -
+   * bg-card, text-muted-foreground, text-success gibi butun semantik
+   * sinifar tek satir degistirmeden burada otomatik acik degere doner.
+   */
+  .exam-paper {
+    --background: 42 36% 96%;
+    --foreground: 202 44% 13%;
+    --card: 40 50% 99%;
+    --card-foreground: 202 44% 13%;
+    --popover: 40 50% 99%;
+    --popover-foreground: 202 44% 13%;
+    --primary: 168 62% 26%;
+    --primary-foreground: 45 60% 98%;
+    --accent: 36 84% 92%;
+    --accent-foreground: 26 68% 24%;
+    --highlight: 34 90% 48%;
+    --highlight-foreground: 30 60% 12%;
+    --secondary: 42 26% 91%;
+    --secondary-foreground: 202 44% 16%;
+    --muted: 42 26% 92%;
+    --muted-foreground: 202 18% 38%;
+    --destructive: 358 62% 44%;
+    --destructive-foreground: 45 60% 98%;
+    --success: 158 66% 26%;
+    --success-foreground: 45 60% 98%;
+    --warning: 28 78% 38%;
+    --warning-foreground: 45 60% 98%;
+    --border: 40 22% 85%;
+    --input: 40 20% 80%;
+    --ring: 168 62% 32%;
+
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+  }
+
   .dark {
     /* Koyu tema slate değil: kâğıdın gece hâli, sıcak lacivert. */
     --background: 202 42% 8%;

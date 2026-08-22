@@ -3,8 +3,9 @@
 import { revalidatePath } from "next/cache";
 
 import { demoGuard, type ActionResult } from "@/app/actions/shared";
-import type { DeneyapCategory } from "@/lib/deneyap";
 import { isSupabaseConfigured } from "@/lib/env";
+import { findSimilarOutcome } from "@/lib/outcome-core";
+import { subjectKey } from "@/lib/subjects";
 import { createServerSupabaseClient, getCurrentUser } from "@/lib/supabase-server";
 import type {
   GeneratedQuestion,
@@ -21,11 +22,20 @@ export interface RecordPreferenceInput {
   verdict: PreferenceVerdict;
   note?: string;
   outcomeId?: string;
+  /**
+   * Geri bildirimin verildigi ders. Tarz hafizasi ders bazinda okundugu icin
+   * bu alan bos gecerse kayit yalnizca "genel" havuzda kalir.
+   */
+  subject?: string;
 }
 
 /**
  * Icerik uzmaninin bir AI taslagina verdigi begeni/red kaydini saklar.
  * Bu kayitlar sonraki uretimlerde modele ornek olarak geri verilir.
+ *
+ * Ders ve konu birlikte yazilir: `getStyleGuide()` once ayni konunun, sonra
+ * ayni dersin orneklerini kullanir. Boylece tarih dersinde "sozel olsun"
+ * denmesi matematik uretimini etkilemez.
  */
 export async function recordPreference(
   input: RecordPreferenceInput,
@@ -42,6 +52,7 @@ export async function recordPreference(
     verdict: input.verdict,
     question_text: input.question.text,
     question_type: input.question.type,
+    subject: input.subject?.trim() || null,
     topic: input.question.topic,
     difficulty: input.question.difficulty,
     options_json: input.question.options,
@@ -75,8 +86,6 @@ export async function deletePreference(id: string): Promise<ActionResult> {
 
 export interface SaveQuestionsInput {
   questions: GeneratedQuestion[];
-  /** DENEYAP atolye dali; sorular bu dala baglanir. */
-  category?: DeneyapCategory;
   /** Bu partideki tum sorularin yazilacagi ders. Zorunlu. */
   subject: string;
   /**
@@ -117,7 +126,6 @@ export async function saveGeneratedQuestions(
   const supabase = await createServerSupabaseClient();
 
   const rows = input.questions.map((question) => ({
-    category: input.category ?? null,
     subject,
     // Havuz ders -> konu olarak kirildigi icin parti genelinde TEK konu
     // anahtari kullanilir; model her soruya farkli bir konu adi uydurursa
@@ -128,6 +136,7 @@ export async function saveGeneratedQuestions(
     options_json: question.options,
     correct_answer: question.correct_answer,
     rubric: question.rubric,
+    visual_json: question.visual,
     status: "taslak" as const,
     outcome_id: input.outcomeId ?? null,
     created_by: current.user.id,
@@ -190,18 +199,56 @@ export async function updateQuestionStatus(
 /* -------------------------------------------------------------------------- */
 
 export interface CreateOutcomeInput {
+  /** Kazanimin ait oldugu ders. Uretim formunda liste bununla suzulur. */
+  subject: string;
   topic: string;
   outcomeText: string;
-  sourceText: string;
+  sourceText?: string;
+  /**
+   * Tekrar uyarisini gecerek yine de kaydet.
+   *
+   * Uyari BAGLAYICI DEGIL: bazen iki kazanim gercekten farklidir ve kelime
+   * benzerligi yanilir. Karar hocada; sistem yalnizca haberdar eder.
+   */
+  force?: boolean;
 }
 
+/** Tekrar bulundugunda hangi kazanimla cakistigini cagirana bildirir. */
+export interface DuplicateOutcome {
+  id: string;
+  outcomeText: string;
+}
+
+/**
+ * `createOutcome` sonucu.
+ *
+ * Hata dalinda `duplicate` tasiyor: arayuz boylece yalnizca "kaydedilemedi"
+ * demekle kalmayip cakisan kazanimi gosterip "bunu kullan" diyebiliyor.
+ * `ActionResult` hata dalinda ek alan tasiyamadigi icin ayri tanimlandi.
+ */
+export type CreateOutcomeResult =
+  | { ok: true; data: { id: string } }
+  | { ok: false; error: string; duplicate?: DuplicateOutcome };
+
+/**
+ * Yeni bir kazanim tanimlar.
+ *
+ * Kazanim, uretimin OLCME HEDEFIdir: soru havuzundaki her soru bir kazanima
+ * baglanir (`questions.outcome_id`) ve ogrencinin gelisim ekrani basariyi
+ * kazanim bazinda kirar. Serbest metin olarak yazilan kazanim bu zincirin
+ * hicbir halkasina giremiyordu; bu yuzden ayri bir kayit olarak tutuluyor.
+ */
 export async function createOutcome(
   input: CreateOutcomeInput,
-): Promise<ActionResult<{ id: string }>> {
+): Promise<CreateOutcomeResult> {
   if (!isSupabaseConfigured) return demoGuard();
 
-  if (!input.topic.trim() || !input.outcomeText.trim()) {
-    return { ok: false, error: "Konu ve kazanim alanlari zorunludur." };
+  const subject = input.subject?.trim() ?? "";
+  const topic = input.topic?.trim() ?? "";
+  const outcomeText = input.outcomeText?.trim() ?? "";
+
+  if (!subject || !topic || !outcomeText) {
+    return { ok: false, error: "Ders, konu ve kazanim alanlari zorunludur." };
   }
 
   const current = await getCurrentUser();
@@ -209,12 +256,52 @@ export async function createOutcome(
 
   const supabase = await createServerSupabaseClient();
 
+  /*
+    TEKRAR KONTROLU SUNUCUDA.
+
+    Arayuz de uyariyor, ama tek koruma orada olamaz: istemci kontrolu
+    atlanabilir ve kazanim havuzu TUM hocalarin paylastigi bir kaynak. Bir
+    kisinin yanlislikla ikinci kez tanimladigi kazanim, o konudaki butun
+    basari yuzdelerini ikiye boler.
+
+    Karsilastirma AYNI DERS + AYNI KONU icinde yapiliyor: "Fotosentez
+    bilgisi" iki farkli derste ayni sey olmak zorunda degil.
+  */
+  if (!input.force) {
+    /*
+      Konu ile suzuluyor, ders JS tarafinda karsilastiriliyor: dersi BOS olan
+      eski kayitlar da hesaba katilmali. `.eq("subject", subject)` onlari
+      disliyordu ve migration'dan onceki kazanimlar tekrar kontrolunden
+      kaciyordu.
+    */
+    const { data: siblings } = await supabase
+      .from("learning_outcomes")
+      .select("id, outcome_text, subject")
+      .eq("topic", topic);
+
+    const candidates = (siblings ?? []).filter(
+      (row) => !row.subject || subjectKey(row.subject) === subjectKey(subject),
+    );
+
+    const similar = findSimilarOutcome(outcomeText, candidates);
+    if (similar) {
+      return {
+        ok: false,
+        error: "Bu konuda cok benzer bir kazanim zaten tanimli.",
+        duplicate: { id: similar.id, outcomeText: similar.outcome_text },
+      };
+    }
+  }
+
   const { data, error } = await supabase
     .from("learning_outcomes")
     .insert({
-      topic: input.topic.trim(),
-      outcome_text: input.outcomeText.trim(),
-      source_text: input.sourceText,
+      subject,
+      topic,
+      outcome_text: outcomeText,
+      // Kaynak metin opsiyonel: kazanim once tanimlanip metin sonra
+      // yuklenebiliyor. Sutun NOT NULL oldugu icin bos dize yaziliyor.
+      source_text: input.sourceText?.trim() ?? "",
       created_by: current.user.id,
     })
     .select("id")

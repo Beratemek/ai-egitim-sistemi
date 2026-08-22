@@ -25,12 +25,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { VisualPicker } from "@/components/shared/visual-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import type { DeneyapCategory } from "@/lib/deneyap";
 import type { ApiResponse, GeneratedQuestion, QuestionOption } from "@/lib/types";
 
 /** Tek tikla gonderilen hazır talimatlar. Anahtarlar API ile eslesir. */
@@ -50,9 +50,8 @@ export interface QuestionReviseDialogProps {
   /** Kaydedilen (elle duzenlenmis ya da revize edilmis) soruyu geri verir. */
   onSave: (question: GeneratedQuestion) => void;
   /** Revizyonda modele baglam olarak gönderilir. */
-  kazanım?: string;
+  kazanim?: string;
   context?: string;
-  category?: DeneyapCategory;
 }
 
 /**
@@ -71,9 +70,8 @@ export function QuestionReviseDialog({
   question,
   index,
   onSave,
-  kazanım,
+  kazanim,
   context,
-  category,
 }: QuestionReviseDialogProps) {
   const [open, setOpen] = React.useState(false);
 
@@ -131,9 +129,8 @@ export function QuestionReviseDialog({
           question: draft,
           ...(preset ? { preset } : {}),
           ...(freeText ? { instruction: freeText } : {}),
-          ...(kazanım ? { kazanım } : {}),
+          ...(kazanim ? { kazanim } : {}),
           ...(context ? { context } : {}),
-          ...(category ? { category } : {}),
         }),
       });
 
@@ -276,6 +273,13 @@ export function QuestionReviseDialog({
               </p>
             </div>
           )}
+
+          {/* ---------- Gorsel ---------- */}
+          <VisualPicker
+            value={draft.visual}
+            onChange={(visual) => setDraft((current) => ({ ...current, visual }))}
+            defaultQuery={draft.topic}
+          />
 
           <Separator />
 

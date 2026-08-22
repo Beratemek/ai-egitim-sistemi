@@ -12,6 +12,7 @@ import {
 import { toast } from "sonner";
 
 import { updateQuestionStatus } from "@/app/actions/questions";
+import { QuestionVisual } from "@/components/shared/question-visual";
 
 import {
   QuestionStatusBadge,
@@ -37,11 +38,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  DENEYAP_CATEGORY_OPTIONS,
-  categoryLabel,
-  type DeneyapCategory,
-} from "@/lib/deneyap";
 import { UNASSIGNED_SUBJECT } from "@/lib/question-pool";
 import { cn, formatDateTime } from "@/lib/utils";
 import {
@@ -53,7 +49,6 @@ import {
 
 type StatusFilter = QuestionStatus | "hepsi";
 type TypeFilter = QuestionType | "hepsi";
-type CategoryFilter = DeneyapCategory | "hepsi";
 
 export interface QuestionPoolTableProps {
   /** Başlangıç verisi. Su an mock; Supabase'e gecerken sunucudan gecirin. */
@@ -85,7 +80,6 @@ export function QuestionPoolTable({
   const [search, setSearch] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState<StatusFilter>("hepsi");
   const [typeFilter, setTypeFilter] = React.useState<TypeFilter>("hepsi");
-  const [categoryFilter, setCategoryFilter] = React.useState<CategoryFilter>("hepsi");
   const [expandedId, setExpandedId] = React.useState<string | null>(null);
   const [pendingId, setPendingId] = React.useState<string | null>(null);
 
@@ -99,7 +93,6 @@ export function QuestionPoolTable({
     return rows.filter((question) => {
       if (statusFilter !== "hepsi" && question.status !== statusFilter) return false;
       if (typeFilter !== "hepsi" && question.type !== typeFilter) return false;
-      if (categoryFilter !== "hepsi" && question.category !== categoryFilter) return false;
       if (!needle) return true;
 
       return (
@@ -108,7 +101,7 @@ export function QuestionPoolTable({
         (question.subject ?? "").toLocaleLowerCase("tr").includes(needle)
       );
     });
-  }, [rows, search, statusFilter, typeFilter, categoryFilter]);
+  }, [rows, search, statusFilter, typeFilter]);
 
   const counts = React.useMemo(
     () => ({
@@ -201,23 +194,6 @@ export function QuestionPoolTable({
               ))}
             </SelectContent>
           </Select>
-
-          <Select
-            value={categoryFilter}
-            onValueChange={(value) => setCategoryFilter(value as CategoryFilter)}
-          >
-            <SelectTrigger className="sm:w-64" aria-label="Atolye dalina gore filtrele">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="hepsi">Tüm atölye dalları</SelectItem>
-              {DENEYAP_CATEGORY_OPTIONS.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </div>
       </div>
 
@@ -231,7 +207,6 @@ export function QuestionPoolTable({
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
                   <TableHead className="w-[30%]">Soru</TableHead>
-                  <TableHead>Atölye dalı</TableHead>
                   <TableHead>Ders</TableHead>
                   <TableHead>Konu</TableHead>
                   <TableHead>Tip</TableHead>
@@ -267,11 +242,6 @@ export function QuestionPoolTable({
                               {question.text}
                             </span>
                           </button>
-                        </TableCell>
-                        <TableCell className="align-top">
-                          <Badge variant="soft" className="font-normal">
-                            {categoryLabel(question.category)}
-                          </Badge>
                         </TableCell>
                         <TableCell className="align-top text-muted-foreground">
                           {question.subject || UNASSIGNED_SUBJECT}
@@ -322,9 +292,6 @@ export function QuestionPoolTable({
                     <div className="flex flex-wrap items-center gap-2">
                       <QuestionStatusBadge status={question.status} />
                       <QuestionTypeBadge type={question.type} />
-                      <Badge variant="soft" className="font-normal">
-                        {categoryLabel(question.category)}
-                      </Badge>
                     </div>
 
                     <p className="text-sm font-medium leading-relaxed">
@@ -454,9 +421,15 @@ function EmptyState() {
 }
 
 function QuestionDetail({ question }: { question: Question }) {
+  // Gorsel her iki soru tipinde de olabildigi icin ortak parca.
+  const visual = question.visual_json ? (
+    <QuestionVisual visual={question.visual_json} className="max-w-xl" />
+  ) : null;
+
   if (question.type === "test") {
     return (
-      <div className="space-y-2">
+      <div className="space-y-3">
+        {visual}
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Seçenekler
         </p>
@@ -473,7 +446,12 @@ function QuestionDetail({ question }: { question: Question }) {
                 )}
               >
                 <span className="font-mono text-xs opacity-70">{option.key})</span>
-                <span>{option.text}</span>
+                <span className="min-w-0 flex-1">
+                  {option.text}
+                  {option.visual ? (
+                    <QuestionVisual visual={option.visual} compact className="mt-1.5" />
+                  ) : null}
+                </span>
                 {isCorrect ? (
                   <Check className="ml-auto h-4 w-4 shrink-0" aria-label="Dogru cevap" />
                 ) : null}
@@ -486,7 +464,8 @@ function QuestionDetail({ question }: { question: Question }) {
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
+      {visual}
       <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         Puanlama rubriği
       </p>

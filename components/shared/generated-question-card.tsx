@@ -6,10 +6,10 @@ import { toast } from "sonner";
 
 import { recordPreference } from "@/app/actions/questions";
 import { QuestionTypeBadge } from "@/components/shared/status-badge";
+import { QuestionVisual } from "@/components/shared/question-visual";
 import { Badge } from "@/components/ui/badge";
 import { QuestionReviseDialog } from "@/components/shared/question-revise-dialog";
 import { Button } from "@/components/ui/button";
-import type { DeneyapCategory } from "@/lib/deneyap";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -27,18 +27,31 @@ const DIFFICULTY_VARIANT: Record<
 export interface GeneratedQuestionCardProps {
   question: GeneratedQuestion;
   /** Düzenleme/revizyon diyalogu için ek baglam. */
-  kazanım?: string;
+  kazanim?: string;
   context?: string;
-  category?: DeneyapCategory;
   /** Elle düzenleme veya AI revizyonu sonucu; taslağı yerinde degistirir. */
   onReplace?: (question: GeneratedQuestion) => void;
-  /** Seçili DENEYAP atölye dalı adi; rozet olarak gösterilir. */
-  categoryName?: string;
   index: number;
   /** Havuza gonderilmek uzere seçili mi? */
   selected: boolean;
   onToggleSelected: (selected: boolean) => void;
   outcomeId?: string;
+  /**
+   * Geri bildirimin yazilacagi ders.
+   *
+   * Tarz hafizasi ders bazinda okunuyor; bu alan bos gecerse begeni/red
+   * kaydi yalnizca "genel" havuzda kalir ve bu dersin uretimini
+   * hedefli olarak etkilemez.
+   */
+  subject?: string;
+  /**
+   * Karta eklenecek ekstra sinif; ozellikle `.exam-paper` icin.
+   *
+   * Karti karanlik temada bile beyaz/kagit zeminde gostermek icin
+   * cagiran bunu geciyor. Bu bilesenin kendisi zemin kararini vermiyor -
+   * baglama gore (taslak listesi, havuz onizlemesi vb.) degisebilir.
+   */
+  cardClassName?: string;
 }
 
 /**
@@ -50,15 +63,15 @@ export interface GeneratedQuestionCardProps {
  */
 export function GeneratedQuestionCard({
   question,
-  categoryName,
-  kazanım,
+  kazanim,
   context,
-  category,
   onReplace,
   index,
   selected,
   onToggleSelected,
   outcomeId,
+  subject,
+  cardClassName,
 }: GeneratedQuestionCardProps) {
   const [verdict, setVerdict] = React.useState<PreferenceVerdict | null>(null);
   const [pending, setPending] = React.useState<PreferenceVerdict | null>(null);
@@ -73,6 +86,9 @@ export function GeneratedQuestionCard({
       verdict: next,
       ...(withNote ? { note: withNote } : {}),
       ...(outcomeId ? { outcomeId } : {}),
+      // Ders kayda yaziliyor: sonraki uretimde tarz hafizasi bu kapsamdan
+      // okunacak.
+      ...(subject ? { subject } : {}),
     });
 
     setPending(null);
@@ -103,6 +119,7 @@ export function GeneratedQuestionCard({
     <Card
       className={cn(
         "transition-colors",
+        cardClassName,
         verdict === "begendi" && "border-success/40 bg-success/[0.03]",
         verdict === "begenmedi" && "border-destructive/30 opacity-70",
       )}
@@ -126,11 +143,6 @@ export function GeneratedQuestionCard({
           <Badge variant={DIFFICULTY_VARIANT[question.difficulty]}>
             {question.difficulty}
           </Badge>
-          {categoryName ? (
-            <Badge variant="soft" className="font-normal">
-              {categoryName}
-            </Badge>
-          ) : null}
           <span className="text-xs text-muted-foreground">{question.topic}</span>
 
           {verdict ? (
@@ -148,7 +160,14 @@ export function GeneratedQuestionCard({
           ) : null}
         </div>
 
-        <p className="font-medium leading-relaxed">{question.text}</p>
+        {/*
+          Onceden ozel bir boyut sinifi yoktu, taban text-base (16px)
+          kullaniliyordu. Kartlar iki sutuna gecince bu buyuk durdu; text-sm
+          diger yerlerdeki (secenekler, rozetler) boyutla da tutarli.
+        */}
+        <p className="text-sm font-medium leading-relaxed">{question.text}</p>
+
+        {question.visual ? <QuestionVisual visual={question.visual} /> : null}
 
         {question.type === "test" ? (
           <ul className="space-y-1">
@@ -166,7 +185,16 @@ export function GeneratedQuestionCard({
                   )}
                 >
                   <span className="font-mono text-xs opacity-70">{option.key})</span>
-                  {option.text}
+                  <span className="min-w-0 flex-1">
+                    {option.text}
+                    {option.visual ? (
+                      <QuestionVisual
+                        visual={option.visual}
+                        compact
+                        className="mt-1.5"
+                      />
+                    ) : null}
+                  </span>
                   {isCorrect ? <Check className="ml-auto h-4 w-4 shrink-0" /> : null}
                 </li>
               );
@@ -218,9 +246,8 @@ export function GeneratedQuestionCard({
               question={question}
               index={index}
               onSave={onReplace}
-              {...(kazanım ? { kazanım } : {})}
+              {...(kazanim ? { kazanim } : {})}
               {...(context ? { context } : {})}
-              {...(category ? { category } : {})}
             />
           ) : null}
 
