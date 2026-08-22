@@ -67,6 +67,8 @@ export interface ExamComposeDialogProps {
   selectedIds?: readonly string[];
   /** Pencere acilirken on secili gelecek ders. */
   defaultSubject?: string | null;
+  /** Tanitim modunda kayit yapilmaz; dugme kapatilir. */
+  canPersist?: boolean;
   onCreated?: () => void;
 }
 
@@ -78,6 +80,7 @@ export function ExamComposeDialog({
   subjects,
   selectedIds = [],
   defaultSubject = null,
+  canPersist = true,
   onCreated,
 }: ExamComposeDialogProps) {
   const router = useRouter();
@@ -472,7 +475,7 @@ export function ExamComposeDialog({
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             Vazgeç
           </Button>
-          <Button disabled={!gecerli || pending} onClick={() => void olustur()}>
+          <Button disabled={!gecerli || pending || !canPersist} onClick={() => void olustur()}>
             {pending ? <Loader2 className="animate-spin" /> : <Sparkles />}
             Sınavı oluştur
           </Button>

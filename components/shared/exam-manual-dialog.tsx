@@ -10,7 +10,6 @@ import {
   ListChecks,
   Loader2,
   Scale,
-  TriangleAlert,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -56,6 +55,8 @@ export interface ExamManualDialogProps {
   subjectOptions?: readonly string[];
   /** On secili ders; bulunulan kademeden gelir. */
   defaultSubject?: string | null;
+  /** Tanitim modunda kayit yapilmaz; dugme kapatilir. */
+  canPersist?: boolean;
   onCreated?: () => void;
 }
 
@@ -67,6 +68,7 @@ export function ExamManualDialog({
   questions,
   subjectOptions = [],
   defaultSubject = null,
+  canPersist = true,
   onCreated,
 }: ExamManualDialogProps) {
   const router = useRouter();
@@ -174,7 +176,7 @@ export function ExamManualDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-4xl">
         <DialogHeader>
-          <DialogTitle className="font-display text-xl">Sınavı kur</DialogTitle>
+          <DialogTitle className="font-display text-xl">Yeni sınav</DialogTitle>
           <DialogDescription>
             Seçtiğiniz {questions.length} soruyla sınav oluşturun. Süre, kamera
             kuralı ve puan dağılımını burada belirleyin.
@@ -290,22 +292,14 @@ export function ExamManualDialog({
               <Badge variant="soft">{testAdedi} test</Badge>
               <Badge variant="soft">{klasikAdedi} klasik</Badge>
               <span aria-hidden>·</span>
-              <span
-                className={cn(
-                  "font-medium",
-                  toplamPuan === 100
-                    ? "text-foreground"
-                    : "text-amber-600 dark:text-amber-500",
-                )}
-              >
+              {/*
+                Toplam puanin 100 olmasi ZORUNLU DEGIL: hoca 50 puanlik bir
+                sinav da yapabilir. 100 yalnizca "Esit dagit"in varsayilani,
+                bir kural degil - bu yuzden farkli bir toplam uyari degil.
+              */}
+              <span className="font-medium text-foreground">
                 toplam {toplamPuan} puan
               </span>
-              {puanModu === "elle" && toplamPuan !== 100 ? (
-                <span className="flex items-center gap-1 text-amber-600 dark:text-amber-500">
-                  <TriangleAlert className="h-3.5 w-3.5" />
-                  100 değil
-                </span>
-              ) : null}
             </div>
 
             <ol className="max-h-[46vh] space-y-1.5 overflow-y-auto rounded-lg border p-2">
@@ -363,7 +357,7 @@ export function ExamManualDialog({
             <p className="text-xs leading-relaxed text-muted-foreground">
               {puanModu === "esit"
                 ? "Puanlar 100 üzerinden eşit dağıtılır; tam bölünmezse artan puan baştaki sorulara verilir."
-                : "Elle puan girdiğinizde otomatik dağıtım kapanır; sonradan soru eklemek girdiğiniz değerleri değiştirmez."}
+                : "Toplamın 100 olması gerekmez; dilediğiniz puanlamayı kurabilirsiniz. Elle puan girdiğinizde otomatik dağıtım kapanır ve sonradan soru eklemek girdiğiniz değerleri değiştirmez."}
             </p>
           </div>
         </div>
@@ -372,7 +366,7 @@ export function ExamManualDialog({
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             Vazgeç
           </Button>
-          <Button disabled={!gecerli || pending} onClick={() => void olustur()}>
+          <Button disabled={!gecerli || pending || !canPersist} onClick={() => void olustur()}>
             {pending ? <Loader2 className="animate-spin" /> : null}
             Sınavı oluştur
           </Button>

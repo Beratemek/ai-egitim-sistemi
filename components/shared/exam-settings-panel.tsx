@@ -329,14 +329,9 @@ export function ExamSettingsPanel({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <span className="text-sm text-muted-foreground">
               {questionCount} soru · toplam{" "}
-              <span
-                className={cn(
-                  "font-semibold",
-                  totalPoints === 100 ? "text-foreground" : "text-amber-600 dark:text-amber-500",
-                )}
-              >
-                {totalPoints}
-              </span>{" "}
+              {/* Toplamin 100 olmasi zorunlu degil; 50 puanlik bir sinav da
+                  gecerli. 100 yalnizca esit dagitimin varsayilani. */}
+              <span className="font-semibold text-foreground">{totalPoints}</span>{" "}
               puan
             </span>
 

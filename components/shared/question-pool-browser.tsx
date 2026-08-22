@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   ArrowRight,
@@ -12,16 +11,12 @@ import {
   Layers,
   Library,
   ListChecks,
-  Loader2,
-  Plus,
   RotateCcw,
   Search,
   ClipboardList,
   Sparkles,
 } from "lucide-react";
-import { toast } from "sonner";
 
-import { addExamQuestions } from "@/app/actions/exams";
 import { ExamComposeDialog } from "@/components/shared/exam-compose-dialog";
 import { ExamManualDialog } from "@/components/shared/exam-manual-dialog";
 import { Badge } from "@/components/ui/badge";
@@ -31,14 +26,6 @@ import {
   CardContent,
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -56,7 +43,7 @@ import {
   type SubjectGroup,
   type TopicGroup,
 } from "@/lib/question-pool";
-import type { Exam, Question, QuestionType } from "@/lib/types";
+import type { Question, QuestionType } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 /**
@@ -85,18 +72,14 @@ type TypeFilter = QuestionType | "hepsi";
 export interface QuestionPoolBrowserProps {
   /** Havuzdaki onaylı sorular. */
   questions: readonly Question[];
-  /** Eğitmenin sınavları; seçilen sorular bunlardan birine eklenir. */
-  exams: readonly Exam[];
   /** Supabase yoksa ekleme adimi hata döndürür. */
   canPersist?: boolean;
 }
 
 export function QuestionPoolBrowser({
   questions,
-  exams,
   canPersist = false,
 }: QuestionPoolBrowserProps) {
-  const router = useRouter();
 
   const [activeSubject, setActiveSubject] = React.useState<string | null>(null);
   const [activeTopic, setActiveTopic] = React.useState<string | null>(null);
@@ -105,8 +88,6 @@ export function QuestionPoolBrowser({
   );
   const [search, setSearch] = React.useState("");
   const [typeFilter, setTypeFilter] = React.useState<TypeFilter>("hepsi");
-  const [examId, setExamId] = React.useState<string>(exams[0]?.id ?? "");
-  const [pending, setPending] = React.useState(false);
   /** Onizlemesi acik olan sorunun kimligi; kapaliyken null. */
   const [openQuestionId, setOpenQuestionId] = React.useState<string | null>(null);
   /** Otomatik sinav kurma penceresi (ders/konu/sayi). */
@@ -181,46 +162,6 @@ export function QuestionPoolBrowser({
       return next;
     });
   }
-
-  /**
-   * Secili sorulari bir sinava ekler.
-   *
-   * Hedef sinav ARGUMAN olarak aliniyor: menuden secim yapildiginda durum
-   * guncellemesi bir sonraki render'da gecerli olur, o ana kadar `examId`
-   * hala eski degeri tasir ve sorular yanlis sinava giderdi.
-   */
-  async function handleAddToExam(hedefId?: string) {
-    const target = hedefId ?? examId;
-
-    if (!target) {
-      toast.error("Önce bir sınav seçin.");
-      return;
-    }
-
-    setPending(true);
-
-    try {
-      const result = await addExamQuestions(target, [...selectedIds]);
-      if (!result.ok) throw new Error(result.error);
-
-      const exam = exams.find((item) => item.id === target);
-      toast.success(`${result.data.added} soru eklendi`, {
-        description: exam ? `"${exam.title}" sinavina eklendi.` : undefined,
-      });
-
-      setSelectedIds(new Set());
-      router.refresh();
-    } catch (caught) {
-      toast.error("Sorular eklenemedi", {
-        description:
-          caught instanceof Error ? caught.message : "Lutfen tekrar deneyin.",
-      });
-    } finally {
-      setPending(false);
-    }
-  }
-
-  /* ------------------------------- render -------------------------------- */
 
   if (questions.length === 0) return <EmptyPool />;
 
@@ -318,11 +259,6 @@ export function QuestionPoolBrowser({
       {/* ---------- Secim bari ---------- */}
       <SelectionBar
         selectedCount={selectedIds.size}
-        exams={exams}
-        onExamChange={setExamId}
-        canPersist={canPersist}
-        pending={pending}
-        onAdd={(hedef) => void handleAddToExam(hedef)}
         onCreate={() => setManualOpen(true)}
         onClear={() => setSelectedIds(new Set())}
       />
@@ -333,6 +269,7 @@ export function QuestionPoolBrowser({
         questions={selectedQuestions}
         subjectOptions={allSubjects.map((group) => group.subject)}
         defaultSubject={openSubject?.subject ?? null}
+        canPersist={canPersist}
         onCreated={() => setSelectedIds(new Set())}
       />
 
@@ -910,22 +847,10 @@ function PoolToolbar({
  */
 function SelectionBar({
   selectedCount,
-  exams,
-  onExamChange,
-  canPersist,
-  pending,
-  onAdd,
   onCreate,
   onClear,
 }: {
   selectedCount: number;
-  exams: readonly Exam[];
-  /** Secilen sinav durumda da tutulur; sonraki eklemede on secili gelir. */
-  onExamChange: (value: string) => void;
-  canPersist: boolean;
-  pending: boolean;
-  /** Hedef sinav dogrudan gecirilir; durum guncellemesini beklemek gerekmesin. */
-  onAdd: (examId: string) => void;
   onCreate: () => void;
   onClear: () => void;
 }) {
@@ -951,53 +876,9 @@ function SelectionBar({
         <Separator orientation="vertical" className="mx-1 h-6" />
 
         {/*
-          Sinav secici + "Ekle" iki ayri denetimdi: once listeden sinav sec,
-          sonra dugmeye bas. Ikisi tek dugmede birlestirildi - menuden bir
-          sinav secmek zaten "oraya ekle" demek, ikinci bir onay adimina
-          gerek yok.
-        */}
-        {exams.length > 0 ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                size="sm"
-                variant="outline"
-                className="gap-1.5"
-                disabled={pending || !canPersist}
-              >
-                {pending ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Plus className="h-3.5 w-3.5" />
-                )}
-                Sınava ekle
-                <ChevronDown className="h-3.5 w-3.5 opacity-60" />
-              </Button>
-            </DropdownMenuTrigger>
-
-            <DropdownMenuContent align="end" className="max-h-72 w-60 overflow-y-auto">
-              <DropdownMenuLabel>Hangi sınava eklensin?</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {exams.map((exam) => (
-                <DropdownMenuItem
-                  key={exam.id}
-                  onSelect={() => {
-                    onExamChange(exam.id);
-                    // Secim durumu bir sonraki render'da yazilacagi icin
-                    // hedef sinav dogrudan gecirilir.
-                    onAdd(exam.id);
-                  }}
-                >
-                  <span className="truncate">{exam.title}</span>
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ) : null}
-
-        {/*
-          Bu dugme "yapay zeka" dugmesi DEGIL: egitmen sorulari zaten kendi
-          secti, burada yapilan is sinavin ayarlarini girmek.
+          Var olan bir sinava soru eklemek BU EKRANIN isi degil: o sinavin
+          kendi duzenleme ekraninda, sorularin sirasi ve puanlari gorunurken
+          yapiliyor. Havuz ekrani yeni sinav kurmaya odakli.
         */}
         <Button size="sm" className="gap-1.5" onClick={onCreate}>
           <ClipboardList className="h-3.5 w-3.5" />
