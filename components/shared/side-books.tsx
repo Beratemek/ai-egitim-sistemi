@@ -1,16 +1,14 @@
 /**
- * Panel kenarlarındaki kitap yığınları.
+ * Panel kenarlarındaki kitaplık.
  *
- * Geniş ekranlarda içerik sütununun iki yanında geniş boş şeritler kalıyordu;
- * ekran "dümdüz" duruyordu. Buraya üst üste yığılmış kitaplar konuldu:
- * ürünün ne olduğunu söyleyen, okumayı bölmeyen bir dolgu.
- *
- * Kitaplar YATAY duruyor - dar bir şeritte dikey sırtlar çubuk grafiğe
- * benzerken, yığılmış ciltler açıkça kitap okunuyor. Her cildin genişliği ve
- * rengi farklı; gerçek bir yığında da hiçbir kitap diğerinin aynı değil.
+ * İlk deneme yatay yığılmış ciltlerdi; uniform yuvarlak kutular olduğu için
+ * kitaptan çok çubuk grafiğe benziyordu. Bu sürümde kitaplar RAFTA DİK
+ * duruyor: farklı yükseklikte sırtlar, aralarında birkaç yatık cilt, altta
+ * gerçek bir raf tahtası. Yükseklik farkı ve yatık ciltler olmadan sıra
+ * hâlâ "çubuk" gibi okunuyordu.
  *
  * Tamamı dekoratif: `aria-hidden`, `pointer-events-none` ve yalnızca xl ve
- * üzeri ekranlarda görünür. Dar ekranda içerik için yer bırakmak, süslemeden
+ * üzeri ekranlarda görünür. Dar ekranda içerik için yer bırakmak süslemeden
  * önce gelir.
  */
 
@@ -19,25 +17,41 @@ export interface SideBooksProps {
   className?: string;
 }
 
-/** Yığındaki ciltler: genişlik, kalınlık, renk numarası, eğim. */
-const YIGIN: readonly {
-  w: number;
-  h: number;
-  book: number;
-  tilt: number;
-}[] = [
-  { w: 96, h: 16, book: 4, tilt: 0 },
-  { w: 84, h: 13, book: 2, tilt: -1.2 },
-  { w: 100, h: 19, book: 1, tilt: 0.8 },
-  { w: 78, h: 12, book: 6, tilt: 0 },
-  { w: 92, h: 17, book: 3, tilt: -0.9 },
-  { w: 88, h: 14, book: 8, tilt: 1.4 },
-  { w: 104, h: 21, book: 5, tilt: 0 },
-  { w: 80, h: 13, book: 7, tilt: -1.6 },
-  { w: 96, h: 16, book: 2, tilt: 0 },
-  { w: 86, h: 18, book: 4, tilt: 1 },
-  { w: 74, h: 12, book: 6, tilt: 0 },
-  { w: 98, h: 15, book: 1, tilt: -0.7 },
+/** Bir rafta duran ciltler: genişlik, yükseklik, renk, eğim. */
+type Cilt = { w: number; h: number; book: number; tilt?: number };
+
+/** Raflar aşağıdan yukarıya. Her raf kendi ritmini taşır. */
+const RAFLAR: readonly Cilt[][] = [
+  [
+    { w: 13, h: 74 },
+    { w: 9, h: 62, book: 2 },
+    { w: 16, h: 82, book: 4 },
+    { w: 8, h: 56, book: 8 },
+    { w: 12, h: 70, book: 3, tilt: -7 },
+    { w: 18, h: 66, book: 5 },
+    { w: 10, h: 78, book: 7 },
+  ].map((c, i) => ({ book: (i % 8) + 1, ...c })),
+  [
+    { w: 10, h: 58, book: 6 },
+    { w: 15, h: 72, book: 1 },
+    { w: 8, h: 64, book: 3 },
+    { w: 13, h: 80, book: 8 },
+    { w: 17, h: 60, book: 4, tilt: 5 },
+    { w: 9, h: 68, book: 2 },
+  ],
+  [
+    { w: 14, h: 66, book: 5 },
+    { w: 8, h: 54, book: 7 },
+    { w: 11, h: 76, book: 2 },
+    { w: 16, h: 62, book: 6 },
+    { w: 10, h: 70, book: 1, tilt: -5 },
+  ],
+];
+
+/** Rafın en üstüne yatık konmuş bir cilt - dik sıranın tekdüzeliğini kırar. */
+const YATIK: readonly { raf: number; w: number; h: number; book: number }[] = [
+  { raf: 0, w: 34, h: 9, book: 6 },
+  { raf: 2, w: 28, h: 8, book: 3 },
 ];
 
 export function SideBooks({ side, className }: SideBooksProps) {
@@ -52,49 +66,82 @@ export function SideBooks({ side, className }: SideBooksProps) {
         className ?? "",
       ].join(" ")}
     >
-      <div
-        className={[
-          "flex flex-col-reverse items-end gap-[3px] px-3 pb-6",
-          sol ? "items-start" : "items-end",
-        ].join(" ")}
-      >
-        {YIGIN.map((kitap, index) => (
-          <div
-            key={index}
-            className={sol ? "animate-kitap-soldan" : "animate-kitap-sagdan"}
-            style={{
-              // Kademeli gecikme: yigin alttan uste dogru kurulmus gibi
-              // gorunsun, hepsi ayni anda belirmesin.
-              animationDelay: `${index * 60}ms`,
-            }}
-          >
-            <div
-              className="relative rounded-[3px] shadow-sm"
-              style={{
-                width: `${kitap.w}px`,
-                height: `${kitap.h}px`,
-                background: `hsl(var(--book-${kitap.book}) / 0.55)`,
-                transform: `rotate(${kitap.tilt}deg)`,
-              }}
-            >
-              {/* Sayfa kenari: cildin ic tarafinda acik bir serit */}
-              <span
-                className="absolute inset-y-[2px] rounded-[2px] bg-background/70"
-                style={
-                  sol
-                    ? { right: "3px", width: "5px" }
-                    : { left: "3px", width: "5px" }
-                }
-              />
+      <div className="flex flex-col justify-end gap-5 px-4 pb-8">
+        {RAFLAR.map((raf, rafIndex) => {
+          const yatik = YATIK.find((item) => item.raf === rafIndex);
 
-              {/* Sirttaki bant */}
+          return (
+            <div key={rafIndex} className="flex flex-col items-start">
+              {/* Ciltler */}
+              <div
+                className={[
+                  "flex items-end gap-[2px]",
+                  sol ? "justify-start" : "justify-end",
+                ].join(" ")}
+              >
+                {raf.map((cilt, index) => (
+                  <span
+                    key={index}
+                    className={sol ? "animate-kitap-soldan" : "animate-kitap-sagdan"}
+                    style={{
+                      animationDelay: `${(rafIndex * 7 + index) * 45}ms`,
+                    }}
+                  >
+                    <span
+                      className="relative block rounded-t-[2px]"
+                      style={{
+                        width: `${cilt.w}px`,
+                        height: `${cilt.h}px`,
+                        background: `hsl(var(--book-${cilt.book}) / 0.42)`,
+                        transform: cilt.tilt
+                          ? `rotate(${cilt.tilt}deg)`
+                          : undefined,
+                        transformOrigin: "bottom center",
+                      }}
+                    >
+                      {/* Sırttaki bantlar */}
+                      <span className="absolute inset-x-[2px] top-[9px] h-[2px] rounded-full bg-background/55" />
+                      <span className="absolute inset-x-[2px] bottom-[11px] h-[2px] rounded-full bg-background/55" />
+
+                      {/* Geniş ciltlerde sırt yazısı izlenimi */}
+                      {cilt.w >= 13 ? (
+                        <span className="absolute inset-y-[18px] left-1/2 w-[2px] -translate-x-1/2 rounded-full bg-background/35" />
+                      ) : null}
+                    </span>
+                  </span>
+                ))}
+
+                {/* Yatık cilt: dik sıranın yanına devrilmiş gibi */}
+                {yatik ? (
+                  <span
+                    className={[
+                      "self-end",
+                      sol ? "animate-kitap-soldan" : "animate-kitap-sagdan",
+                    ].join(" ")}
+                    style={{ animationDelay: `${rafIndex * 120 + 200}ms` }}
+                  >
+                    <span
+                      className="relative ml-[3px] block rounded-[2px]"
+                      style={{
+                        width: `${yatik.w}px`,
+                        height: `${yatik.h}px`,
+                        background: `hsl(var(--book-${yatik.book}) / 0.42)`,
+                      }}
+                    >
+                      <span className="absolute inset-y-[2px] left-[6px] w-[2px] rounded-full bg-background/55" />
+                    </span>
+                  </span>
+                ) : null}
+              </div>
+
+              {/* Raf tahtası */}
               <span
-                className="absolute inset-y-[3px] w-[2px] rounded-full bg-background/50"
-                style={sol ? { left: "10px" } : { right: "10px" }}
+                className="mt-[2px] block h-[3px] rounded-full bg-foreground/[0.14]"
+                style={{ width: "100%", minWidth: "108px" }}
               />
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
