@@ -106,7 +106,12 @@ export function PendingByClassroom({ reviews }: PendingByClassroomProps) {
                 <section key={classroom} className="space-y-2.5">
                   <div className="flex items-center gap-2">
                     <Users className="h-4 w-4 text-muted-foreground" />
-                    <h3 className="text-sm font-semibold">{classroom}</h3>
+                    <Link
+                      href={`/dashboard/egitmen/kontrol/${encodeURIComponent(classroom)}`}
+                      className="text-sm font-semibold hover:text-primary hover:underline"
+                    >
+                      {classroom}
+                    </Link>
                     <span className="text-xs text-muted-foreground">
                       {classroomPending} cevap · {items.length} sınav
                     </span>
