@@ -32,15 +32,17 @@ export default async function KontrolDetayPage({ params }: PageProps) {
 
   return (
     <>
+      {/* Geri: bir ust seviye DERSLIK. Egitmen ayni dersligin diger
+          sinavlarina gecerken en basa donmek zorunda kalmasin. */}
       <Link
-        href="/dashboard/egitmen/kontrol"
+        href={`/dashboard/egitmen/kontrol/${encodeURIComponent(classroom)}`}
         className={cn(
           buttonVariants({ variant: "ghost", size: "sm" }),
           "-ml-2 gap-1.5 text-muted-foreground",
         )}
       >
         <ArrowLeft className="h-4 w-4" />
-        Sınav kontrolü
+        {classroom} sınavları
       </Link>
 
       <PageHeader

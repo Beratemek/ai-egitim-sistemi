@@ -198,8 +198,7 @@ export function ExamCreateDialog({
           {canPersist ? null : (
             <p className="flex items-start gap-2 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2.5 text-xs text-warning">
               <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-              Demo modu: formu inceleyebilirsiniz ama Supabase baglantisi olmadan
-              sınav kaydedilemez.
+              Tanıtım modu: formu inceleyebilirsiniz, kayıt yapılmaz.
             </p>
           )}
 

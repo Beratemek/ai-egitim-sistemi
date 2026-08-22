@@ -6,6 +6,7 @@ import { demoGuard, type ActionResult } from "@/app/actions/shared";
 import { isSupabaseConfigured } from "@/lib/env";
 import { getSubjectOptions } from "@/lib/queries";
 import { canonicalizeSubject } from "@/lib/subjects";
+import type { Exam } from "@/lib/types";
 import { createServerSupabaseClient, getCurrentUser } from "@/lib/supabase-server";
 
 /** Sinav degisikliklerinden etkilenen sayfalari tazeler. */
@@ -311,4 +312,281 @@ export async function setExamSubject(
 
   revalidateExamPaths(examId);
   return { ok: true, data: { subject: updated[0]?.subject ?? null } };
+}
+
+export interface ExamSettingsInput {
+  /** Ogrenci basina sure (dakika). null: yalnizca pencere gecerli. */
+  durationMinutes?: number | null;
+  /** Kamera+mikrofon zorunlulugu. */
+  proctored?: boolean;
+}
+
+/**
+ * Sinav ayarlarini gunceller.
+ *
+ * Tek fonksiyon, cunku ayarlar tek panelde birlikte duzenleniyor; her alan
+ * icin ayri bir eylem, ayni ekrandan pes pese istek atilmasina yol acardi.
+ * Yalnizca VERILEN alanlar yazilir - kismi guncelleme, dokunulmayan ayarin
+ * sifirlanmamasi icin.
+ */
+export async function updateExamSettings(
+  examId: string,
+  input: ExamSettingsInput,
+): Promise<ActionResult<{ durationMinutes: number | null; proctored: boolean }>> {
+  if (!isSupabaseConfigured) return demoGuard();
+  if (!examId) return { ok: false, error: "Sinav secilmedi." };
+
+  const patch: Partial<Pick<Exam, "duration_minutes" | "proctored">> = {};
+
+  if (input.durationMinutes !== undefined) {
+    const dakika = input.durationMinutes;
+
+    if (dakika !== null) {
+      if (!Number.isInteger(dakika) || dakika < 1 || dakika > 600) {
+        return { ok: false, error: "Sure 1 ile 600 dakika arasinda olmalidir." };
+      }
+    }
+    patch.duration_minutes = dakika;
+  }
+
+  if (input.proctored !== undefined) patch.proctored = input.proctored;
+
+  if (Object.keys(patch).length === 0) {
+    return { ok: false, error: "Degistirilecek ayar verilmedi." };
+  }
+
+  const supabase = await createServerSupabaseClient();
+
+  // `.select()` sart: RLS eslesmezse PostgREST hata dondurmez, sessizce
+  // 0 satir gunceller ve egitmen "kaydedildi" sanir.
+  const { data: updated, error } = await supabase
+    .from("exams")
+    .update(patch)
+    .eq("id", examId)
+    .select("id, duration_minutes, proctored");
+
+  if (error) return { ok: false, error: error.message };
+
+  if (!updated || updated.length === 0) {
+    return {
+      ok: false,
+      error:
+        "Ayar kaydedilemedi: bu sinav uzerinde yetkiniz yok ya da sinav artik mevcut degil.",
+    };
+  }
+
+  revalidateExamPaths(examId);
+  revalidatePath("/dashboard/ogrenci", "layout");
+
+  return {
+    ok: true,
+    data: {
+      durationMinutes: updated[0]?.duration_minutes ?? null,
+      proctored: updated[0]?.proctored ?? false,
+    },
+  };
+}
+
+/**
+ * Bir sorunun sinavdaki puanini degistirir.
+ *
+ * Puanlar sinava OZELDIR (exam_questions), soruya degil: ayni soru bir
+ * sinavda 5, digerinde 20 puan olabilir. Sifir puana izin verilmez -
+ * toplam sifir olursa sonuc hesaplama bolme yapamaz ve sinav asla
+ * sonuclanmaz; kural veritabaninda da check kisitiyla var.
+ */
+export async function setExamQuestionPoints(
+  examId: string,
+  questionId: string,
+  points: number,
+): Promise<ActionResult<{ points: number }>> {
+  if (!isSupabaseConfigured) return demoGuard();
+  if (!examId || !questionId) return { ok: false, error: "Soru secilmedi." };
+
+  if (!Number.isInteger(points) || points < 1 || points > 100) {
+    return { ok: false, error: "Puan 1 ile 100 arasinda bir tam sayi olmalidir." };
+  }
+
+  const supabase = await createServerSupabaseClient();
+
+  const { data: updated, error } = await supabase
+    .from("exam_questions")
+    .update({ points })
+    .eq("exam_id", examId)
+    .eq("question_id", questionId)
+    .select("question_id, points");
+
+  if (error) return { ok: false, error: error.message };
+
+  /**
+   * Elle puan verildigi anda otomatik dagitim kapanir.
+   *
+   * Aksi halde egitmen puanlari ayarladiktan sonra sinava bir soru eklese
+   * butun emegi silinir, puanlar yeniden esit dagitilirdi. Geri acmak icin
+   * "Eşit dağıt" var.
+   */
+  if (updated && updated.length > 0) {
+    await supabase.from("exams").update({ points_auto: false }).eq("id", examId);
+  }
+
+  if (!updated || updated.length === 0) {
+    return {
+      ok: false,
+      error:
+        "Puan kaydedilemedi: bu sinav uzerinde yetkiniz yok ya da soru artik sinavda degil.",
+    };
+  }
+
+  revalidateExamPaths(examId);
+  return { ok: true, data: { points: updated[0]?.points ?? points } };
+}
+
+/**
+ * Puanlari soru sayisina gore yeniden esit dagitir (toplam 100).
+ *
+ * Otomatik dagitimi da yeniden ACAR: egitmen bundan sonra soru ekleyip
+ * cikardikca puanlar kendiliginden guncellenir. Elle bir puana dokundugu
+ * anda tekrar kapanir.
+ */
+export async function resetExamPoints(
+  examId: string,
+): Promise<ActionResult<{ total: number }>> {
+  if (!isSupabaseConfigured) return demoGuard();
+  if (!examId) return { ok: false, error: "Sinav secilmedi." };
+
+  const supabase = await createServerSupabaseClient();
+  const { data, error } = await supabase.rpc("reset_exam_points", {
+    target_exam: examId,
+  });
+
+  if (error) {
+    if (error.code === "42501") {
+      return { ok: false, error: "Bu sinavin puanlarini degistirme yetkiniz yok." };
+    }
+    return { ok: false, error: error.message };
+  }
+
+  revalidateExamPaths(examId);
+  return { ok: true, data: { total: (data as number | null) ?? 0 } };
+}
+
+export interface CreateExamWithQuestionsInput {
+  title: string;
+  description?: string;
+  subject?: string;
+  /** Ogrenci basina sure (dakika). Verilmezse sutun varsayilani (60) uygulanir. */
+  durationMinutes?: number;
+  /** Kamera+mikrofon zorunlulugu. */
+  proctored?: boolean;
+  /** Sinava eklenecek soru kimlikleri. */
+  questionIds: readonly string[];
+  /**
+   * Soru basina puan (soru kimligi -> puan).
+   *
+   * Verilirse otomatik dagitim KAPATILIR: egitmen puanlari elle belirlemis
+   * demektir ve sonradan soru eklemek onun girdigi degerleri silmemeli.
+   * Verilmezse puanlar 100 uzerinden kendiliginden dagitilir.
+   */
+  points?: Readonly<Record<string, number>>;
+}
+
+/**
+ * Sinavi olusturur ve secilen sorulari TEK ADIMDA ekler.
+ *
+ * Ayri ayri cagrilsa arada bir hata olustugunda ortada sorusuz bir sinav
+ * kalirdi; egitmen de onu bulup silmek zorunda kalirdi. Soru ekleme
+ * basarisiz olursa olusturulan sinav geri alinir.
+ */
+export async function createExamWithQuestions(
+  input: CreateExamWithQuestionsInput,
+): Promise<ActionResult<{ id: string; added: number }>> {
+  if (!isSupabaseConfigured) return demoGuard();
+
+  const title = input.title.trim();
+  if (!title) return { ok: false, error: "Sinav basligi zorunludur." };
+
+  const ids = [...new Set(input.questionIds)].filter(Boolean);
+  if (ids.length === 0) return { ok: false, error: "En az bir soru secmelisiniz." };
+
+  if (
+    input.durationMinutes !== undefined &&
+    (!Number.isInteger(input.durationMinutes) ||
+      input.durationMinutes < 1 ||
+      input.durationMinutes > 600)
+  ) {
+    return { ok: false, error: "Sure 1 ile 600 dakika arasinda olmalidir." };
+  }
+
+  const current = await getCurrentUser();
+  if (!current) return { ok: false, error: "Oturum acmaniz gerekiyor." };
+
+  const subject = input.subject
+    ? canonicalizeSubject(input.subject, await getSubjectOptions())
+    : "";
+
+  const supabase = await createServerSupabaseClient();
+
+  const elle = input.points ?? null;
+
+  const { data: exam, error } = await supabase
+    .from("exams")
+    .insert({
+      title,
+      description: input.description?.trim() ?? "",
+      subject: subject || null,
+      instructor_id: current.user.id,
+      ...(input.proctored === undefined ? {} : { proctored: input.proctored }),
+      ...(input.durationMinutes === undefined
+        ? {}
+        : { duration_minutes: input.durationMinutes }),
+      // Elle puan verildiyse otomatik dagitim bastan kapali olmali; aksi
+      // halde tetikleyici sorular eklenirken puanlari esitleyip yazardi.
+      ...(elle ? { points_auto: false } : {}),
+    })
+    .select("id")
+    .single();
+
+  if (error) return { ok: false, error: error.message };
+
+  const added = await addExamQuestions(exam.id, ids);
+
+  if (!added.ok) {
+    // Sorusuz sinav birakma: olusturulani geri al.
+    await supabase.from("exams").delete().eq("id", exam.id);
+    return { ok: false, error: added.error };
+  }
+
+  if (elle) {
+    // Ayni puani alan sorular tek istekte guncellenir; soru basina istek
+    // 40 soruluk bir sinavda 40 gidis-donus demek olurdu.
+    const gruplar = new Map<number, string[]>();
+
+    for (const id of ids) {
+      const puan = elle[id];
+      if (!Number.isInteger(puan) || puan === undefined || puan < 1 || puan > 100) {
+        continue;
+      }
+      const bucket = gruplar.get(puan) ?? [];
+      bucket.push(id);
+      gruplar.set(puan, bucket);
+    }
+
+    for (const [puan, grup] of gruplar) {
+      const { error: puanError } = await supabase
+        .from("exam_questions")
+        .update({ points: puan })
+        .eq("exam_id", exam.id)
+        .in("question_id", grup);
+
+      if (puanError) {
+        return {
+          ok: false,
+          error: `Sinav olusturuldu ama puanlar yazilamadi: ${puanError.message}`,
+        };
+      }
+    }
+  }
+
+  revalidateExamPaths(exam.id);
+  return { ok: true, data: { id: exam.id, added: added.data.added } };
 }

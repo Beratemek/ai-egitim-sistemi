@@ -35,7 +35,7 @@ export function StatCard({
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             {label}
           </p>
-          <p className="mt-2 text-3xl font-semibold tracking-tight">{value}</p>
+          <p className="tabular mt-2 font-display text-3xl">{value}</p>
           {hint ? (
             <p className="mt-1 truncate text-xs text-muted-foreground">{hint}</p>
           ) : null}

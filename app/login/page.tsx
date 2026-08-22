@@ -28,26 +28,43 @@ export default async function LoginPage({
     <main className="grid min-h-screen lg:grid-cols-2">
       {/* ---------- Sol: marka paneli (yalnızca genis ekran) ---------- */}
       <aside className="relative hidden flex-col justify-between overflow-hidden bg-primary p-12 text-primary-foreground lg:flex">
-        <div className="bg-grid absolute inset-0 opacity-[0.07]" aria-hidden />
+        {/*
+          Izgara + bulanik kure yerine kitap rafi. O ikili neredeyse her
+          hazir sablonda var; raf ise urunun ne oldugunu soyluyor.
+        */}
+        <div className="bg-paper absolute inset-0 opacity-[0.12]" aria-hidden />
         <div
-          className="absolute -right-24 -top-24 h-96 w-96 rounded-full bg-white/10 blur-3xl"
+          className="bg-shelf pointer-events-none absolute inset-x-0 bottom-0 h-64 opacity-[0.22]"
           aria-hidden
         />
 
         <div className="relative">
+          {/*
+            Burada elle yazilmis bir "A" harfi vardi; sitede iki farkli logo
+            dolasiyordu. Marka isareti tek yerden gelmeli.
+          */}
           <Link href="/" className="flex items-center gap-2.5">
-            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/15 backdrop-blur">
-              <span className="text-lg font-semibold">A</span>
+            <span className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-white/15 backdrop-blur">
+              <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" aria-hidden>
+                <path
+                  d="M4 4.6A1.6 1.6 0 0 1 5.6 3H10a2.5 2.5 0 0 1 2 1 2.5 2.5 0 0 1 2-1h4.4A1.6 1.6 0 0 1 20 4.6v12.8a1.6 1.6 0 0 1-1.6 1.6H14a2.5 2.5 0 0 0-2 1 2.5 2.5 0 0 0-2-1H5.6A1.6 1.6 0 0 1 4 17.4Z"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.7"
+                  strokeLinejoin="round"
+                />
+                <path d="M12 5.6v13.4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+              </svg>
             </span>
-            <span className="text-sm font-semibold tracking-tight">
+            <span className="font-display text-[15px] font-semibold">
               AI Destekli Eğitim Sistemi
             </span>
           </Link>
         </div>
 
         <div className="relative space-y-8">
-          <h1 className="max-w-md text-4xl font-semibold leading-tight tracking-tight">
-            Degerlendirmenin yorucu kismini yapay zekaya bırakın.
+          <h1 className="max-w-md font-display text-4xl leading-[1.12]">
+            Değerlendirmenin yorucu kısmını yapay zekâya bırakın.
           </h1>
 
           <ul className="space-y-3">
@@ -61,7 +78,7 @@ export default async function LoginPage({
         </div>
 
         <p className="relative text-xs text-white/60">
-          Hackathon MVP &middot; Next.js + Supabase + AI SDK
+          Ölçme ve değerlendirmede öğretmenin yanında.
         </p>
       </aside>
 
@@ -85,7 +102,7 @@ export default async function LoginPage({
             </div>
 
             <div>
-              <h2 className="text-2xl font-semibold tracking-tight">
+              <h2 className="font-display text-2xl">
                 Hesabiniza giriş yapın
               </h2>
               <p className="mt-1.5 text-sm text-muted-foreground">
@@ -96,9 +113,7 @@ export default async function LoginPage({
             <LoginForm callbackError={callbackError} />
 
             <p className="text-center text-xs text-muted-foreground">
-              Sorun mu yasiyorsunuz?{" "}
-              <code className="font-mono">supabase/schema.sql</code> dosyasinin
-              calistirildigindan emin olun.
+              Giriş yapamıyorsanız okulunuzun sistem yöneticisine başvurun.
             </p>
           </div>
         </div>

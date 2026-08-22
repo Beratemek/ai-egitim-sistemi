@@ -3,10 +3,8 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import {
-  CheckCircle2,
   Loader2,
   Lock,
-  Save,
   Sparkles,
   TriangleAlert,
 } from "lucide-react";
@@ -14,7 +12,6 @@ import { toast } from "sonner";
 
 import { submitAnswer, type SubmitAnswerResult } from "@/app/actions/submissions";
 import { SubmissionStatusBadge } from "@/components/shared/status-badge";
-import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
@@ -64,15 +61,15 @@ export function AnswerForm({
   const [answer, setAnswer] = React.useState(persistedAnswer);
   const [savedAnswer, setSavedAnswer] = React.useState(persistedAnswer);
   const [draftReady, setDraftReady] = React.useState(false);
-  const [restoredDraft, setRestoredDraft] = React.useState(false);
   const [pending, setPending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [result, setResult] = React.useState<SubmitAnswerResult | null>(null);
 
   const wordCount = answer.trim() ? answer.trim().split(/\s+/).length : 0;
+  /** Coktan secmeli mi? Otomatik kaydetmenin gecikmesi buna gore degisir. */
+  const isTest = type === "test";
   const hasChanged = answer.trim() !== savedAnswer.trim();
   const meetsMinimum = type !== "acik_uclu" || answer.trim().length >= 10;
-  const canSubmit = answer.trim().length > 0 && meetsMinimum && hasChanged && !pending;
   const draftKey = `student-exam-draft:${studentId}:${examId}:${questionId}`;
 
   React.useEffect(() => {
@@ -80,7 +77,6 @@ export function AnswerForm({
     const stored = window.sessionStorage.getItem(draftKey);
     if (stored !== null && stored !== persistedAnswer) {
       setAnswer(stored);
-      setRestoredDraft(true);
     }
     setDraftReady(true);
   }, [draftKey, existing, isDraft, persistedAnswer]);
@@ -91,7 +87,6 @@ export function AnswerForm({
       window.sessionStorage.setItem(draftKey, answer);
     } else {
       window.sessionStorage.removeItem(draftKey);
-      setRestoredDraft(false);
     }
   }, [answer, draftKey, draftReady, existing, isDraft, savedAnswer]);
 
@@ -105,12 +100,21 @@ export function AnswerForm({
     return () => window.removeEventListener("beforeunload", warnBeforeLeave);
   }, [answer, hasChanged]);
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  /**
+   * Cevabi kaydeder.
+   *
+   * Artik dugmeye basmakla degil, KENDILIGINDEN cagriliyor: sikki
+   * isaretlemek zaten "cevabim bu" demek, ayrica onaylatmak gereksiz bir
+   * adimdi. Acik uclu cevaplarda yazma durunca (gecikmeli) kaydediliyor -
+   * her tus vurusunda gondermek sunucuyu bosuna mesgul ederdi.
+   */
+  async function kaydet(metin: string) {
+    if (pending) return;
+
     setPending(true);
     setError(null);
 
-    const response = await submitAnswer({ examId, questionId, answerText: answer });
+    const response = await submitAnswer({ examId, questionId, answerText: metin });
 
     setPending(false);
 
@@ -124,23 +128,47 @@ export function AnswerForm({
     setResult(response.data.persisted ? null : response.data);
 
     if (response.data.persisted) {
-      setSavedAnswer(answer);
-      setRestoredDraft(false);
+      setSavedAnswer(metin);
       window.sessionStorage.removeItem(draftKey);
     }
 
-    toast.success(
-      response.data.persisted ? "Cevabınız kaydedildi" : "Cevabınız değerlendirildi",
-      {
-        description: response.data.persisted
-          ? "Sınavı bitirene kadar cevabınızı değiştirebilirsiniz."
-          : "Demo modu: sonuç gösterildi ama veritabanına yazılmadı.",
-      },
-    );
+    // Kayit artik her isaretlemede kendiliginden oluyor; her seferinde
+    // bildirim cikarmak sinav boyunca onlarca kez ekrani mesgul ederdi.
+    // Durum satir icindeki gostergeden okunuyor.
+    if (!response.data.persisted) {
+      toast.success("Cevabınız değerlendirildi", {
+        description: "Tanıtım modu: sonuç gösterildi, kayıt yapılmadı.",
+      });
+    }
 
     // Kaydedildiyse sayfayi tazele: ilerleme ve geçmiş cevaplar guncellenir.
     if (response.data.persisted) router.refresh();
   }
+
+  /**
+   * Otomatik kaydetme.
+   *
+   * Test sorusunda sik degisince HEMEN, acik uclu cevapta yazma durduktan
+   * 1.2 saniye sonra kaydedilir. Gecikme sart: her tus vurusunda istek
+   * atmak hem sunucuyu hem de ogrencinin baglantisini bosuna yorardi.
+   *
+   * `draftReady` beklenir: taslak geri yuklenmeden kaydetmek, geri yuklenen
+   * metnin uzerine bos degeri yazabilirdi.
+   */
+  React.useEffect(() => {
+    if (!draftReady) return;
+    if (answer === savedAnswer) return;
+    if (!answer.trim()) return;
+    if (!meetsMinimum) return;
+
+    const gecikme = isTest ? 0 : 1200;
+    const zamanlayici = window.setTimeout(() => void kaydet(answer), gecikme);
+
+    return () => window.clearTimeout(zamanlayici);
+    // `kaydet` her render'da yeniden olusuyor; bagimlilik listesine
+    // alinsaydi effect surekli tetiklenirdi.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [answer, savedAnswer, draftReady, isTest, meetsMinimum]);
 
   // AI'a gonderilmis cevap artık degistirilemez.
   if (existing && !isDraft) {
@@ -175,30 +203,15 @@ export function AnswerForm({
 
   return (
     <div className="space-y-4">
-      <form onSubmit={handleSubmit} className="space-y-3">
-        {hasChanged && answer.trim() ? (
-          <div className="flex items-start gap-2 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning">
-            <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            <span>
-              {restoredDraft
-                ? "Kaydedilmemiş taslağınız bu sekmede geri yüklendi. Veritabanına kaydetmek için Cevabı kaydet'e basın."
-                : "Kaydedilmemiş değişiklikleriniz var."}
-            </span>
-          </div>
-        ) : savedAnswer ? (
-          <div className="flex items-center gap-2 rounded-lg bg-success/10 px-3 py-2 text-xs text-success">
-            <CheckCircle2 className="h-3.5 w-3.5" />
-            Bu sorunun son değişiklikleri kaydedildi.
-          </div>
-        ) : null}
+      <form onSubmit={(event) => event.preventDefault()} className="space-y-3">
+        {/*
+          Kaydetme durumu icin serit YOK.
 
-        {isDraft ? (
-          <div className="flex items-center justify-between rounded-lg bg-primary/5 px-3 py-2 text-xs text-primary">
-            <span>Cevabınız kaydedildi; sınavı bitirene kadar düzenleyebilirsiniz.</span>
-            <SubmissionStatusBadge status="gonderildi" />
-          </div>
-        ) : null}
-
+          Cevap kendiliginden kaydediliyor ve secilen sikkin yesil yanmasi
+          ogrenciye zaten "cevabin alindi" diyor. Ustune "kaydedildi",
+          "kaydedilmemis degisiklik var" gibi seritler koymak sinav boyunca
+          her soruda tekrar eden bir gurultuydu.
+        */}
         {type === "test" ? (
           <fieldset className="space-y-2">
             <legend className="mb-2 text-sm font-medium">Dogru sikki secin</legend>
@@ -264,23 +277,26 @@ export function AnswerForm({
           </p>
         ) : null}
 
-        <Button type="submit" className="gap-2" disabled={!canSubmit}>
-          {pending ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Gonderiliyor...
-            </>
-          ) : (
-            <>
-              <Save className="h-4 w-4" />
-              {isDraft ? "Değişiklikleri kaydet" : "Cevabı kaydet"}
-            </>
-          )}
-        </Button>
-
-        <p className="text-xs text-muted-foreground">
-          Cevaplarınız, sınavı bitirme adimina kadar taslak olarak saklanir.
-        </p>
+        {/*
+          Kaydet dugmesi kaldirildi: sikki isaretlemek zaten "cevabim bu"
+          demek. Yerine ne olup bittigini soyleyen bir gosterge var -
+          ogrenci cevabinin gittigini gormeli, ama bunun icin bir dugmeye
+          basmak zorunda kalmamali.
+        */}
+        {/*
+          Yalnizca istek SURERKEN gorunur. Basarili kayitta hicbir sey
+          yazmiyoruz - yesil sik zaten yeterli geri bildirim. Yavas bir
+          baglantida ekranin donmus gibi gorunmemesi icin bu kadari kaliyor.
+        */}
+        {pending ? (
+          <p
+            className="flex items-center gap-1.5 text-xs text-muted-foreground"
+            aria-live="polite"
+          >
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            Kaydediliyor...
+          </p>
+        ) : null}
       </form>
 
       {result ? (
@@ -448,7 +464,7 @@ function GradePanel({
         <p className="rounded-lg bg-warning/10 px-3 py-2 text-xs text-warning">
           {persisted
             ? "Bu puan geçicidir; eğitmen onayından sonra kesinleşir."
-            : "Demo modu: sonuç veritabanına yazılmadı."}
+            : "Tanıtım modu: sonuç kaydedilmedi."}
         </p>
       )}
     </div>

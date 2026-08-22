@@ -3,7 +3,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   ArrowLeft,
+  ArrowRight,
   CalendarClock,
+  Camera,
   CheckCircle2,
   Clock3,
   Hourglass,
@@ -12,24 +14,25 @@ import {
 
 import { AiMockNotice } from "@/components/shared/ai-mock-notice";
 import { ExamCountdown } from "@/components/shared/exam-countdown";
-import { ExamFinalizePanel } from "@/components/shared/exam-finalize-panel";
 import { ExamStartPanel } from "@/components/shared/exam-start-panel";
 import { PageHeader } from "@/components/shared/page-header";
 import { StudentExamQuestions } from "@/components/shared/student-exam-questions";
 import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
 import {
   Card,
   CardContent,
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { serverEnv } from "@/lib/env";
+import { effectiveDeadline } from "@/lib/exam-time";
 import { getStudentExamDetail } from "@/lib/queries";
 import { getCurrentUser } from "@/lib/supabase-server";
 import {
   canAnswerStudentExam,
   getStudentExamStatus,
 } from "@/lib/student-exam-status";
-import { formatDateTime } from "@/lib/utils";
+import { cn, formatDateTime } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Sınav" };
 
@@ -86,6 +89,18 @@ export default async function OgrenciSinavPage({
     evaluatedCount: evaluated,
     approvedCount: approved,
     attemptStatus: attempt?.status,
+    attemptStartedAt: attempt?.started_at ?? null,
+  });
+
+  /**
+   * Ogrenciyi baglayan etkin bitis: pencere ile kisiye ozel sureden hangisi
+   * once biterse o. Sayac ve "Bitis" satiri bunu gosterir, aksi halde
+   * ogrenci 2 saatlik pencereyi gorup 40 dakikasi oldugunu bilmezdi.
+   */
+  const deadline = effectiveDeadline({
+    endsAt: exam.ends_at,
+    durationMinutes: exam.duration_minutes,
+    startedAt: attempt?.started_at ?? null,
   });
   const canAnswer = canAnswerStudentExam(status);
   const lockReason = getLockReason(status, exam.starts_at, exam.ends_at);
@@ -104,7 +119,17 @@ export default async function OgrenciSinavPage({
       <PageHeader
         title={exam.title}
         description={exam.description || "Soruları yanıtlayın."}
-        actions={<ExamStatusBadge status={status} />}
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            {exam.proctored ? (
+              <Badge variant="warning" className="gap-1.5">
+                <Camera className="h-3.5 w-3.5" />
+                Kamera zorunlu
+              </Badge>
+            ) : null}
+            <ExamStatusBadge status={status} />
+          </div>
+        }
       />
 
       {lockReason ? <ExamAvailabilityNotice status={status} message={lockReason} /> : null}
@@ -152,16 +177,21 @@ export default async function OgrenciSinavPage({
               value={questionCount > 0 ? (answered / questionCount) * 100 : 0}
               className="h-2"
             />
-            {exam.ends_at ? (
+            {deadline ? (
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                   <CalendarClock className="h-3.5 w-3.5" />
-                  Bitis: {formatDateTime(exam.ends_at)}
+                  Bitiş: {formatDateTime(deadline.toISOString())}
+                  {exam.duration_minutes !== null ? (
+                    <span className="text-muted-foreground/80">
+                      · {exam.duration_minutes} dk süre
+                    </span>
+                  ) : null}
                 </p>
                 {attempt?.status === "devam_ediyor" ? (
                   <ExamCountdown
                     examId={exam.id}
-                    endsAt={exam.ends_at}
+                    endsAt={deadline.toISOString()}
                     autoSubmit
                   />
                 ) : null}
@@ -171,31 +201,59 @@ export default async function OgrenciSinavPage({
         </Card>
       ) : null}
 
-      {canAnswer && !requiresStart ? (
-        <ExamFinalizePanel
-          examId={exam.id}
-          answeredCount={answered}
-          questionCount={questionCount}
-        />
-      ) : null}
+      {/*
+        Sinav BURADA cozulmuyor.
 
-      {/* ---------- Sorular ---------- */}
-      {requiresStart ? null : questions.length === 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="py-16 text-center text-sm text-muted-foreground">
-            Bu sınava henüz soru eklenmemis.
+        Cozme ekrani /sinav/<id> adresinde, panel kabugunun disinda ve tam
+        ekran. Bu sayfa sinavin kunyesi: kurallar, sure, durum ve sonuc.
+        Sorulari iki yerde birden gostermek, ogrencinin hangi ekranda
+        cevap verdiginden emin olamamasi demekti.
+      */}
+      {canAnswer && !requiresStart ? (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardContent className="flex flex-wrap items-center justify-between gap-4 py-5">
+            <div className="min-w-0">
+              <p className="font-medium">Sınav devam ediyor</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {answered} / {questionCount} soru cevaplandı. Kaldığınız yerden
+                devam edebilirsiniz.
+              </p>
+            </div>
+
+            <Link
+              href={`/sinav/${exam.id}`}
+              className={cn(buttonVariants({ size: "lg" }), "gap-2")}
+            >
+              Sınava devam et
+              <ArrowRight className="h-4 w-4" />
+            </Link>
           </CardContent>
         </Card>
-      ) : (
+      ) : null}
+
+      {/* ---------- Cevaplar (yalnizca sinav bittikten sonra) ---------- */}
+      {!requiresStart && !canAnswer && questions.length > 0 ? (
         <StudentExamQuestions
           examId={exam.id}
           studentId={current.user.id}
           questions={questions}
           submissions={submissions}
-          disabledReason={canAnswer ? null : lockReason}
+          disabledReason={lockReason}
           revealResults={status === "sonuclandi"}
         />
-      )}
+      ) : null}
+
+      {!requiresStart && questions.length === 0 && questionCount > 0 ? (
+        <Card className="border-dashed">
+          <CardContent className="py-12 text-center text-sm text-muted-foreground">
+            <p className="font-medium text-foreground">Sorular yüklenemedi</p>
+            <p className="mx-auto mt-1.5 max-w-sm">
+              Bu sınavda {questionCount} soru var ama size gösterilemedi.
+              Sayfayı yenileyin; sorun sürerse eğitmeninize bildirin.
+            </p>
+          </CardContent>
+        </Card>
+      ) : null}
     </>
   );
 }

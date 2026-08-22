@@ -4,6 +4,7 @@ import {
   ArrowRight,
   BookMarked,
   CalendarClock,
+  Camera,
   FileText,
   Library,
 } from "lucide-react";
@@ -42,7 +43,7 @@ export default async function SinavlarPage() {
         actions={
           <div className="flex items-center gap-2">
             {isSupabaseConfigured ? null : (
-              <Badge variant="warning">Demo — kayıt yapılamaz</Badge>
+              <Badge variant="warning">Tanıtım modu</Badge>
             )}
             <ExamCreateDialog
               canPersist={isSupabaseConfigured}
@@ -90,6 +91,12 @@ export default async function SinavlarPage() {
                       <span className="flex items-center gap-1.5">
                         <BookMarked className="h-3.5 w-3.5" />
                         {exam.subject}
+                      </span>
+                    ) : null}
+                    {exam.proctored ? (
+                      <span className="flex items-center gap-1.5 text-amber-600 dark:text-amber-500">
+                        <Camera className="h-3.5 w-3.5" />
+                        Kamera zorunlu
                       </span>
                     ) : null}
                     <span className="flex items-center gap-1.5">

@@ -41,7 +41,8 @@ export function ExamStartPanel({
     }
 
     toast.success("Sınav başlatıldı");
-    router.refresh();
+    // Sinav kendi TAM EKRAN sayfasinda cozuluyor; panel kabugu disinda.
+    router.push(`/sinav/${examId}`);
   }
 
   return (

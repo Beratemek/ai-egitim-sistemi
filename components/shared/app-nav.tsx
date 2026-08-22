@@ -149,10 +149,21 @@ export function NavLinks({ role, onNavigate }: NavLinksProps) {
   }, [items, pathname]);
 
   return (
-    <nav className="space-y-1">
-      {items.map((item) => {
+    /*
+      Menu ogeleri RAFTAKI KITAP gibi kuruldu: her ogenin solunda kendi
+      renginde bir sirt duruyor, secilen kitap raftan bir tik disari
+      cikiyor. Duz bir baglanti listesi yerine bu secildi cunku urunun
+      gorsel dili zaten kitaplik; menu de o dilin parcasi olmali.
+
+      Sirt renkleri sabit sirayla dagitiliyor: menu ogeleri az ve degismez
+      oldugu icin her sayfa her zaman AYNI rengi tasiyor - kullanici bir
+      sure sonra rengi tanir hale geliyor.
+    */
+    <nav className="relative space-y-1.5 pl-1">
+      {items.map((item, index) => {
         const isActive = item.href === activeHref;
         const Icon = item.icon;
+        const book = (index % 8) + 1;
 
         return (
           <Link
@@ -161,25 +172,48 @@ export function NavLinks({ role, onNavigate }: NavLinksProps) {
             onClick={onNavigate}
             aria-current={isActive ? "page" : undefined}
             className={cn(
-              "group flex items-start gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors",
+              "group relative flex items-stretch gap-3 overflow-hidden rounded-md rounded-l-sm py-2.5 pl-4 pr-3 text-sm",
+              "transition-[transform,background-color,color] duration-200",
               isActive
-                ? "bg-primary/10 text-primary"
-                : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                ? "translate-x-1.5 bg-card text-foreground shadow-sm ring-1 ring-border"
+                : "text-muted-foreground hover:translate-x-1 hover:bg-accent/60 hover:text-foreground",
             )}
           >
+            {/* Kitap sirti: renk + iki bant + sirt cizgisi */}
+            <span
+              aria-hidden
+              className={cn(
+                "absolute inset-y-0 left-0 w-[7px] transition-opacity",
+                isActive ? "opacity-100" : "opacity-60 group-hover:opacity-85",
+              )}
+              style={{ background: `hsl(var(--book-${book}))` }}
+            >
+              <span className="absolute inset-x-0 top-[7px] h-[2px] bg-background/60" />
+              <span className="absolute inset-x-0 bottom-[7px] h-[2px] bg-background/60" />
+            </span>
+
             <Icon
               className={cn(
-                "mt-0.5 h-4 w-4 shrink-0",
-                isActive ? "text-primary" : "text-muted-foreground",
+                "mt-0.5 h-4 w-4 shrink-0 transition-colors",
+                isActive ? "text-foreground" : "text-muted-foreground",
               )}
             />
+
             <span className="flex flex-col">
-              <span className="font-medium">{item.label}</span>
-              <span className="text-xs text-muted-foreground">{item.description}</span>
+              <span className="font-medium leading-tight">{item.label}</span>
+              <span className="mt-0.5 text-xs leading-snug text-muted-foreground">
+                {item.description}
+              </span>
             </span>
           </Link>
         );
       })}
+
+      {/* Kitaplarin uzerinde durdugu raf */}
+      <span
+        aria-hidden
+        className="mt-2 block h-[3px] rounded-full bg-foreground/15"
+      />
     </nav>
   );
 }
@@ -188,15 +222,56 @@ export function RoleCard({ role }: { role: UserRole }) {
   const definition = ROLE_DEFINITIONS[role];
   const Icon = ROLE_ICONS[role];
 
+  /*
+    Once rolun ham Tailwind rozet rengi (violet/sky/amber...) kartin
+    TAMAMINA veriliyordu. O renkler tema jetonlarina bagli olmadigi icin yeni
+    paletle catisiyor, kart menunun geri kalanina yabanci duruyordu.
+
+    Simdi renk yalnizca INCE bir aksan: ustte bir serit ve ikon kabi. Rol
+    yine ilk bakista ayirt ediliyor ama kart kendi zeminine oturuyor.
+  */
+  const book = ROLE_BOOK[role];
+
   return (
-    <div className="rounded-lg border bg-card p-3">
-      <div className="flex items-center gap-2">
-        <Icon className="h-4 w-4 text-primary" />
-        <p className="text-sm font-medium">{definition.label}</p>
+    <div className="relative overflow-hidden rounded-lg border bg-card">
+      <span
+        aria-hidden
+        className="absolute inset-x-0 top-0 h-[3px]"
+        style={{ background: `hsl(var(--book-${book}))` }}
+      />
+
+      <div className="p-3 pt-3.5">
+        <div className="flex items-center gap-2">
+          <span
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md"
+            style={{ background: `hsl(var(--book-${book}) / 0.16)` }}
+          >
+            <Icon
+              className="h-3.5 w-3.5"
+              style={{ color: `hsl(var(--book-${book}))` }}
+            />
+          </span>
+          <p className="text-sm font-semibold">{definition.label}</p>
+        </div>
+
+        <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+          {definition.description}
+        </p>
       </div>
-      <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
-        {definition.description}
-      </p>
     </div>
   );
 }
+
+/**
+ * Rol -> cilt rengi.
+ *
+ * Menudeki kitap sirtlariyla ayni palete baglaniyor ki panel butun olarak
+ * tek bir gorsel dil konussun.
+ */
+const ROLE_BOOK: Record<UserRole, number> = {
+  icerik_uzmani: 3,
+  egitmen: 4,
+  ogrenci: 2,
+  egitim_yoneticisi: 8,
+  admin: 1,
+};

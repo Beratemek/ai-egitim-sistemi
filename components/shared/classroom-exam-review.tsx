@@ -66,7 +66,7 @@ export function ClassroomExamReview({
 
   async function runApproval(key: string, ids: readonly string[], label: string) {
     if (!canPersist) {
-      toast.error("Demo modunda onay kaydedilemez");
+      toast.error("Tanıtım modunda kayıt yapılmaz");
       return;
     }
     if (ids.length === 0) return;

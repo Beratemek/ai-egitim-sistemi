@@ -15,8 +15,18 @@ const config: Config = {
       screens: { "2xl": "1400px" },
     },
     extend: {
+      /*
+       * Kodda 17 yerde `h-4.5` / `w-4.5` kullaniliyordu ama Tailwind'in
+       * varsayilan olceginde 4.5 adimi YOK; uretilen CSS'te bu siniflar hic
+       * olusmuyor ve o ikonlar lucide'in 24px varsayilanina dusuyordu.
+       * Adim tanimlanarak 18px'e sabitlendi.
+       */
+      spacing: {
+        "4.5": "1.125rem",
+      },
       fontFamily: {
         sans: ["var(--font-sans)", "system-ui", "-apple-system", "Segoe UI", "sans-serif"],
+        display: ["var(--font-display)", "Georgia", "Times New Roman", "serif"],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -55,6 +65,10 @@ const config: Config = {
         success: {
           DEFAULT: "hsl(var(--success))",
           foreground: "hsl(var(--success-foreground))",
+        },
+        highlight: {
+          DEFAULT: "hsl(var(--highlight))",
+          foreground: "hsl(var(--highlight-foreground))",
         },
         warning: {
           DEFAULT: "hsl(var(--warning))",

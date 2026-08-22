@@ -40,7 +40,15 @@ Atlanan bir adım "function does not exist" hatası verir.
 
 ## Şu an bekleyenler
 
-**Yok.** Bütün migration'lar uygulandı.
+Klasördeki dosya adına bakma — **veritabanına sor:**
 
-Yeni bir tane yazıldığında bu klasörde `BEKLEYEN-<n>-...sql` adıyla belirir;
-çalıştırdıktan sonra `uygulandi/` klasörüne taşınır.
+```
+npm run migration:durum
+```
+
+Bu komut her migration'ın bıraktığı izi (bir sütun ya da fonksiyon) tek tek
+kontrol eder ve eksik olanı söyler. Dosyanın `uygulandi/` klasörüne taşınmış
+olup olmaması yalnızca bir defter kaydıdır; SQL'i çalıştırdığında dosya
+kendiliğinden taşınmaz. Tek doğru ölçüt şemanın kendisi.
+
+Şu an: **bekleyen yok** (15/15 uygulanmış).

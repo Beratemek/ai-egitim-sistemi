@@ -1,12 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
 import {
   ArrowLeft,
   ArrowRight,
-  BookOpen,
   ChevronRight,
   ChevronDown,
   FileText,
@@ -14,28 +11,23 @@ import {
   Layers,
   Library,
   ListChecks,
-  Loader2,
-  Plus,
   RotateCcw,
   Search,
-  Wand2,
+  ClipboardList,
+  Sparkles,
 } from "lucide-react";
-import { toast } from "sonner";
 
-import { addExamQuestions } from "@/app/actions/exams";
-import { QuestionPreviewPanel } from "@/components/shared/question-preview-panel";
+import { ExamComposeDialog } from "@/components/shared/exam-compose-dialog";
+import { ExamManualDialog } from "@/components/shared/exam-manual-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 import {
   Select,
   SelectContent,
@@ -43,24 +35,30 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
 import {
-  groupByCategory,
-  pickBalanced,
-  type CategoryGroup,
+  countByType,
+  countTopicsByType,
+  formatTypeCounts,
+  groupBySubject,
   type SubjectGroup,
   type TopicGroup,
 } from "@/lib/question-pool";
-import type { Exam, Question, QuestionType } from "@/lib/types";
+import type { Question, QuestionType } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 /**
  * Eğitmenin soru havuzu.
  *
- * Havuz dort kademe halinde, her kademede kutucuklarla gezilir:
- *   Atölye dalı  ->  Ders  ->  Konu  ->  Soru listesi (isaretlenebilir)
+ * Havuz uc kademe halinde, her kademede kutucuklarla gezilir:
+ *   Ders  ->  Konu  ->  Soru listesi (isaretlenebilir)
  *
- * Kutucuklar sorulardan turetilir; altinda sorusu olmayan dal, ders veya konu
+ * UST KADEME DERSTIR. Atolye dali gezilen bir kademe degil, ders kartinda
+ * gosterilen bir etikettir: egitmen sinav hazirlarken "hangi ders" diye
+ * dusunuyor, "hangi atolye dali" diye degil. Dal ust kademe oldugunda dali
+ * girilmemis sorular ayri bir "Kategori yok" kutusuna dusuyor ve ayni ders
+ * ikiye bolunuyordu.
+ *
+ * Kutucuklar sorulardan turetilir; altinda sorusu olmayan ders veya konu
  * kutucugu hic olusmaz. İçerik uzmanı yeni bir derse soru onayladigi anda o
  * dersin kutucugu kendiliginden belirir.
  *
@@ -74,20 +72,15 @@ type TypeFilter = QuestionType | "hepsi";
 export interface QuestionPoolBrowserProps {
   /** Havuzdaki onaylı sorular. */
   questions: readonly Question[];
-  /** Eğitmenin sınavları; seçilen sorular bunlardan birine eklenir. */
-  exams: readonly Exam[];
   /** Supabase yoksa ekleme adimi hata döndürür. */
   canPersist?: boolean;
 }
 
 export function QuestionPoolBrowser({
   questions,
-  exams,
   canPersist = false,
 }: QuestionPoolBrowserProps) {
-  const router = useRouter();
 
-  const [activeCategory, setActiveCategory] = React.useState<string | null>(null);
   const [activeSubject, setActiveSubject] = React.useState<string | null>(null);
   const [activeTopic, setActiveTopic] = React.useState<string | null>(null);
   const [selectedIds, setSelectedIds] = React.useState<ReadonlySet<string>>(
@@ -95,36 +88,39 @@ export function QuestionPoolBrowser({
   );
   const [search, setSearch] = React.useState("");
   const [typeFilter, setTypeFilter] = React.useState<TypeFilter>("hepsi");
-  const [targetCount, setTargetCount] = React.useState("20");
-  const [examId, setExamId] = React.useState<string>(exams[0]?.id ?? "");
-  const [pending, setPending] = React.useState(false);
   /** Onizlemesi acik olan sorunun kimligi; kapaliyken null. */
   const [openQuestionId, setOpenQuestionId] = React.useState<string | null>(null);
+  /** Otomatik sinav kurma penceresi (ders/konu/sayi). */
+  const [composeOpen, setComposeOpen] = React.useState(false);
+  /** Isaretlenen sorularla elle sinav kurma penceresi. */
+  const [manualOpen, setManualOpen] = React.useState(false);
 
-  /** Havuzun tamami: dal -> ders -> konu -> soru. Filtreden etkilenmez. */
-  const allCategories = React.useMemo(() => groupByCategory(questions), [questions]);
-
-  /** Arama / tip filtresinden geçmiş hali. */
-  const visibleCategories = React.useMemo(
-    () => filterCategories(allCategories, search, typeFilter),
-    [allCategories, search, typeFilter],
+  /**
+   * Isaretlenen sorular, havuzdaki SIRAYLA.
+   *
+   * Elle kurma penceresi metni ve tipi gosterdigi icin yalnizca kimlik
+   * yetmiyor; sira da onemli cunku sinav kagidinda ayni sirayla cikiyorlar.
+   */
+  const selectedQuestions = React.useMemo(
+    () => questions.filter((question) => selectedIds.has(question.id)),
+    [questions, selectedIds],
   );
 
-  const openCategory = React.useMemo(
-    () =>
-      activeCategory === null
-        ? null
-        : (visibleCategories.find((group) => keyOf(group) === activeCategory) ?? null),
-    [visibleCategories, activeCategory],
+  /** Havuzun tamami: ders -> konu -> soru. Filtreden etkilenmez. */
+  const allSubjects = React.useMemo(() => groupBySubject(questions), [questions]);
+
+  /** Arama / tip filtresinden geçmiş hali. */
+  const visibleSubjects = React.useMemo(
+    () => filterSubjects(allSubjects, search, typeFilter),
+    [allSubjects, search, typeFilter],
   );
 
   const openSubject = React.useMemo(
     () =>
-      openCategory === null || activeSubject === null
+      activeSubject === null
         ? null
-        : (openCategory.subjects.find((group) => group.subject === activeSubject) ??
-          null),
-    [openCategory, activeSubject],
+        : (visibleSubjects.find((group) => group.subject === activeSubject) ?? null),
+    [visibleSubjects, activeSubject],
   );
 
   const openTopic = React.useMemo(
@@ -136,12 +132,6 @@ export function QuestionPoolBrowser({
   );
 
   /* ------------------------------ gezinme -------------------------------- */
-
-  function backToCategories() {
-    setActiveCategory(null);
-    setActiveSubject(null);
-    setActiveTopic(null);
-  }
 
   function backToSubjects() {
     setActiveSubject(null);
@@ -173,192 +163,63 @@ export function QuestionPoolBrowser({
     });
   }
 
-  /**
-   * Konular arasında sirayla gezerek istenen sayida soru secer.
-   * Kapsam bulundugun kademedir: konudayken o konudan, derste o dersin
-   * konularindan, dalda o dalin tüm derslerinden, en ustte görünen her seyden.
-   */
-  function autoSelect() {
-    const source = openTopic
-      ? [openTopic]
-      : openSubject
-        ? openSubject.topics
-        : openCategory
-          ? topicsOfCategory(openCategory)
-          : visibleCategories.flatMap(topicsOfCategory);
-
-    const available = source.reduce((total, group) => total + group.questions.length, 0);
-    const requested = Number.parseInt(targetCount, 10);
-
-    if (!Number.isFinite(requested) || requested < 1) {
-      toast.error("Geçerli bir soru sayısı girin.");
-      return;
-    }
-
-    const picked = pickBalanced(source, Math.min(requested, available));
-    setSelectedIds(new Set(picked));
-
-    if (picked.length < requested) {
-      toast.warning(`Bu kapsamda ${picked.length} uygun soru var`, {
-        description: "Üst kademeye çıkın, filtreyi genişletin veya daha az soru isteyin.",
-      });
-    } else {
-      toast.success(`${picked.length} soru secildi`, {
-        description: `${source.length} konudan dengeli dagitildi.`,
-      });
-    }
-  }
-
-  async function handleAddToExam() {
-    if (!examId) {
-      toast.error("Önce bir sınav seçin.");
-      return;
-    }
-
-    setPending(true);
-
-    try {
-      const result = await addExamQuestions(examId, [...selectedIds]);
-      if (!result.ok) throw new Error(result.error);
-
-      const exam = exams.find((item) => item.id === examId);
-      toast.success(`${result.data.added} soru eklendi`, {
-        description: exam ? `"${exam.title}" sinavina eklendi.` : undefined,
-      });
-
-      setSelectedIds(new Set());
-      router.refresh();
-    } catch (caught) {
-      toast.error("Sorular eklenemedi", {
-        description:
-          caught instanceof Error ? caught.message : "Lutfen tekrar deneyin.",
-      });
-    } finally {
-      setPending(false);
-    }
-  }
-
-  /* ------------------------------- render -------------------------------- */
-
   if (questions.length === 0) return <EmptyPool />;
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
-      <SelectionPanel
-        exams={exams}
-        examId={examId}
-        onExamChange={setExamId}
-        selectedCount={selectedIds.size}
-        targetCount={targetCount}
-        onTargetCountChange={setTargetCount}
-        onAutoSelect={autoSelect}
-        autoSelectScope={
-          openTopic
-            ? `${openTopic.topic} konusundan`
-            : openSubject
-              ? `${openSubject.subject} dersinin konularindan`
-              : openCategory
-                ? `${openCategory.label} dalinin tüm derslerinden`
-                : "görünen tüm dallardan"
-        }
-        canPersist={canPersist}
-        pending={pending}
-        onAdd={() => void handleAddToExam()}
-        onClear={() => setSelectedIds(new Set())}
+    <div className="space-y-4">
+      {/* ---------- Ust cubuk: arama, filtre, hedef sinav, otomatik secim ---------- */}
+      <PoolToolbar
+        search={search}
+        onSearchChange={setSearch}
+        typeFilter={typeFilter}
+        onTypeFilterChange={setTypeFilter}
+        onCreateExam={() => setComposeOpen(true)}
       />
 
-      <div className="space-y-4 lg:order-1">
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <div className="relative flex-1">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              type="search"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Dal, ders, konu veya soru ara..."
-              aria-label="Havuzda ara"
-              className="pl-9"
-            />
-          </div>
-
-          <Select
-            value={typeFilter}
-            onValueChange={(value) => setTypeFilter(value as TypeFilter)}
-          >
-            <SelectTrigger className="sm:w-52" aria-label="Tipe gore filtrele">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="hepsi">Tüm soru tipleri</SelectItem>
-              <SelectItem value="test">Çoktan seçmeli</SelectItem>
-              <SelectItem value="acik_uclu">Açık uçlu</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        {openCategory === null ? (
-          /* ------------- 1. kademe: atölye dalı kutucuklari -------------- */
-          visibleCategories.length === 0 ? (
+        {openSubject === null ? (
+          /* ------------- 1. kademe: ders kutucuklari --------------------- */
+          visibleSubjects.length === 0 ? (
             <NoMatch />
           ) : (
             <>
               <p className="text-sm text-muted-foreground">
-                {visibleCategories.length} dal ·{" "}
-                {visibleCategories.reduce((sum, g) => sum + g.subjects.length, 0)} ders ·{" "}
-                {visibleCategories.reduce((sum, g) => sum + g.topicCount, 0)} konu ·{" "}
-                {visibleCategories.reduce((sum, g) => sum + g.questionCount, 0)} soru
+                {visibleSubjects.length} ders ·{" "}
+                {visibleSubjects.reduce((sum, g) => sum + g.topics.length, 0)} konu ·{" "}
+                {visibleSubjects.reduce((sum, g) => sum + g.questionCount, 0)} soru
+                <span className="mx-1.5" aria-hidden>
+                  ·
+                </span>
+                {formatTypeCounts(
+                  countTopicsByType(visibleSubjects.flatMap((g) => g.topics)),
+                )}
               </p>
 
-              <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-3">
-                {visibleCategories.map((group) => (
-                  <CategoryCard
-                    key={keyOf(group)}
-                    group={group}
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                {visibleSubjects.map((subject) => (
+                  <SubjectCard
+                    key={subject.subject}
+                    group={subject}
                     selectedIds={selectedIds}
                     onOpen={() => {
-                      setActiveCategory(keyOf(group));
-                      setActiveSubject(null);
+                      setActiveSubject(subject.subject);
                       setActiveTopic(null);
                     }}
+                    onToggleAll={() => toggleMany(idsOfSubject(subject))}
                   />
                 ))}
               </div>
             </>
           )
-        ) : openSubject === null ? (
-          /* ------------- 2. kademe: ders kutucuklari --------------------- */
-          <>
-            <Breadcrumb
-              trail={[{ label: "Atölye dalları", onClick: backToCategories }]}
-              current={openCategory.label}
-              meta={`${openCategory.subjects.length} ders · ${openCategory.questionCount} soru`}
-            />
-
-            <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-3">
-              {openCategory.subjects.map((subject) => (
-                <SubjectCard
-                  key={subject.subject}
-                  group={subject}
-                  selectedIds={selectedIds}
-                  onOpen={() => setActiveSubject(subject.subject)}
-                  onToggleAll={() => toggleMany(idsOfSubject(subject))}
-                />
-              ))}
-            </div>
-          </>
         ) : openTopic === null ? (
-          /* ------------- 3. kademe: konu kutucuklari --------------------- */
+          /* ------------- 2. kademe: konu kutucuklari --------------------- */
           <>
             <Breadcrumb
-              trail={[
-                { label: "Atölye dalları", onClick: backToCategories },
-                { label: openCategory.label, onClick: backToSubjects },
-              ]}
+              trail={[{ label: "Dersler", onClick: backToSubjects }]}
               current={openSubject.subject}
-              meta={`${openSubject.topics.length} konu · ${openSubject.questionCount} soru`}
+              meta={`${openSubject.topics.length} konu · ${openSubject.questionCount} soru · ${formatTypeCounts(countTopicsByType(openSubject.topics))}`}
             />
 
-            <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
               {openSubject.topics.map((topic) => (
                 <TopicCard
                   key={topic.topic}
@@ -371,16 +232,15 @@ export function QuestionPoolBrowser({
             </div>
           </>
         ) : (
-          /* ------------- 4. kademe: sorular ------------------------------ */
+          /* ------------- 3. kademe: sorular ------------------------------ */
           <>
             <Breadcrumb
               trail={[
-                { label: "Atölye dalları", onClick: backToCategories },
-                { label: openCategory.label, onClick: backToSubjects },
+                { label: "Dersler", onClick: backToSubjects },
                 { label: openSubject.subject, onClick: () => setActiveTopic(null) },
               ]}
               current={openTopic.topic}
-              meta={`${openTopic.questions.length} soru`}
+              meta={`${openTopic.questions.length} soru · ${formatTypeCounts(countByType(openTopic.questions))}`}
             />
 
             <QuestionList
@@ -395,71 +255,38 @@ export function QuestionPoolBrowser({
             />
           </>
         )}
-      </div>
 
+      {/* ---------- Secim bari ---------- */}
+      <SelectionBar
+        selectedCount={selectedIds.size}
+        onCreate={() => setManualOpen(true)}
+        onClear={() => setSelectedIds(new Set())}
+      />
+
+      <ExamManualDialog
+        open={manualOpen}
+        onOpenChange={setManualOpen}
+        questions={selectedQuestions}
+        subjectOptions={allSubjects.map((group) => group.subject)}
+        defaultSubject={openSubject?.subject ?? null}
+        canPersist={canPersist}
+        onCreated={() => setSelectedIds(new Set())}
+      />
+
+      <ExamComposeDialog
+        open={composeOpen}
+        onOpenChange={setComposeOpen}
+        subjects={allSubjects}
+        selectedIds={[...selectedIds]}
+        defaultSubject={openSubject?.subject ?? null}
+        onCreated={() => setSelectedIds(new Set())}
+      />
     </div>
   );
 }
 
 /* -------------------------------------------------------------------------- */
-/*  1. kademe - atölye dalı kutucugu                                          */
-/* -------------------------------------------------------------------------- */
-
-function CategoryCard({
-  group,
-  selectedIds,
-  onOpen,
-}: {
-  group: CategoryGroup;
-  selectedIds: ReadonlySet<string>;
-  onOpen: () => void;
-}) {
-  const selectedCount = countSelected(idsOfCategory(group), selectedIds);
-  const preview = group.subjects.slice(0, 3);
-  const rest = group.subjects.length - preview.length;
-
-  return (
-    <button
-      type="button"
-      onClick={onOpen}
-      className={cn(
-        "group flex flex-col gap-3 rounded-xl border bg-card p-5 text-left shadow-sm transition-colors",
-        "hover:border-primary/50 hover:bg-accent/40",
-        "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-        selectedCount > 0 && "border-primary/40",
-      )}
-    >
-      <div className="flex items-start justify-between gap-3">
-        <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-          <BookOpen className="h-5 w-5" />
-        </span>
-
-        {selectedCount > 0 ? (
-          <Badge variant="success">{selectedCount} seçili</Badge>
-        ) : null}
-      </div>
-
-      <div className="min-w-0">
-        <p className="font-semibold leading-snug">{group.label}</p>
-        <p className="mt-0.5 text-sm text-muted-foreground">
-          {group.subjects.length} ders · {group.topicCount} konu ·{" "}
-          {group.questionCount} soru
-        </p>
-      </div>
-
-      <ChipRow
-        items={preview.map((subject) => subject.subject)}
-        rest={rest}
-        restLabel="ders"
-      />
-
-      <CardAction label="Dersleri ac" />
-    </button>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
-/*  2. kademe - ders kutucugu                                                 */
+/*  1. kademe - ders kutucugu                                                 */
 /* -------------------------------------------------------------------------- */
 
 function SubjectCard({
@@ -488,8 +315,15 @@ function SubjectCard({
       icon={<GraduationCap className="h-4 w-4 shrink-0 text-primary" />}
       title={group.subject}
       subtitle={`${group.topics.length} konu · ${group.questionCount} soru`}
+      meta={formatTypeCounts(countTopicsByType(group.topics))}
       action="Konuları ac"
     >
+      {/* Atolye dali gezilen bir kademe degil; dersin hangi dala ait
+          oldugunu burada etiket olarak gosteriyoruz. */}
+      <p className="text-xs text-muted-foreground">
+        {group.categoryLabels.join(" · ")}
+      </p>
+
       <ChipRow
         items={preview.map((topic) => topic.topic)}
         rest={rest}
@@ -500,7 +334,7 @@ function SubjectCard({
 }
 
 /* -------------------------------------------------------------------------- */
-/*  3. kademe - konu kutucugu                                                 */
+/*  2. kademe - konu kutucugu                                                 */
 /* -------------------------------------------------------------------------- */
 
 function TopicCard({
@@ -532,6 +366,7 @@ function TopicCard({
       icon={<Layers className="h-4 w-4 shrink-0 text-primary" />}
       title={group.topic}
       subtitle={`${group.questions.length} soru`}
+      meta={formatTypeCounts(countByType(group.questions))}
       action="Soruları ac"
     >
       <div className="flex flex-wrap gap-1.5">
@@ -568,6 +403,7 @@ function SelectableCard({
   icon,
   title,
   subtitle,
+  meta,
   action,
   children,
 }: {
@@ -579,6 +415,8 @@ function SelectableCard({
   icon: React.ReactNode;
   title: string;
   subtitle: string;
+  /** Tip dagilimi ("40 test · 10 klasik") - toplam sayi tek basina yetmiyor. */
+  meta?: string;
   action: string;
   children?: React.ReactNode;
 }) {
@@ -614,6 +452,23 @@ function SelectableCard({
         <div className="min-w-0">
           <p className="font-medium leading-snug">{title}</p>
           <p className="mt-0.5 text-sm text-muted-foreground">{subtitle}</p>
+          {meta ? (
+            <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs">
+              {meta.split(" · ").map((parca) => (
+                <span
+                  key={parca}
+                  className={cn(
+                    "rounded-full px-1.5 py-0.5 font-medium",
+                    parca.includes("klasik")
+                      ? "bg-highlight/15 text-highlight-foreground dark:text-highlight"
+                      : "bg-primary/10 text-primary",
+                  )}
+                >
+                  {parca}
+                </span>
+              ))}
+            </p>
+          ) : null}
         </div>
 
         {children}
@@ -662,9 +517,24 @@ function ChipRow({
 }
 
 /* -------------------------------------------------------------------------- */
-/*  4. kademe - soru listesi                                                  */
+/*  3. kademe - soru listesi                                                  */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Konudaki sorular - KAGIT gorunumu.
+ *
+ * Onceki surumde sorular koyu, dar satirlar halinde listeleniyordu ve siklar
+ * yalnizca satiri acinca gorunuyordu; egitmen bir soruyu degerlendirmek icin
+ * once tiklamak zorundaydi. Degerlendirme isi okuma isidir: soru ve siklari
+ * AYNI ANDA, ogrencinin gorecegi duzende gorunmeli.
+ *
+ * Bu yuzden liste beyaz bir kagit uzerinde, genis ve punto tipografisiyle
+ * ciziliyor - koyu temada bile. Dogru sik yesil vurguyla isaretli; bu ekran
+ * yalnizca egitmene acik (bkz. questions_select politikasi).
+ *
+ * Acilir bolum yalnizca RUBRIK icin kaldi: acik uclu sorularin puanlama
+ * olcutu her zaman gorunse liste okunmaz hale gelirdi.
+ */
 function QuestionList({
   group,
   selectedIds,
@@ -684,8 +554,9 @@ function QuestionList({
   const allSelected = selectedCount === group.questions.length;
 
   return (
-    <Card>
-      <CardHeader className="flex-row items-center gap-3 space-y-0 py-3">
+    <div className="space-y-3">
+      {/* ---------- Kagidin ustundeki denetim seridi ---------- */}
+      <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-card px-4 py-2.5">
         <label className="flex cursor-pointer items-center gap-2.5 text-sm font-medium">
           <Checkbox
             checked={allSelected}
@@ -698,101 +569,151 @@ function QuestionList({
         <span className="ml-auto text-sm text-muted-foreground">
           {selectedCount} / {group.questions.length} seçili
         </span>
-      </CardHeader>
+      </div>
 
-      <CardContent className="space-y-2 pt-0">
-        {group.questions.map((question) => (
-          <QuestionRow
-            key={question.id}
-            question={question}
-            checked={selectedIds.has(question.id)}
-            onToggle={() => onToggleQuestion(question.id)}
-            expanded={openQuestionId === question.id}
-            onTogglePreview={() => onTogglePreview(question.id)}
-          />
-        ))}
-      </CardContent>
-    </Card>
+      {/* ---------- Kagit ---------- */}
+      <div className="rounded-xl bg-white px-6 py-5 text-slate-900 shadow-sm ring-1 ring-slate-300 sm:px-10 sm:py-8">
+        <div className="mb-6 border-b border-slate-300 pb-3">
+          <p className="text-[13pt] font-bold leading-tight">{group.topic}</p>
+          <p className="mt-0.5 text-[9.5pt] text-slate-500">
+            {group.questions.length} soru
+          </p>
+        </div>
+
+        <ol className="space-y-7">
+          {group.questions.map((question, index) => (
+            <PaperQuestion
+              key={question.id}
+              question={question}
+              number={index + 1}
+              checked={selectedIds.has(question.id)}
+              onToggle={() => onToggleQuestion(question.id)}
+              expanded={openQuestionId === question.id}
+              onTogglePreview={() => onTogglePreview(question.id)}
+            />
+          ))}
+        </ol>
+      </div>
+    </div>
   );
 }
 
-function QuestionRow({
+/** Kagit uzerindeki tek soru: metin, siklar ve secim kutusu. */
+function PaperQuestion({
   question,
+  number,
   checked,
   onToggle,
   expanded,
   onTogglePreview,
 }: {
   question: Question;
+  number: number;
   checked: boolean;
   onToggle: () => void;
   expanded: boolean;
   onTogglePreview: () => void;
 }) {
-  const Icon = question.type === "test" ? ListChecks : FileText;
+  const isTest = question.type === "test";
+  const options = question.options_json ?? [];
 
   return (
-    <div
+    <li
       className={cn(
-        "overflow-hidden rounded-lg border transition-colors",
-        "focus-within:border-primary/50",
-        checked && "border-primary/50",
-        expanded && "border-primary/40",
+        "-mx-3 rounded-lg px-3 py-2 transition-colors",
+        checked && "bg-emerald-50 ring-1 ring-emerald-300",
       )}
     >
-      <div
-        className={cn(
-          "flex items-start gap-3 p-3 transition-colors",
-          "hover:bg-accent/50",
-          checked && "bg-primary/5",
-        )}
-      >
-        <label className="shrink-0 cursor-pointer p-0.5" title="Sınava eklemek için seç">
+      <div className="flex gap-3">
+        {/* Secim kutusu kagidin disinda kalir: sorunun kendisi degil, onun
+            hakkindaki bir karar. */}
+        <label
+          className="mt-1 shrink-0 cursor-pointer"
+          title="Sınava eklemek için seç"
+        >
           <Checkbox
+            tone="paper"
             checked={checked}
             onChange={onToggle}
-            aria-label="Soruyu seç"
+            aria-label={`${number}. soruyu seç`}
           />
         </label>
 
-        <button
-          type="button"
-          onClick={onTogglePreview}
-          aria-expanded={expanded}
-          className="min-w-0 flex-1 text-left focus-visible:outline-none"
-        >
-          <span className="flex items-start gap-2">
-            <span className="block text-sm leading-relaxed">{question.text}</span>
-            <ChevronDown
-              className={cn(
-                "mt-0.5 h-4 w-4 shrink-0 text-muted-foreground transition-transform",
-                expanded && "rotate-180",
-              )}
-            />
-          </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-[11.5pt] font-medium leading-[1.5]">
+            <span className="mr-1.5 font-bold tabular-nums">{number}.</span>
+            {question.text}
+          </p>
 
-          <span className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-            <span className="inline-flex items-center gap-1.5 rounded border px-1.5 py-0.5">
-              <Icon className="h-3 w-3" />
-              {question.type === "test" ? "Çoktan seçmeli" : "Açık uçlu"}
-            </span>
+          {isTest ? (
+            <ol className="mt-2.5 space-y-1.5 text-[10.5pt] leading-[1.4]">
+              {options.map((option) => {
+                const isCorrect = option.key === question.correct_answer;
 
-            {question.type === "test" ? (
-              <span>
-                Doğru cevap:{" "}
-                <span className="font-semibold text-foreground">
-                  {question.correct_answer ?? "-"}
-                </span>
-              </span>
-            ) : (
-              <span>{question.rubric ? "Rubrik hazır" : "Rubrik tanımsız"}</span>
-            )}
+                return (
+                  <li
+                    key={option.key}
+                    className={cn(
+                      "flex gap-2 rounded px-2 py-1",
+                      isCorrect && "bg-emerald-100 font-medium",
+                    )}
+                  >
+                    <span className="shrink-0 font-semibold">{option.key})</span>
+                    <span className="min-w-0">{option.text}</span>
+                    {isCorrect ? (
+                      <span className="ml-auto shrink-0 self-center text-[8pt] font-semibold uppercase tracking-wide text-emerald-700">
+                        doğru
+                      </span>
+                    ) : null}
+                  </li>
+                );
+              })}
+
+              {options.length === 0 ? (
+                <li className="text-[10pt] italic text-slate-500">
+                  Bu soruya şık tanımlanmamış.
+                </li>
+              ) : null}
+            </ol>
+          ) : (
+            <>
+              {/* Acik uclu: ogrencinin gorecegi bos satirlar */}
+              <div className="mt-3 space-y-4" aria-hidden>
+                {[0, 1, 2].map((line) => (
+                  <div key={line} className="border-b border-dotted border-slate-400" />
+                ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={onTogglePreview}
+                aria-expanded={expanded}
+                className="mt-3 inline-flex items-center gap-1.5 text-[9.5pt] font-medium text-slate-600 underline-offset-4 hover:text-slate-900 hover:underline"
+              >
+                Puanlama rubriği
+                <ChevronDown
+                  className={cn("h-3.5 w-3.5 transition-transform", expanded && "rotate-180")}
+                />
+              </button>
+
+              {expanded ? (
+                <pre className="mt-2 whitespace-pre-wrap rounded-md bg-slate-100 px-3 py-2 font-sans text-[9.5pt] leading-relaxed text-slate-700">
+                  {question.rubric ?? "Rubrik tanımlanmamış."}
+                </pre>
+              ) : null}
+            </>
+          )}
+        </div>
+
+        {/* Kunye: kagidin sag kenarinda, soruyu bolmeden */}
+        <span className="hidden shrink-0 flex-col items-end gap-1 pt-0.5 text-[8.5pt] text-slate-500 sm:flex">
+          <span className="rounded bg-slate-100 px-1.5 py-0.5 font-medium">
+            {isTest ? "Çoktan seçmeli" : "Açık uçlu"}
           </span>
-        </button>
+          {question.ai_generated ? <span>AI üretti</span> : <span>Elle eklendi</span>}
+        </span>
       </div>
-
-      {expanded ? <QuestionPreviewPanel question={question} /> : null}
-    </div>
+    </li>
   );
 }
 
@@ -848,141 +769,126 @@ function Breadcrumb({
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Sag panel                                                                 */
+/*  Ust cubuk                                                                 */
 /* -------------------------------------------------------------------------- */
 
-function SelectionPanel({
-  exams,
-  examId,
-  onExamChange,
-  selectedCount,
-  targetCount,
-  onTargetCountChange,
-  onAutoSelect,
-  autoSelectScope,
-  canPersist,
-  pending,
-  onAdd,
-  onClear,
+/**
+ * Arama, tip filtresi, hedef sinav ve otomatik secim.
+ *
+ * Bu denetimler onceden sagda 340 piksellik bir sutunda duruyordu; kutucuklar
+ * kalan dar alana sikisiyor, soru listesi de okunmaz hale geliyordu. Denetimler
+ * ust cubuga alininca havuz TAM GENISLIK kullaniyor.
+ */
+function PoolToolbar({
+  search,
+  onSearchChange,
+  typeFilter,
+  onTypeFilterChange,
+  onCreateExam,
 }: {
-  exams: readonly Exam[];
-  examId: string;
-  onExamChange: (value: string) => void;
-  selectedCount: number;
-  targetCount: string;
-  onTargetCountChange: (value: string) => void;
-  onAutoSelect: () => void;
-  autoSelectScope: string;
-  canPersist: boolean;
-  pending: boolean;
-  onAdd: () => void;
-  onClear: () => void;
+  search: string;
+  onSearchChange: (value: string) => void;
+  typeFilter: TypeFilter;
+  onTypeFilterChange: (value: TypeFilter) => void;
+  onCreateExam: () => void;
 }) {
   return (
-    <Card className="lg:order-2 lg:sticky lg:top-20 lg:self-start">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base">Secilenleri sinava ekle</CardTitle>
-        <CardDescription>
-          Sınavın kendisi Sınavlar ekranindan yonetilir; buradan yalnızca soru
-          eklenir.
-        </CardDescription>
-      </CardHeader>
+    <div className="flex flex-col gap-2 sm:flex-row">
+      <div className="relative min-w-0 flex-1">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          type="search"
+          value={search}
+          onChange={(event) => onSearchChange(event.target.value)}
+          placeholder="Ders, konu veya soru ara..."
+          aria-label="Havuzda ara"
+          className="pl-9"
+        />
+      </div>
 
-      <CardContent className="space-y-4">
-        <div className="space-y-1.5">
-          <Label htmlFor="pool-exam">Hedef sınav</Label>
+      <Select
+        value={typeFilter}
+        onValueChange={(value) => onTypeFilterChange(value as TypeFilter)}
+      >
+        <SelectTrigger className="sm:w-52" aria-label="Tipe gore filtrele">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="hepsi">Tüm soru tipleri</SelectItem>
+          <SelectItem value="test">Çoktan seçmeli</SelectItem>
+          <SelectItem value="acik_uclu">Açık uçlu</SelectItem>
+        </SelectContent>
+      </Select>
 
-          {exams.length === 0 ? (
-            <div className="rounded-lg border border-dashed p-3 text-xs leading-relaxed text-muted-foreground">
-              Henüz sınavınız yok. Önce{" "}
-              <Link
-                href="/dashboard/egitmen/sinavlar"
-                className="font-medium text-primary underline-offset-4 hover:underline"
-              >
-                Sınavlar
-              </Link>{" "}
-              ekranindan bir sınav oluşturun, sonra buradan soru ekleyin.
-            </div>
-          ) : (
-            <Select value={examId} onValueChange={onExamChange}>
-              <SelectTrigger id="pool-exam">
-                <SelectValue placeholder="Sınav seçin" />
-              </SelectTrigger>
-              <SelectContent>
-                {exams.map((exam) => (
-                  <SelectItem key={exam.id} value={exam.id}>
-                    {exam.title}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-        </div>
-
-        <Separator />
-
-        <div className="space-y-2">
-          <Label htmlFor="pool-target">Otomatik seçim</Label>
-          <div className="flex gap-2">
-            <Input
-              id="pool-target"
-              type="number"
-              min={1}
-              value={targetCount}
-              onChange={(event) => onTargetCountChange(event.target.value)}
-              className="w-20"
-            />
-            <Button variant="outline" className="flex-1" onClick={onAutoSelect}>
-              <Wand2 />
-              Dengeli seç
-            </Button>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Bulundugunuz kademeden secer: su an{" "}
-            <strong className="font-medium text-foreground">{autoSelectScope}</strong>{" "}
-            alir.
-          </p>
-        </div>
-
-        <Separator />
-
-        <div className="flex items-baseline justify-between gap-3 text-sm">
-          <span className="text-muted-foreground">Secili soru</span>
-          <span className="font-semibold tabular">{selectedCount} soru</span>
-        </div>
-
-        <div className="flex gap-2">
-          <Button
-            className="flex-1"
-            disabled={selectedCount === 0 || exams.length === 0 || pending}
-            onClick={onAdd}
-          >
-            {pending ? <Loader2 className="animate-spin" /> : <Plus />}
-            Sınava ekle
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            disabled={selectedCount === 0}
-            onClick={onClear}
-            aria-label="Seçimi temizle"
-          >
-            <RotateCcw />
-          </Button>
-        </div>
-
-        {canPersist ? null : (
-          <p className="text-xs text-muted-foreground">
-            Demo modunda ekleme kaydedilmez.
-          </p>
-        )}
-      </CardContent>
-    </Card>
+      {/*
+        Sinav kurma dugmesi SECIMDEN BAGIMSIZ. Onceden yalnizca soru
+        isaretlendikten sonra beliriyordu; oysa egitmen cogu zaman tek tek
+        secmek degil "su dersten 20 soruluk sinav" demek istiyor.
+      */}
+      <Button className="gap-2 whitespace-nowrap" onClick={onCreateExam}>
+        <Sparkles className="h-4 w-4" />
+        Sınav oluştur
+      </Button>
+    </div>
   );
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Boş durumlar                                                              */
+/*  Secim bari                                                                */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Ekranin altina yapisan secim seridi.
+ *
+ * Yalnizca secim varken gorunur: bos dururken yer kaplamasi, havuzda gezinen
+ * egitmenin ekranindan bir serit calardi. Secim yapildiginda ise nerede
+ * olursa olsun elinin altinda olmali - listenin sonuna kadar kaydirip
+ * dugme aramak zorunda kalmasin.
+ */
+function SelectionBar({
+  selectedCount,
+  onCreate,
+  onClear,
+}: {
+  selectedCount: number;
+  onCreate: () => void;
+  onClear: () => void;
+}) {
+  if (selectedCount === 0) return null;
+
+  return (
+    <div className="sticky bottom-4 z-20 mx-auto w-fit max-w-full">
+      <div className="flex flex-wrap items-center gap-2 rounded-2xl border bg-card/95 px-3 py-2.5 shadow-lg backdrop-blur">
+        <span className="px-1 text-sm font-medium">
+          {selectedCount} soru seçili
+        </span>
+
+        <Button
+          size="sm"
+          variant="ghost"
+          className="gap-1.5 text-muted-foreground"
+          onClick={onClear}
+        >
+          <RotateCcw className="h-3.5 w-3.5" />
+          Temizle
+        </Button>
+
+        <Separator orientation="vertical" className="mx-1 h-6" />
+
+        {/*
+          Var olan bir sinava soru eklemek BU EKRANIN isi degil: o sinavin
+          kendi duzenleme ekraninda, sorularin sirasi ve puanlari gorunurken
+          yapiliyor. Havuz ekrani yeni sinav kurmaya odakli.
+        */}
+        <Button size="sm" className="gap-1.5" onClick={onCreate}>
+          <ClipboardList className="h-3.5 w-3.5" />
+          Yeni sınav
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 /* -------------------------------------------------------------------------- */
 
 function EmptyPool() {
@@ -1018,15 +924,6 @@ function NoMatch() {
 /*  Yardimcilar                                                               */
 /* -------------------------------------------------------------------------- */
 
-/** Dalı atanmamış grubun da kararli bir anahtarı olmali. */
-function keyOf(group: CategoryGroup): string {
-  return group.category ?? "__kategorisiz__";
-}
-
-function topicsOfCategory(group: CategoryGroup): TopicGroup[] {
-  return group.subjects.flatMap((subject) => subject.topics);
-}
-
 function idsOfTopic(group: TopicGroup): string[] {
   return group.questions.map((question) => question.id);
 }
@@ -1035,72 +932,55 @@ function idsOfSubject(group: SubjectGroup): string[] {
   return group.topics.flatMap(idsOfTopic);
 }
 
-function idsOfCategory(group: CategoryGroup): string[] {
-  return group.subjects.flatMap(idsOfSubject);
-}
-
 function countSelected(ids: readonly string[], selected: ReadonlySet<string>): number {
   return ids.reduce((total, id) => (selected.has(id) ? total + 1 : total), 0);
 }
 
 /**
- * Arama ve tip filtresini dal -> ders -> konu -> soru agacina uygular.
- * Üst kademenin adi aramayla eslesiyorsa altindakiler kirpilmaz; boylece
- * "İleri Robotik" yazinca dalin tamami gorulebilir.
+ * Arama ve tip filtresini ders -> konu -> soru agacina uygular.
+ *
+ * Ust kademenin adi aramayla eslesiyorsa altindakiler kirpilmaz; boylece
+ * "Siber Guvenlik" yazinca dersin tamami gorulebilir. Dal adi da aranabilir:
+ * gezinilen bir kademe olmasa da ders kartinda etiket olarak duruyor.
  */
-function filterCategories(
-  categories: readonly CategoryGroup[],
+function filterSubjects(
+  subjects: readonly SubjectGroup[],
   search: string,
   typeFilter: TypeFilter,
-): CategoryGroup[] {
+): SubjectGroup[] {
   const needle = search.trim().toLocaleLowerCase("tr");
 
-  return categories
-    .map((category) => {
-      const categoryMatches =
-        !needle || category.label.toLocaleLowerCase("tr").includes(needle);
+  return subjects
+    .map((subject) => {
+      const subjectMatches =
+        !needle ||
+        subject.subject.toLocaleLowerCase("tr").includes(needle) ||
+        subject.categoryLabels.some((label) =>
+          label.toLocaleLowerCase("tr").includes(needle),
+        );
 
-      const subjects = category.subjects
-        .map((subject) => {
-          const subjectMatches =
-            categoryMatches || subject.subject.toLocaleLowerCase("tr").includes(needle);
-
-          const topics = subject.topics
-            .map((topic) => {
-              const topicMatches =
-                subjectMatches || topic.topic.toLocaleLowerCase("tr").includes(needle);
-
-              return {
-                topic: topic.topic,
-                questions: topic.questions.filter((question) => {
-                  if (typeFilter !== "hepsi" && question.type !== typeFilter) {
-                    return false;
-                  }
-                  if (topicMatches) return true;
-                  return question.text.toLocaleLowerCase("tr").includes(needle);
-                }),
-              };
-            })
-            .filter((topic) => topic.questions.length > 0);
+      const topics = subject.topics
+        .map((topic) => {
+          const topicMatches =
+            subjectMatches || topic.topic.toLocaleLowerCase("tr").includes(needle);
 
           return {
-            subject: subject.subject,
-            topics,
-            questionCount: topics.reduce(
-              (total, topic) => total + topic.questions.length,
-              0,
-            ),
+            topic: topic.topic,
+            questions: topic.questions.filter((question) => {
+              if (typeFilter !== "hepsi" && question.type !== typeFilter) return false;
+              if (topicMatches) return true;
+              return question.text.toLocaleLowerCase("tr").includes(needle);
+            }),
           };
         })
-        .filter((subject) => subject.topics.length > 0);
+        .filter((topic) => topic.questions.length > 0);
 
       return {
-        category: category.category,
-        label: category.label,
-        subjects,
-        topicCount: subjects.reduce((total, s) => total + s.topics.length, 0),
-        questionCount: subjects.reduce((total, s) => total + s.questionCount, 0),
+        subject: subject.subject,
+        topics,
+        questionCount: topics.reduce((total, topic) => total + topic.questions.length, 0),
+        categoryLabels: subject.categoryLabels,
       };
     })
-    .filter((category) => category.subjects.length > 0);
+    .filter((subject) => subject.topics.length > 0);
 }

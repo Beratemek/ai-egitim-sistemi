@@ -26,6 +26,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ROLE_DEFINITIONS } from "@/lib/roles";
+import { hasAllSubjects, subjectLabel } from "@/lib/subjects";
 import type { UserProfile, UserRole } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -174,14 +175,15 @@ export function ProfileForm({
                   {subjects.map((subject) => (
                     <Badge key={subject} variant="soft" className="gap-1.5">
                       <BookMarked className="h-3 w-3" />
-                      {subject}
+                      {subjectLabel(subject)}
                     </Badge>
                   ))}
                 </div>
               )}
               <p className="text-xs text-muted-foreground">
-                Yalnızca bu derslerdeki sınavları ve öğrenci cevaplarını
-                görürsünüz. Ders yetkisini sistem yöneticisi verir.
+                {hasAllSubjects(subjects)
+                  ? "Her dersteki sınavı ve öğrenci cevaplarını görürsünüz; sonradan eklenen dersler de kapsanır. Ders yetkisini sistem yöneticisi verir."
+                  : "Yalnızca bu derslerdeki sınavları ve öğrenci cevaplarını görürsünüz. Ders yetkisini sistem yöneticisi verir."}
               </p>
             </div>
           ) : null}

@@ -75,12 +75,18 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const isDashboard = pathname.startsWith("/dashboard");
+  /**
+   * Sinav cozme ekrani panel kabugunun disinda ama korumasi AYNI olmali:
+   * oturum, e-posta dogrulamasi ve rol onayi burada da aranir. Ayri bir
+   * kok yol acip korumayi unutmak, sinava herkesin girebilmesi demekti.
+   */
+  const isExam = pathname.startsWith("/sinav/");
   const isLogin = pathname === "/login";
   const isOnboarding = pathname === ONBOARDING_PATH;
   const isPending = pathname === PENDING_PATH;
 
   if (!user) {
-    if (isDashboard || isOnboarding || isPending) {
+    if (isDashboard || isExam || isOnboarding || isPending) {
       const loginUrl = new URL("/login", request.url);
       loginUrl.searchParams.set("next", pathname);
       return NextResponse.redirect(loginUrl);
@@ -95,13 +101,13 @@ export async function middleware(request: NextRequest) {
    * vermez; bu kontrol ikinci bir savunma katmani. Proje ayari sonradan
    * gevsetilse bile uygulama dogrulanmamis hesabi iceri almaz.
    */
-  if (!user.email_confirmed_at && isDashboard) {
+  if (!user.email_confirmed_at && (isDashboard || isExam)) {
     return NextResponse.redirect(new URL("/auth/dogrulama-bekleniyor", request.url));
   }
 
   // Rol yalnizca yonlendirme kararinin gerektigi yerlerde lazim.
   // Tanitim sayfasi, /auth/* gibi yollarda sorgulamaya gerek yok.
-  if (!isDashboard && !isLogin && !isOnboarding && !isPending) return response;
+  if (!isDashboard && !isExam && !isLogin && !isOnboarding && !isPending) return response;
 
   const { role: actualRole, roles, status } = await resolveProfile(
     request,

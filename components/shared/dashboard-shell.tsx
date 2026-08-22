@@ -5,6 +5,7 @@ import Link from "next/link";
 import { LogOut, Menu, UserRound } from "lucide-react";
 
 import { NavLinks, RoleCard } from "@/components/shared/app-nav";
+import { SideBooks } from "@/components/shared/side-books";
 import { ActiveRoleSwitcher } from "@/components/shared/active-role-switcher";
 import { BrandMark } from "@/components/shared/brand-mark";
 import { ROLE_ICONS } from "@/components/shared/role-icons";
@@ -62,15 +63,26 @@ export function DashboardShell({
     .join("");
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="bg-study min-h-screen bg-background">
+      {/* Genis ekranlarda icerik sutununun iki yanindaki bos seritleri
+          kitap yiginlariyla dolduruyoruz; bkz. SideBooks. */}
+      <SideBooks side="left" />
+      <SideBooks side="right" />
+
       {/* ---------- Masaustu sol menu ---------- */}
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-[264px] flex-col border-r bg-card lg:flex">
+        {/* Menunun dibinde ince bir kitap rafi: bos kalan alani urunun
+            kimligiyle dolduruyor, hicbir bilgi tasimiyor. */}
+        <div
+          className="bg-shelf pointer-events-none absolute inset-x-0 bottom-0 h-28 opacity-[0.5]"
+          aria-hidden
+        />
         <div className="flex h-16 items-center border-b px-5">
           <BrandMark />
         </div>
 
         <div className="flex-1 overflow-y-auto px-3 py-4">
-          <p className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <p className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
             Menü
           </p>
           <NavLinks role={role} />
@@ -82,7 +94,7 @@ export function DashboardShell({
       </aside>
 
       {/* ---------- İçerik sutunu ---------- */}
-      <div className="lg:pl-[264px]">
+      <div className="relative z-10 lg:pl-[264px]">
         {/* ---------- Üst cubuk ---------- */}
         <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b bg-background/80 px-4 backdrop-blur-md sm:px-6">
           {/* Mobil cekmece */}
@@ -127,14 +139,16 @@ export function DashboardShell({
 
             <div className="hidden items-center gap-2 lg:flex">
               <RoleIcon className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium">{definition.label} Paneli</span>
+              <span className="font-display text-[15px] font-semibold">
+                {definition.label} Paneli
+              </span>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
             {demoMode ? (
               <Badge variant="warning" className="hidden sm:inline-flex">
-                Demo modu
+                Tanıtım modu
               </Badge>
             ) : null}
 
@@ -193,7 +207,7 @@ export function DashboardShell({
           </div>
         </header>
 
-        <main className="mx-auto w-full max-w-[1400px] space-y-6 px-4 py-6 sm:px-6 sm:py-8">
+        <main className="animate-kitap-yukselir mx-auto w-full max-w-[1400px] space-y-6 px-4 py-6 sm:px-6 sm:py-8">
           {children}
         </main>
       </div>

@@ -3,7 +3,13 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Check, GraduationCap, Loader2, UserMinus, UserPlus } from "lucide-react";
+import {
+  Check,
+  GraduationCap,
+  Loader2,
+  UserMinus,
+  UserPlus,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -112,7 +118,7 @@ export function ExamClassroomAssign({
         </CardDescription>
       </CardHeader>
 
-      <CardContent>
+      <CardContent className="space-y-4">
         {classrooms.length === 0 ? (
           <div className="rounded-lg border border-dashed p-4 text-sm leading-relaxed text-muted-foreground">
             Henüz tanımlı sınıf yok. Sistem yöneticisi{" "}
@@ -201,7 +207,7 @@ export function ExamClassroomAssign({
 
         {canPersist ? null : (
           <p className="mt-3 text-xs text-muted-foreground">
-            Demo modunda atama kaydedilmez.
+            Tanıtım modunda atama kaydedilmez.
           </p>
         )}
       </CardContent>

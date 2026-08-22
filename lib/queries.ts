@@ -9,7 +9,7 @@
 import { cache } from "react";
 
 import { isSupabaseConfigured } from "@/lib/env";
-import { subjectKey } from "@/lib/subjects";
+import { ALL_SUBJECTS, subjectKey } from "@/lib/subjects";
 import {
   MOCK_EXAMS,
   MOCK_OUTCOMES,
@@ -288,10 +288,19 @@ export async function getStudentExams(): Promise<StudentExamCard[]> {
 
   if (exams.length === 0) return [];
 
-  const supabase = await createServerSupabaseClient();
+  const [supabase, current] = await Promise.all([
+    createServerSupabaseClient(),
+    getCurrentUser(),
+  ]);
+
+  if (!current) return [];
+
+  // Kimlik filtresi ACIKCA veriliyor; RLS ayricalikli hesaplarda daha genis
+  // oldugu icin baskasinin atamasi bu listeye karisabiliyordu.
   const assignmentResult = await supabase
     .from("exam_assignments")
-    .select("*");
+    .select("*")
+    .eq("student_id", current.user.id);
   // Migration henuz uzak projeye uygulanmadiysa eski "tum yayinlananlar"
   // davranisina geri don; uygulandiginda yalnizca atanmis sinavlar gorunur.
   const assignments = assignmentResult.error ? null : (assignmentResult.data ?? []);
@@ -308,7 +317,11 @@ export async function getStudentExams(): Promise<StudentExamCard[]> {
   const [links, submissions, attemptsResult] = await Promise.all([
     supabase.from("exam_questions").select("exam_id").in("exam_id", examIds),
     getOwnSubmissions(supabase),
-    supabase.from("exam_attempts").select("*").in("exam_id", examIds),
+    supabase
+      .from("exam_attempts")
+      .select("*")
+      .in("exam_id", examIds)
+      .eq("student_id", current.user.id),
   ]);
 
   const countBy = (rows: { exam_id: string }[] | null): Map<string, number> => {
@@ -404,15 +417,38 @@ export async function getStudentExamDetail(
     };
   }
 
-  const supabase = await createServerSupabaseClient();
+  const [supabase, current] = await Promise.all([
+    createServerSupabaseClient(),
+    getCurrentUser(),
+  ]);
 
+  if (!current) return null;
+
+  /*
+    Ogrenci kimligiyle ACIKCA filtreleniyor.
+
+    Onceden yalnizca `exam_id` ile sorulup kapsama RLS'e birakiliyordu. Ama
+    RLS ayricalikli kullanicilarda GENIS: egitmen ya da yonetici rolu de
+    olan bir hesap sinavin BUTUN atamalarini goruyor. O durumda
+    `.maybeSingle()` "birden fazla satir" hatasi veriyor, `data` null
+    donuyor ve atama yokmus gibi davraniliyordu. Sonuc: sinava baslama
+    paneli hic cikmiyor, sorular da bos geliyordu (soru RPC'si denemesi
+    olmayan ogrenciye satir dondurmez) ve ekranda "bu sinava henuz soru
+    eklenmemis" yaziyordu - oysa sinavda 50 soru vardi.
+  */
   const [assignmentResult, attemptResult] = await Promise.all([
     supabase
       .from("exam_assignments")
       .select("*")
       .eq("exam_id", examId)
+      .eq("student_id", current.user.id)
       .maybeSingle(),
-    supabase.from("exam_attempts").select("*").eq("exam_id", examId).maybeSingle(),
+    supabase
+      .from("exam_attempts")
+      .select("*")
+      .eq("exam_id", examId)
+      .eq("student_id", current.user.id)
+      .maybeSingle(),
   ]);
 
   if (!assignmentResult.error && !assignmentResult.data) return null;
@@ -556,10 +592,23 @@ export interface StudentResultSummary {
 export async function getStudentResults(): Promise<StudentResultSummary[]> {
   if (!isSupabaseConfigured) return [];
 
-  const supabase = await createServerSupabaseClient();
+  const [supabase, current] = await Promise.all([
+    createServerSupabaseClient(),
+    getCurrentUser(),
+  ]);
+
+  if (!current) return [];
+
+  /*
+    Kimlik filtresi ACIKCA veriliyor. Kapsam RLS'e birakilsaydi, egitmen ya
+    da yonetici rolu de olan bir hesap BASKA ogrencilerin sonuclarini kendi
+    "Sonuclarim" ekraninda gorurdu - exam_attempts politikasi o roller icin
+    sinifin tamamini aciyor.
+  */
   const { data: attempts, error } = await supabase
     .from("exam_attempts")
     .select("*")
+    .eq("student_id", current.user.id)
     .eq("status", "sonuclandi")
     .order("completed_at", { ascending: false });
 
@@ -1216,14 +1265,15 @@ export async function getSubjectOptions(): Promise<string[]> {
   const seen = new Map<string, string>();
   for (const question of questions) {
     const subject = question.subject?.trim();
-    if (!subject) continue;
+    // Joker deger bir ders adi degil; secenek listesine dusmemeli.
+    if (!subject || subject === ALL_SUBJECTS) continue;
     // Tekillestirme kurali VERITABANIYLA ayni olmali; bkz. lib/subjects.ts.
     seen.set(subjectKey(subject), subject);
   }
 
   for (const exam of exams) {
     const subject = exam.subject?.trim();
-    if (!subject) continue;
+    if (!subject || subject === ALL_SUBJECTS) continue;
     seen.set(subjectKey(subject), subject);
   }
 

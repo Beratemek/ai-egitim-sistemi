@@ -153,6 +153,29 @@ export type Exam = {
    * tum egitmenlere aciktir.
    */
   subject: string | null;
+  /**
+   * Sinav kamera+mikrofon acikken mi cozulecek?
+   *
+   * Egitmen belirler. Acikken ogrenci once kamera kontrolunden gecer ve
+   * sinav boyunca akis kapanirsa cevap veremez.
+   */
+  proctored: boolean;
+  /**
+   * Ogrenci basina sinav suresi (dakika).
+   *
+   * Pencereden (starts_at/ends_at) farkli: pencere sinavin ACIK OLDUGU
+   * araligi, bu ise her ogrenciye denemesini baslattigi andan itibaren
+   * taninan sureyi tanimlar. Bos ise yalnizca pencere gecerlidir.
+   */
+  duration_minutes: number | null;
+  /**
+   * Puanlar soru sayisina gore kendiliginden mi dagitilsin?
+   *
+   * Egitmen bir soruya elle puan verdigi anda false olur; boylece sonradan
+   * soru eklendiginde elle yapilan duzenleme silinmez. "Esit dagit" ile
+   * yeniden acilabilir.
+   */
+  points_auto: boolean;
   instructor_id: string;
   is_published: boolean;
   starts_at: string | null;
@@ -392,6 +415,9 @@ export interface Database {
           | "starts_at"
           | "ends_at"
           | "subject"
+          | "proctored"
+          | "duration_minutes"
+          | "points_auto"
         >
       >;
       exam_questions: TableDefinition<
@@ -494,6 +520,14 @@ export interface Database {
       set_instructor_subjects: {
         Args: { target_user: string; subjects: string[] };
         Returns: string[];
+      };
+      reset_exam_points: {
+        Args: { target_exam: string };
+        Returns: number;
+      };
+      exam_attempt_deadline: {
+        Args: { target_exam: string; target_student: string };
+        Returns: string | null;
       };
       my_subjects: {
         Args: Record<string, never>;

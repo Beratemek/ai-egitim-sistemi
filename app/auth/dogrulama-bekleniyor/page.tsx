@@ -29,13 +29,16 @@ export default async function DogrulamaBekleniyorPage() {
   if (user.email_confirmed_at) redirect("/dashboard");
 
   return (
-    <main className="flex min-h-screen flex-col bg-muted/30">
+    <main className="bg-study relative flex min-h-screen flex-col overflow-hidden bg-background">
+      {/* Bekleme ekrani kullanicinin gunlerce gorebilecegi tek sayfa
+          olabiliyor; ciplak bir zemin yerine ayni kitap dili. */}
+      <div className="bg-shelf pointer-events-none absolute inset-x-0 bottom-0 h-52 opacity-[0.4]" aria-hidden />
       <div className="flex items-center justify-between p-4 sm:p-6">
         <BrandMark />
         <ThemeToggle />
       </div>
 
-      <div className="flex flex-1 items-center justify-center px-4 pb-16">
+      <div className="relative z-10 flex flex-1 items-center justify-center px-4 pb-16">
         <Card className="w-full max-w-md">
           <CardContent className="space-y-5 p-6 text-center">
             <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -57,9 +60,7 @@ export default async function DogrulamaBekleniyorPage() {
 
             <div className="border-t pt-4 text-xs leading-relaxed text-muted-foreground">
               <p>
-                Baglantiyi, uygulamanin calistigi bilgisayarda acmalisiniz - adres
-                <code className="mx-1 font-mono">localhost</code> uzerinden geldigi
-                için telefondan acilmaz.
+                Bağlantıyı, giriş yapmaya çalıştığınız cihazda açın.
               </p>
               <p className="mt-2">
                 Başka bir hesapla devam etmek için{" "}

@@ -35,6 +35,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ROLE_DEFINITIONS, ROLE_LIST } from "@/lib/roles";
+import { ALL_SUBJECTS, hasAllSubjects, subjectLabel } from "@/lib/subjects";
 import type { UserProfile, UserRole } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -170,9 +171,18 @@ export function UserAdminTable({
 
   async function toggleSubject(user: UserProfile, subject: string) {
     const current = subjectsOf(user);
-    const next = current.includes(subject)
-      ? current.filter((item) => item !== subject)
-      : [...current, subject];
+
+    let next: string[];
+    if (current.includes(subject)) {
+      next = current.filter((item) => item !== subject);
+    } else if (subject === ALL_SUBJECTS) {
+      // "Tum dersler" secilince tek tek dersler anlamsiz kalir; ikisini
+      // birlikte tutmak "hem hepsi hem bazilari" gibi tutarsiz olurdu.
+      next = [ALL_SUBJECTS];
+    } else {
+      // Tek bir ders secilince joker dusurulur - kapsam daraltiliyor demektir.
+      next = [...current.filter((item) => item !== ALL_SUBJECTS), subject];
+    }
 
     setPendingId(user.id);
     setSubjectDraft((draft) => ({ ...draft, [user.id]: next }));
@@ -186,7 +196,7 @@ export function UserAdminTable({
       toast.success(
         result.data.subjects.length === 0
           ? "Ders yetkisi kaldırıldı"
-          : `Ders yetkisi: ${result.data.subjects.join(", ")}`,
+          : `Ders yetkisi: ${result.data.subjects.map(subjectLabel).join(", ")}`,
         { description: user.full_name || user.email || undefined },
       );
       router.refresh();
@@ -420,19 +430,55 @@ export function UserAdminTable({
                                 kullanıcılara atanır.
                               </p>
                             ) : subjectOptions.length === 0 ? (
-                              <p className="rounded-md border border-dashed px-3 py-2 text-xs leading-relaxed text-muted-foreground">
-                                Soru havuzunda ders yok. İçerik uzmanı ders adı
-                                belirterek soru ürettiğinde burada listelenir.
-                              </p>
+                              <>
+                                <OptionRow
+                                  id={`ders-${user.id}-tumu`}
+                                  label="Tüm dersler"
+                                  hint="Sonradan eklenen dersler de kapsanır"
+                                  checked={hasAllSubjects(subjects)}
+                                  disabled={busy}
+                                  onToggle={() =>
+                                    void toggleSubject(user, ALL_SUBJECTS)
+                                  }
+                                />
+                                <p className="text-xs leading-relaxed text-muted-foreground">
+                                  Soru havuzunda henüz ders yok. İçerik uzmanı
+                                  ders adı belirterek soru ürettiğinde tek tek
+                                  seçilebilir hale gelir.
+                                </p>
+                              </>
                             ) : (
                               <>
-                                <div className="max-h-52 space-y-1 overflow-y-auto pr-1">
+                                <OptionRow
+                                  id={`ders-${user.id}-tumu`}
+                                  label="Tüm dersler"
+                                  hint="Sonradan eklenen dersler de kapsanır"
+                                  checked={hasAllSubjects(subjects)}
+                                  disabled={busy}
+                                  onToggle={() =>
+                                    void toggleSubject(user, ALL_SUBJECTS)
+                                  }
+                                />
+
+                                <div
+                                  className={cn(
+                                    "max-h-52 space-y-1 overflow-y-auto border-t pt-2 pr-1",
+                                    // Joker secilinken tek tek dersler zaten
+                                    // kapsam disi degil - ama secilmeleri de
+                                    // bir sey degistirmez; soluk gosterip
+                                    // karisikligi onluyoruz.
+                                    hasAllSubjects(subjects) && "opacity-50",
+                                  )}
+                                >
                                   {subjectOptions.map((subject) => (
                                     <OptionRow
                                       key={subject}
                                       id={`ders-${user.id}-${subject}`}
                                       label={subject}
-                                      checked={subjects.includes(subject)}
+                                      checked={
+                                        hasAllSubjects(subjects) ||
+                                        subjects.includes(subject)
+                                      }
                                       disabled={busy}
                                       onToggle={() =>
                                         void toggleSubject(user, subject)
@@ -440,9 +486,11 @@ export function UserAdminTable({
                                     />
                                   ))}
                                 </div>
+
                                 <p className="text-xs leading-relaxed text-muted-foreground">
-                                  Eğitmen yalnızca bu derslerdeki sınavları ve
-                                  öğrenci cevaplarını görür.
+                                  {hasAllSubjects(subjects)
+                                    ? "Eğitmen her dersteki sınavı görür. Tek bir ders seçerseniz kapsam ona daralır."
+                                    : "Eğitmen yalnızca bu derslerdeki sınavları ve öğrenci cevaplarını görür."}
                                 </p>
                               </>
                             )}
@@ -588,6 +636,14 @@ function AssignmentSummary({
         >
           ders atanmadı
         </span>,
+      );
+    } else if (hasAllSubjects(subjects)) {
+      // Joker tek rozet: "Tum dersler" yaninda ders adi listelemek yaniltir.
+      chips.push(
+        <Badge key="tum-dersler" variant="soft" className="gap-1 font-normal">
+          <BookMarked className="h-3 w-3" />
+          Tüm dersler
+        </Badge>,
       );
     } else {
       for (const subject of subjects.slice(0, 2)) {
