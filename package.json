@@ -8,7 +8,8 @@
     "start": "next start -p 8080",
     "lint": "eslint .",
     "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test tests/*.test.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "seed": "node scripts/test-verisi.mjs"
   },
   "dependencies": {
     "@ai-sdk/google": "^1.2.22",
