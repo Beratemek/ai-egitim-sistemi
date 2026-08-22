@@ -39,6 +39,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  countByType,
+  countTopicsByType,
+  formatTypeCounts,
   groupBySubject,
   type SubjectGroup,
   type TopicGroup,
@@ -210,6 +213,12 @@ export function QuestionPoolBrowser({
                 {visibleSubjects.length} ders ·{" "}
                 {visibleSubjects.reduce((sum, g) => sum + g.topics.length, 0)} konu ·{" "}
                 {visibleSubjects.reduce((sum, g) => sum + g.questionCount, 0)} soru
+                <span className="mx-1.5" aria-hidden>
+                  ·
+                </span>
+                {formatTypeCounts(
+                  countTopicsByType(visibleSubjects.flatMap((g) => g.topics)),
+                )}
               </p>
 
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
@@ -234,7 +243,7 @@ export function QuestionPoolBrowser({
             <Breadcrumb
               trail={[{ label: "Dersler", onClick: backToSubjects }]}
               current={openSubject.subject}
-              meta={`${openSubject.topics.length} konu · ${openSubject.questionCount} soru`}
+              meta={`${openSubject.topics.length} konu · ${openSubject.questionCount} soru · ${formatTypeCounts(countTopicsByType(openSubject.topics))}`}
             />
 
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
@@ -258,7 +267,7 @@ export function QuestionPoolBrowser({
                 { label: openSubject.subject, onClick: () => setActiveTopic(null) },
               ]}
               current={openTopic.topic}
-              meta={`${openTopic.questions.length} soru`}
+              meta={`${openTopic.questions.length} soru · ${formatTypeCounts(countByType(openTopic.questions))}`}
             />
 
             <QuestionList
@@ -329,6 +338,7 @@ function SubjectCard({
       icon={<GraduationCap className="h-4 w-4 shrink-0 text-primary" />}
       title={group.subject}
       subtitle={`${group.topics.length} konu · ${group.questionCount} soru`}
+      meta={formatTypeCounts(countTopicsByType(group.topics))}
       action="Konuları ac"
     >
       {/* Atolye dali gezilen bir kademe degil; dersin hangi dala ait
@@ -379,6 +389,7 @@ function TopicCard({
       icon={<Layers className="h-4 w-4 shrink-0 text-primary" />}
       title={group.topic}
       subtitle={`${group.questions.length} soru`}
+      meta={formatTypeCounts(countByType(group.questions))}
       action="Soruları ac"
     >
       <div className="flex flex-wrap gap-1.5">
@@ -415,6 +426,7 @@ function SelectableCard({
   icon,
   title,
   subtitle,
+  meta,
   action,
   children,
 }: {
@@ -426,6 +438,8 @@ function SelectableCard({
   icon: React.ReactNode;
   title: string;
   subtitle: string;
+  /** Tip dagilimi ("40 test · 10 klasik") - toplam sayi tek basina yetmiyor. */
+  meta?: string;
   action: string;
   children?: React.ReactNode;
 }) {
@@ -461,6 +475,23 @@ function SelectableCard({
         <div className="min-w-0">
           <p className="font-medium leading-snug">{title}</p>
           <p className="mt-0.5 text-sm text-muted-foreground">{subtitle}</p>
+          {meta ? (
+            <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs">
+              {meta.split(" · ").map((parca) => (
+                <span
+                  key={parca}
+                  className={cn(
+                    "rounded-full px-1.5 py-0.5 font-medium",
+                    parca.includes("klasik")
+                      ? "bg-highlight/15 text-highlight-foreground dark:text-highlight"
+                      : "bg-primary/10 text-primary",
+                  )}
+                >
+                  {parca}
+                </span>
+              ))}
+            </p>
+          ) : null}
         </div>
 
         {children}

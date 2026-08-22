@@ -33,7 +33,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { pickBalancedByType, type SubjectGroup } from "@/lib/question-pool";
+import {
+  countByType,
+  countTopicsByType,
+  pickBalancedByType,
+  type SubjectGroup,
+} from "@/lib/question-pool";
 import { cn } from "@/lib/utils";
 
 /**
@@ -270,11 +275,16 @@ export function ExamComposeDialog({
                     <SelectValue placeholder="Ders seçin" />
                   </SelectTrigger>
                   <SelectContent>
-                    {subjects.map((group) => (
-                      <SelectItem key={group.subject} value={group.subject}>
-                        {group.subject} · {group.questionCount} soru
-                      </SelectItem>
-                    ))}
+                    {subjects.map((group) => {
+                      const sayim = countTopicsByType(group.topics);
+
+                      return (
+                        <SelectItem key={group.subject} value={group.subject}>
+                          {group.subject} · {sayim.test} test · {sayim.acikUclu}{" "}
+                          klasik
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               </div>
@@ -306,6 +316,7 @@ export function ExamComposeDialog({
                     {acikDers.topics.map((topic) => {
                       const id = `konu-${topic.topic}`;
                       const secili = konular.has(topic.topic);
+                      const sayim = countByType(topic.questions);
 
                       return (
                         <label
@@ -322,8 +333,20 @@ export function ExamComposeDialog({
                             onChange={() => konuDegistir(topic.topic)}
                           />
                           <span className="min-w-0 flex-1 text-sm">{topic.topic}</span>
-                          <span className="shrink-0 text-xs text-muted-foreground">
-                            {topic.questions.length}
+
+                          {/* Konu basina tip dagilimi: egitmen hangi konuda
+                              klasik soru oldugunu gormeden secim yapamiyordu. */}
+                          <span className="flex shrink-0 items-center gap-1 text-[11px] font-medium">
+                            {sayim.test > 0 ? (
+                              <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-primary">
+                                {sayim.test} test
+                              </span>
+                            ) : null}
+                            {sayim.acikUclu > 0 ? (
+                              <span className="rounded-full bg-highlight/15 px-1.5 py-0.5 text-highlight-foreground dark:text-highlight">
+                                {sayim.acikUclu} klasik
+                              </span>
+                            ) : null}
                           </span>
                         </label>
                       );
@@ -352,8 +375,15 @@ export function ExamComposeDialog({
                     value={testSayisi}
                     onChange={(event) => setTestSayisi(event.target.value)}
                   />
-                  <p className="text-xs text-muted-foreground">
-                    Kapsamda {mevcut.test} tane var
+                  <p
+                    className={cn(
+                      "text-xs",
+                      istenenTest > mevcut.test
+                        ? "font-medium text-amber-600 dark:text-amber-500"
+                        : "text-muted-foreground",
+                    )}
+                  >
+                    Kapsamda {mevcut.test} test sorusu var
                   </p>
                 </div>
 
@@ -369,8 +399,15 @@ export function ExamComposeDialog({
                     value={klasikSayisi}
                     onChange={(event) => setKlasikSayisi(event.target.value)}
                   />
-                  <p className="text-xs text-muted-foreground">
-                    Kapsamda {mevcut.acik} tane var
+                  <p
+                    className={cn(
+                      "text-xs",
+                      istenenKlasik > mevcut.acik
+                        ? "font-medium text-amber-600 dark:text-amber-500"
+                        : "text-muted-foreground",
+                    )}
+                  >
+                    Kapsamda {mevcut.acik} klasik soru var
                   </p>
                 </div>
               </div>

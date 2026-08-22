@@ -19,6 +19,44 @@ const collator = new Intl.Collator("tr", { sensitivity: "base" });
 /*  Konu bazli gruplama                                                       */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Bir gruptaki soru tiplerinin dagilimi.
+ *
+ * Yalnizca toplam sayi gostermek yetmiyordu: egitmen "50 soru" goruyor ama
+ * kacinin klasik oldugunu bilmeden sinav kurarken kac klasik soru
+ * isteyecegini kestiremiyordu.
+ */
+export interface TypeCounts {
+  test: number;
+  acikUclu: number;
+}
+
+export function countByType(questions: readonly Question[]): TypeCounts {
+  let test = 0;
+  for (const question of questions) if (question.type === "test") test += 1;
+  return { test, acikUclu: questions.length - test };
+}
+
+/** Birden fazla konunun tip dagilimini toplar. */
+export function countTopicsByType(groups: readonly TopicGroup[]): TypeCounts {
+  let test = 0;
+  let acikUclu = 0;
+  for (const group of groups) {
+    const sayim = countByType(group.questions);
+    test += sayim.test;
+    acikUclu += sayim.acikUclu;
+  }
+  return { test, acikUclu };
+}
+
+/** "40 test · 10 klasik" - kartlarda ve listelerde ortak bicim. */
+export function formatTypeCounts(counts: TypeCounts): string {
+  const parcalar: string[] = [];
+  if (counts.test > 0) parcalar.push(`${counts.test} test`);
+  if (counts.acikUclu > 0) parcalar.push(`${counts.acikUclu} klasik`);
+  return parcalar.join(" · ") || "soru yok";
+}
+
 export interface TopicGroup {
   topic: string;
   questions: Question[];
