@@ -1,7 +1,13 @@
 "use client";
 
 import * as React from "react";
-import { ArrowLeft, ArrowRight, Check, Circle } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  ChevronDown,
+  Circle,
+} from "lucide-react";
 
 import { AnswerForm } from "@/components/shared/answer-form";
 import { QuestionTypeBadge } from "@/components/shared/status-badge";
@@ -48,6 +54,12 @@ export function StudentExamQuestions({
   const firstUnanswered = questions.findIndex(
     (question) => !answerByQuestion.has(question.id),
   );
+  const answeredCount = questions.reduce(
+    (total, question) => (answerByQuestion.has(question.id) ? total + 1 : total),
+    0,
+  );
+  /** Gezinti acik mi? Sinav ekraninda oncelik soruda. */
+  const [navOpen, setNavOpen] = React.useState(false);
   const [activeIndex, setActiveIndex] = React.useState(
     firstUnanswered >= 0 ? firstUnanswered : 0,
   );
@@ -63,15 +75,37 @@ export function StudentExamQuestions({
 
   return (
     <div className="space-y-4">
+      {/*
+        Gezinti varsayilan olarak KAPALI.
+
+        50 soruluk bir sinavda 50 dugme ekranin yarisini kapliyor ve ogrenci
+        soruyu okumak icin her seferinde asagi kaydirmak zorunda kaliyordu.
+        Sinav ekraninda gorunmesi gereken sey SORU; gezinti isteyince aciliyor.
+      */}
       <Card>
-        <CardContent className="space-y-3 p-4">
+        <CardContent className="space-y-3 p-3">
           <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-medium">Soru gezintisi</p>
+            <button
+              type="button"
+              onClick={() => setNavOpen((acik) => !acik)}
+              aria-expanded={navOpen}
+              className="flex items-center gap-1.5 text-sm font-medium hover:text-primary"
+            >
+              Soru gezintisi
+              <ChevronDown
+                className={cn(
+                  "h-4 w-4 transition-transform",
+                  navOpen && "rotate-180",
+                )}
+              />
+            </button>
+
             <span className="text-xs tabular text-muted-foreground">
-              {activeIndex + 1} / {questions.length}
+              {answeredCount} cevaplandı · {activeIndex + 1} / {questions.length}
             </span>
           </div>
-          <div className="flex flex-wrap gap-2">
+
+          <div className={cn("flex flex-wrap gap-2", !navOpen && "hidden")}>
             {questions.map((item, index) => {
               const submission = answerByQuestion.get(item.id);
               const isAnswered = Boolean(submission);

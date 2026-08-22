@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   ArrowLeft,
+  ArrowRight,
   CalendarClock,
   Camera,
   CheckCircle2,
@@ -13,12 +14,11 @@ import {
 
 import { AiMockNotice } from "@/components/shared/ai-mock-notice";
 import { ExamCountdown } from "@/components/shared/exam-countdown";
-import { ExamFinalizePanel } from "@/components/shared/exam-finalize-panel";
 import { ExamStartPanel } from "@/components/shared/exam-start-panel";
 import { PageHeader } from "@/components/shared/page-header";
-import { ProctoringGate } from "@/components/shared/proctoring-gate";
 import { StudentExamQuestions } from "@/components/shared/student-exam-questions";
 import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -32,7 +32,7 @@ import {
   canAnswerStudentExam,
   getStudentExamStatus,
 } from "@/lib/student-exam-status";
-import { formatDateTime } from "@/lib/utils";
+import { cn, formatDateTime } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Sınav" };
 
@@ -201,53 +201,59 @@ export default async function OgrenciSinavPage({
         </Card>
       ) : null}
 
+      {/*
+        Sinav BURADA cozulmuyor.
+
+        Cozme ekrani /sinav/<id> adresinde, panel kabugunun disinda ve tam
+        ekran. Bu sayfa sinavin kunyesi: kurallar, sure, durum ve sonuc.
+        Sorulari iki yerde birden gostermek, ogrencinin hangi ekranda
+        cevap verdiginden emin olamamasi demekti.
+      */}
       {canAnswer && !requiresStart ? (
-        <ExamFinalizePanel
+        <Card className="border-primary/30 bg-primary/5">
+          <CardContent className="flex flex-wrap items-center justify-between gap-4 py-5">
+            <div className="min-w-0">
+              <p className="font-medium">Sınav devam ediyor</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {answered} / {questionCount} soru cevaplandı. Kaldığınız yerden
+                devam edebilirsiniz.
+              </p>
+            </div>
+
+            <Link
+              href={`/sinav/${exam.id}`}
+              className={cn(buttonVariants({ size: "lg" }), "gap-2")}
+            >
+              Sınava devam et
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {/* ---------- Cevaplar (yalnizca sinav bittikten sonra) ---------- */}
+      {!requiresStart && !canAnswer && questions.length > 0 ? (
+        <StudentExamQuestions
           examId={exam.id}
-          answeredCount={answered}
-          questionCount={questionCount}
+          studentId={current.user.id}
+          questions={questions}
+          submissions={submissions}
+          disabledReason={lockReason}
+          revealResults={status === "sonuclandi"}
         />
       ) : null}
 
-      {/* ---------- Sorular ---------- */}
-      {requiresStart ? null : questions.length === 0 ? (
-        /*
-          Bos liste iki ayri sebepten olabilir ve ikisini ayirmak sart:
-          sinavda gercekten soru yoksa ogrencinin yapacagi bir sey yok, ama
-          soru VARKEN liste bossa sorun ogrencinin oturumundadir. Onceden
-          her iki durumda da "bu sinava henuz soru eklenmemis" yaziyordu -
-          50 soruluk bir sinavda bu duz yanlis bir bilgiydi.
-        */
+      {!requiresStart && questions.length === 0 && questionCount > 0 ? (
         <Card className="border-dashed">
-          <CardContent className="py-16 text-center text-sm text-muted-foreground">
-            {questionCount > 0 ? (
-              <>
-                <p className="font-medium text-foreground">
-                  Sorular yüklenemedi
-                </p>
-                <p className="mx-auto mt-1.5 max-w-sm">
-                  Bu sınavda {questionCount} soru var ama size gösterilemedi.
-                  Sayfayı yenileyin; sorun sürerse eğitmeninize bildirin.
-                </p>
-              </>
-            ) : (
-              "Bu sınava henüz soru eklenmemiş."
-            )}
+          <CardContent className="py-12 text-center text-sm text-muted-foreground">
+            <p className="font-medium text-foreground">Sorular yüklenemedi</p>
+            <p className="mx-auto mt-1.5 max-w-sm">
+              Bu sınavda {questionCount} soru var ama size gösterilemedi.
+              Sayfayı yenileyin; sorun sürerse eğitmeninize bildirin.
+            </p>
           </CardContent>
         </Card>
-      ) : (
-        withProctoring(
-          exam.proctored,
-          <StudentExamQuestions
-            examId={exam.id}
-            studentId={current.user.id}
-            questions={questions}
-            submissions={submissions}
-            disabledReason={canAnswer ? null : lockReason}
-            revealResults={status === "sonuclandi"}
-          />,
-        )
-      )}
+      ) : null}
     </>
   );
 }
@@ -348,14 +354,4 @@ function ExamAvailabilityNotice({
       <p className="text-sm leading-relaxed">{message}</p>
     </div>
   );
-}
-
-/**
- * Kamera zorunlu sinavlari denetim kapisinin arkasina alir.
- *
- * Zorunlu degilse ekran oldugu gibi kalir; sarmalayici yalnizca gerektiginde
- * devreye girer, boylece kamerasiz sinavlar hicbir ek adim gormez.
- */
-function withProctoring(proctored: boolean, exam: React.ReactNode) {
-  return proctored ? <ProctoringGate>{exam}</ProctoringGate> : exam;
 }

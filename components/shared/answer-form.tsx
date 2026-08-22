@@ -3,10 +3,11 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import {
+  Check,
   CheckCircle2,
+  Circle,
   Loader2,
   Lock,
-  Save,
   Sparkles,
   TriangleAlert,
 } from "lucide-react";
@@ -14,7 +15,6 @@ import { toast } from "sonner";
 
 import { submitAnswer, type SubmitAnswerResult } from "@/app/actions/submissions";
 import { SubmissionStatusBadge } from "@/components/shared/status-badge";
-import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
@@ -70,9 +70,10 @@ export function AnswerForm({
   const [result, setResult] = React.useState<SubmitAnswerResult | null>(null);
 
   const wordCount = answer.trim() ? answer.trim().split(/\s+/).length : 0;
+  /** Coktan secmeli mi? Otomatik kaydetmenin gecikmesi buna gore degisir. */
+  const isTest = type === "test";
   const hasChanged = answer.trim() !== savedAnswer.trim();
   const meetsMinimum = type !== "acik_uclu" || answer.trim().length >= 10;
-  const canSubmit = answer.trim().length > 0 && meetsMinimum && hasChanged && !pending;
   const draftKey = `student-exam-draft:${studentId}:${examId}:${questionId}`;
 
   React.useEffect(() => {
@@ -105,12 +106,21 @@ export function AnswerForm({
     return () => window.removeEventListener("beforeunload", warnBeforeLeave);
   }, [answer, hasChanged]);
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  /**
+   * Cevabi kaydeder.
+   *
+   * Artik dugmeye basmakla degil, KENDILIGINDEN cagriliyor: sikki
+   * isaretlemek zaten "cevabim bu" demek, ayrica onaylatmak gereksiz bir
+   * adimdi. Acik uclu cevaplarda yazma durunca (gecikmeli) kaydediliyor -
+   * her tus vurusunda gondermek sunucuyu bosuna mesgul ederdi.
+   */
+  async function kaydet(metin: string) {
+    if (pending) return;
+
     setPending(true);
     setError(null);
 
-    const response = await submitAnswer({ examId, questionId, answerText: answer });
+    const response = await submitAnswer({ examId, questionId, answerText: metin });
 
     setPending(false);
 
@@ -124,23 +134,48 @@ export function AnswerForm({
     setResult(response.data.persisted ? null : response.data);
 
     if (response.data.persisted) {
-      setSavedAnswer(answer);
+      setSavedAnswer(metin);
       setRestoredDraft(false);
       window.sessionStorage.removeItem(draftKey);
     }
 
-    toast.success(
-      response.data.persisted ? "Cevabınız kaydedildi" : "Cevabınız değerlendirildi",
-      {
-        description: response.data.persisted
-          ? "Sınavı bitirene kadar cevabınızı değiştirebilirsiniz."
-          : "Tanıtım modu: sonuç gösterildi, kayıt yapılmadı.",
-      },
-    );
+    // Kayit artik her isaretlemede kendiliginden oluyor; her seferinde
+    // bildirim cikarmak sinav boyunca onlarca kez ekrani mesgul ederdi.
+    // Durum satir icindeki gostergeden okunuyor.
+    if (!response.data.persisted) {
+      toast.success("Cevabınız değerlendirildi", {
+        description: "Tanıtım modu: sonuç gösterildi, kayıt yapılmadı.",
+      });
+    }
 
     // Kaydedildiyse sayfayi tazele: ilerleme ve geçmiş cevaplar guncellenir.
     if (response.data.persisted) router.refresh();
   }
+
+  /**
+   * Otomatik kaydetme.
+   *
+   * Test sorusunda sik degisince HEMEN, acik uclu cevapta yazma durduktan
+   * 1.2 saniye sonra kaydedilir. Gecikme sart: her tus vurusunda istek
+   * atmak hem sunucuyu hem de ogrencinin baglantisini bosuna yorardi.
+   *
+   * `draftReady` beklenir: taslak geri yuklenmeden kaydetmek, geri yuklenen
+   * metnin uzerine bos degeri yazabilirdi.
+   */
+  React.useEffect(() => {
+    if (!draftReady) return;
+    if (answer === savedAnswer) return;
+    if (!answer.trim()) return;
+    if (!meetsMinimum) return;
+
+    const gecikme = isTest ? 0 : 1200;
+    const zamanlayici = window.setTimeout(() => void kaydet(answer), gecikme);
+
+    return () => window.clearTimeout(zamanlayici);
+    // `kaydet` her render'da yeniden olusuyor; bagimlilik listesine
+    // alinsaydi effect surekli tetiklenirdi.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [answer, savedAnswer, draftReady, isTest, meetsMinimum]);
 
   // AI'a gonderilmis cevap artık degistirilemez.
   if (existing && !isDraft) {
@@ -175,7 +210,7 @@ export function AnswerForm({
 
   return (
     <div className="space-y-4">
-      <form onSubmit={handleSubmit} className="space-y-3">
+      <form onSubmit={(event) => event.preventDefault()} className="space-y-3">
         {hasChanged && answer.trim() ? (
           <div className="flex items-start gap-2 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning">
             <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
@@ -264,22 +299,37 @@ export function AnswerForm({
           </p>
         ) : null}
 
-        <Button type="submit" className="gap-2" disabled={!canSubmit}>
+        {/*
+          Kaydet dugmesi kaldirildi: sikki isaretlemek zaten "cevabim bu"
+          demek. Yerine ne olup bittigini soyleyen bir gosterge var -
+          ogrenci cevabinin gittigini gormeli, ama bunun icin bir dugmeye
+          basmak zorunda kalmamali.
+        */}
+        <p
+          className="flex items-center gap-1.5 text-xs text-muted-foreground"
+          aria-live="polite"
+        >
           {pending ? (
             <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Gonderiliyor...
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Kaydediliyor...
+            </>
+          ) : hasChanged ? (
+            <>
+              <Circle className="h-3 w-3" />
+              Kaydedilmeyi bekliyor
+            </>
+          ) : savedAnswer ? (
+            <>
+              <Check className="h-3.5 w-3.5 text-success" />
+              Kaydedildi · sınavı bitirene kadar değiştirebilirsiniz
             </>
           ) : (
             <>
-              <Save className="h-4 w-4" />
-              {isDraft ? "Değişiklikleri kaydet" : "Cevabı kaydet"}
+              <Circle className="h-3 w-3" />
+              {isTest ? "Bir şık seçin" : "En az 10 karakter yazın"}
             </>
           )}
-        </Button>
-
-        <p className="text-xs text-muted-foreground">
-          Cevaplarınız, sınavı bitirme adimina kadar taslak olarak saklanir.
         </p>
       </form>
 
