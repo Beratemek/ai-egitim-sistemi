@@ -42,6 +42,7 @@ Atlanan bir adım "function does not exist" hatası verir.
 
 | Dosya | Ne yapar | Neden önemli |
 |---|---|---|
-| `BEKLEYEN-1-tum-dersler-yetkisi.sql` | Eğitmene "Tüm dersler" yetkisi verilebilir | Bunsuz seçenek arayüzde görünür ama kaydedilse de işe yaramaz |
+| `BEKLEYEN-1-tum-dersler-yetkisi.sql` | Eğitmene "Tüm dersler" yetkisi verilebilir | Bunsuz seçenek arayüzde görünür ama işe yaramaz |
+| `BEKLEYEN-2-sinifsiz-ogrenci-sinav-cozemez.sql` | Sınıfı olmayan öğrenciye sınav atanamaz ve sınava giremez | Bunsuz eski atamalar duruyor ve sınıfsız öğrenci sınav çözebiliyor |
 
 Çalıştırıp çalıştırmadığından emin değilsen tekrar çalıştır — zararı yok.

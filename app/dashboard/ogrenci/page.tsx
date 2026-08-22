@@ -8,6 +8,7 @@ import {
   Clock3,
   Hourglass,
   LockKeyhole,
+  TriangleAlert,
   Trophy,
   type LucideIcon,
 } from "lucide-react";
@@ -23,11 +24,13 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { isSupabaseConfigured } from "@/lib/env";
 import {
   getStudentExams,
   getSubmissions,
   type StudentExamCard,
 } from "@/lib/queries";
+import { getCurrentUser } from "@/lib/supabase-server";
 import {
   getStudentExamStatus,
   type StudentExamStatus,
@@ -82,10 +85,21 @@ const STATUS_META: Record<
 };
 
 export default async function OgrenciPage() {
-  const [exams, submissions] = await Promise.all([
+  const [exams, submissions, current] = await Promise.all([
     getStudentExams(),
     getSubmissions(),
+    getCurrentUser(),
   ]);
+
+  /**
+   * Sinavlar SINIF BAZLI atanir; sinifi olmayan ogrenciye atama yapilamaz.
+   * Bu durumda ekran bos kalir - sebebini soylemezsek ogrenci sistemi
+   * bozuk saniyor.
+   */
+  const sinifsiz =
+    isSupabaseConfigured &&
+    !!current &&
+    !(current.profile.classroom ?? "").trim();
 
   const examItems: ExamItem[] = exams.map((exam) => ({
     exam,
@@ -121,6 +135,23 @@ export default async function OgrenciPage() {
         title="Sinavlarim"
         description="Açık sınavlara katılın; sonuçlarınızı eğitmen onayından sonra görün."
       />
+
+      {sinifsiz ? (
+        <Card className="border-amber-500/40 bg-amber-500/5">
+          <CardContent className="flex items-start gap-3 py-4">
+            <TriangleAlert className="mt-0.5 h-4.5 w-4.5 shrink-0 text-amber-600 dark:text-amber-500" />
+            <div>
+              <p className="text-sm font-medium">Sınıfınız henüz atanmadı</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Sınavlar sınıflara atanır, bu yüzden size şu an sınav
+                görünmüyor. Sistem yöneticisi sınıfınızı atadığında
+                sınavlarınız burada listelenir.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+
 
       <div className="grid gap-4 sm:grid-cols-3">
         <StatCard
