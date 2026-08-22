@@ -6,6 +6,7 @@ import { demoGuard, type ActionResult } from "@/app/actions/shared";
 import { isSupabaseConfigured } from "@/lib/env";
 import { getSubjectOptions } from "@/lib/queries";
 import { canonicalizeSubject } from "@/lib/subjects";
+import type { Exam } from "@/lib/types";
 import { createServerSupabaseClient, getCurrentUser } from "@/lib/supabase-server";
 
 /** Sinav degisikliklerinden etkilenen sayfalari tazeler. */
@@ -313,19 +314,46 @@ export async function setExamSubject(
   return { ok: true, data: { subject: updated[0]?.subject ?? null } };
 }
 
+export interface ExamSettingsInput {
+  /** Ogrenci basina sure (dakika). null: yalnizca pencere gecerli. */
+  durationMinutes?: number | null;
+  /** Kamera+mikrofon zorunlulugu. */
+  proctored?: boolean;
+}
+
 /**
- * Sinavda kamera+mikrofon zorunlulugunu belirler.
+ * Sinav ayarlarini gunceller.
  *
- * Ayar sinav basinadir, atama basina degil: ayni sinavin bir derslikte
- * kamerali, digerinde kamerasiz cozulmesi hem denetimi anlamsizlastirir hem
- * de ayni kagidin iki farkli kosulda cozulmesi demektir.
+ * Tek fonksiyon, cunku ayarlar tek panelde birlikte duzenleniyor; her alan
+ * icin ayri bir eylem, ayni ekrandan pes pese istek atilmasina yol acardi.
+ * Yalnizca VERILEN alanlar yazilir - kismi guncelleme, dokunulmayan ayarin
+ * sifirlanmamasi icin.
  */
-export async function setExamProctored(
+export async function updateExamSettings(
   examId: string,
-  proctored: boolean,
-): Promise<ActionResult<{ proctored: boolean }>> {
+  input: ExamSettingsInput,
+): Promise<ActionResult<{ durationMinutes: number | null; proctored: boolean }>> {
   if (!isSupabaseConfigured) return demoGuard();
   if (!examId) return { ok: false, error: "Sinav secilmedi." };
+
+  const patch: Partial<Pick<Exam, "duration_minutes" | "proctored">> = {};
+
+  if (input.durationMinutes !== undefined) {
+    const dakika = input.durationMinutes;
+
+    if (dakika !== null) {
+      if (!Number.isInteger(dakika) || dakika < 1 || dakika > 600) {
+        return { ok: false, error: "Sure 1 ile 600 dakika arasinda olmalidir." };
+      }
+    }
+    patch.duration_minutes = dakika;
+  }
+
+  if (input.proctored !== undefined) patch.proctored = input.proctored;
+
+  if (Object.keys(patch).length === 0) {
+    return { ok: false, error: "Degistirilecek ayar verilmedi." };
+  }
 
   const supabase = await createServerSupabaseClient();
 
@@ -333,9 +361,9 @@ export async function setExamProctored(
   // 0 satir gunceller ve egitmen "kaydedildi" sanir.
   const { data: updated, error } = await supabase
     .from("exams")
-    .update({ proctored })
+    .update(patch)
     .eq("id", examId)
-    .select("id, proctored");
+    .select("id, duration_minutes, proctored");
 
   if (error) return { ok: false, error: error.message };
 
@@ -350,5 +378,54 @@ export async function setExamProctored(
   revalidateExamPaths(examId);
   revalidatePath("/dashboard/ogrenci", "layout");
 
-  return { ok: true, data: { proctored: updated[0]?.proctored ?? proctored } };
+  return {
+    ok: true,
+    data: {
+      durationMinutes: updated[0]?.duration_minutes ?? null,
+      proctored: updated[0]?.proctored ?? false,
+    },
+  };
+}
+
+/**
+ * Bir sorunun sinavdaki puanini degistirir.
+ *
+ * Puanlar sinava OZELDIR (exam_questions), soruya degil: ayni soru bir
+ * sinavda 5, digerinde 20 puan olabilir. Sifir puana izin verilmez -
+ * toplam sifir olursa sonuc hesaplama bolme yapamaz ve sinav asla
+ * sonuclanmaz; kural veritabaninda da check kisitiyla var.
+ */
+export async function setExamQuestionPoints(
+  examId: string,
+  questionId: string,
+  points: number,
+): Promise<ActionResult<{ points: number }>> {
+  if (!isSupabaseConfigured) return demoGuard();
+  if (!examId || !questionId) return { ok: false, error: "Soru secilmedi." };
+
+  if (!Number.isInteger(points) || points < 1 || points > 100) {
+    return { ok: false, error: "Puan 1 ile 100 arasinda bir tam sayi olmalidir." };
+  }
+
+  const supabase = await createServerSupabaseClient();
+
+  const { data: updated, error } = await supabase
+    .from("exam_questions")
+    .update({ points })
+    .eq("exam_id", examId)
+    .eq("question_id", questionId)
+    .select("question_id, points");
+
+  if (error) return { ok: false, error: error.message };
+
+  if (!updated || updated.length === 0) {
+    return {
+      ok: false,
+      error:
+        "Puan kaydedilemedi: bu sinav uzerinde yetkiniz yok ya da soru artik sinavda degil.",
+    };
+  }
+
+  revalidateExamPaths(examId);
+  return { ok: true, data: { points: updated[0]?.points ?? points } };
 }

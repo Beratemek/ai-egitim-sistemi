@@ -40,7 +40,8 @@ Atlanan bir adım "function does not exist" hatası verir.
 
 ## Şu an bekleyenler
 
-**Yok.** Bütün migration'lar uygulandı.
+| Dosya | Ne yapar | Neden önemli |
+|---|---|---|
+| `BEKLEYEN-1-sinav-suresi.sql` | `exams.duration_minutes` + süre kısıtının sunucuda zorlanması | Bunsuz süre alanı kaydedilemez; ayrıca süre yalnızca sayaçta kalırsa istemciden süresiz cevap gönderilebilir |
 
-Yeni bir tane yazıldığında bu klasörde `BEKLEYEN-<n>-...sql` adıyla belirir;
-çalıştırdıktan sonra `uygulandi/` klasörüne taşınır.
+Çalıştırıp çalıştırmadığından emin değilsen tekrar çalıştır — zararı yok.

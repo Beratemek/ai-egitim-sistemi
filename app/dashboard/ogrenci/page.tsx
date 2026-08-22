@@ -110,6 +110,7 @@ export default async function OgrenciPage() {
       evaluatedCount: exam.evaluatedCount,
       approvedCount: exam.approvedCount,
       attemptStatus: exam.attempt?.status,
+      attemptStartedAt: exam.attempt?.started_at ?? null,
     }),
   }));
 

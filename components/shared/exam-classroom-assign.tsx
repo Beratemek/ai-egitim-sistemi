@@ -4,7 +4,6 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  Camera,
   Check,
   GraduationCap,
   Loader2,
@@ -15,12 +14,10 @@ import { toast } from "sonner";
 
 import {
   assignExamToClassroom,
-  setExamProctored,
   unassignExamFromClassroom,
 } from "@/app/actions/exams";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Card,
   CardContent,
@@ -49,58 +46,14 @@ export interface ClassroomSummary {
 export interface ExamClassroomAssignProps {
   examId: string;
   classrooms: readonly ClassroomSummary[];
-  /** Sinav kamera+mikrofon acikken mi cozulecek? */
-  proctored?: boolean;
   canPersist?: boolean;
 }
 
 export function ExamClassroomAssign({
   examId,
   classrooms,
-  proctored = false,
   canPersist = false,
 }: ExamClassroomAssignProps) {
-  const [kamera, setKamera] = React.useState(proctored);
-  const [kameraPending, setKameraPending] = React.useState(false);
-
-  React.useEffect(() => setKamera(proctored), [proctored]);
-
-  async function kamerayiDegistir(deger: boolean) {
-    if (!canPersist) {
-      toast.error("Demo modunda kayıt yapılamaz");
-      return;
-    }
-
-    // Once ekranda degistir: anahtarin tiklamaya aninda yanit vermesi
-    // gerekiyor, sunucu turu ~150 ms suruyor.
-    setKamera(deger);
-    setKameraPending(true);
-
-    try {
-      const result = await setExamProctored(examId, deger);
-      if (!result.ok) throw new Error(result.error);
-
-      toast.success(
-        result.data.proctored
-          ? "Kamera zorunluluğu açıldı"
-          : "Kamera zorunluluğu kaldırıldı",
-        {
-          description: result.data.proctored
-            ? "Öğrenciler sınavı kamera ve mikrofon açıkken çözecek."
-            : "Sınav kamerasız çözülebilir.",
-        },
-      );
-      router.refresh();
-    } catch (caught) {
-      setKamera(!deger);
-      toast.error("Ayar kaydedilemedi", {
-        description:
-          caught instanceof Error ? caught.message : "Lütfen tekrar deneyin.",
-      });
-    } finally {
-      setKameraPending(false);
-    }
-  }
   const router = useRouter();
   const [pending, setPending] = React.useState<string | null>(null);
 
@@ -166,38 +119,6 @@ export function ExamClassroomAssign({
       </CardHeader>
 
       <CardContent className="space-y-4">
-        {/* ---------- Kamera zorunlulugu ---------- */}
-        <label
-          htmlFor="exam-proctored"
-          className={cn(
-            "flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors",
-            kamera ? "border-primary/50 bg-primary/5" : "hover:bg-accent/40",
-          )}
-        >
-          <Checkbox
-            id="exam-proctored"
-            checked={kamera}
-            disabled={kameraPending || !canPersist}
-            onChange={(event) => void kamerayiDegistir(event.target.checked)}
-            className="mt-0.5"
-          />
-          <span className="min-w-0">
-            <span className="flex items-center gap-1.5 text-sm font-medium">
-              <Camera className="h-3.5 w-3.5" />
-              Kamera zorunlu olsun
-              {kameraPending ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
-              ) : null}
-            </span>
-            <span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
-              Açarsanız öğrenci sınava ancak kamerası ve mikrofonu açıkken
-              girebilir; soruları tek tek geçer. Görüntü ve ses kaydedilmez,
-              yalnızca sınav boyunca açık kalması gerekir. Ayar sınavın
-              tamamı için geçerlidir, sınıf başına değil.
-            </span>
-          </span>
-        </label>
-
         {classrooms.length === 0 ? (
           <div className="rounded-lg border border-dashed p-4 text-sm leading-relaxed text-muted-foreground">
             Henüz tanımlı sınıf yok. Sistem yöneticisi{" "}

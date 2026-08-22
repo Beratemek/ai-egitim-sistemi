@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import {
   addExamQuestions,
   removeExamQuestion,
+  setExamQuestionPoints,
   setExamPublished,
 } from "@/app/actions/exams";
 import { QuestionTypeBadge } from "@/components/shared/status-badge";
@@ -36,8 +37,8 @@ import type { Exam, Question } from "@/lib/types";
 
 export interface ExamBuilderProps {
   exam: Exam;
-  /** Sınavda bulunan sorular, `position` sırasında. */
-  examQuestions: readonly Question[];
+  /** Sınavda bulunan sorular, `position` sırasında; puanlariyla birlikte. */
+  examQuestions: readonly (Question & { points: number; position: number })[];
   /** Havuzdaki onaylı sorular; bilesen sınavda olanlari kendisi ayiklar. */
   pool: readonly Question[];
   /** Sınava cevap verilmis mi? Verilmisse soru cikarma konusunda uyarilir. */
@@ -192,7 +193,7 @@ export function ExamBuilder({
           <CardDescription>
             {examQuestions.length === 0
               ? "Henüz soru eklenmedi. Aşağıdaki havuzdan seçim yapın."
-              : `Öğrenciye bu sirayla gösterilir. Toplam ${examQuestions.length} soru.`}
+              : `Öğrenciye bu sirayla gösterilir. ${examQuestions.length} soru · toplam ${examQuestions.reduce((sum, q) => sum + q.points, 0)} puan.`}
           </CardDescription>
         </CardHeader>
 
@@ -221,6 +222,14 @@ export function ExamBuilder({
                     </span>
                   </div>
                 </div>
+
+                <PuanAlani
+                  examId={exam.id}
+                  questionId={question.id}
+                  points={question.points}
+                  disabled={pendingAction !== null}
+                  canPersist={canPersist}
+                />
 
                 <Button
                   size="sm"
@@ -351,6 +360,104 @@ export function ExamBuilder({
           )}
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Sorunun bu sinavdaki puani.
+ *
+ * Puan soruya degil SINAVA ozeldir (exam_questions): ayni soru bir sinavda
+ * 5, digerinde 20 puan olabilir. Her tus vurusunda kaydetmek gereksiz istek
+ * uretirdi; kaydetme yalnizca deger degistiginde etkinlesir ve Enter da
+ * calisir.
+ */
+function PuanAlani({
+  examId,
+  questionId,
+  points,
+  disabled,
+  canPersist,
+}: {
+  examId: string;
+  questionId: string;
+  points: number;
+  disabled: boolean;
+  canPersist: boolean;
+}) {
+  const router = useRouter();
+  const [draft, setDraft] = React.useState(String(points));
+  const [pending, setPending] = React.useState(false);
+
+  React.useEffect(() => setDraft(String(points)), [points]);
+
+  const dirty = draft.trim() !== String(points);
+
+  async function kaydet() {
+    if (!canPersist) {
+      toast.error("Demo modunda kayıt yapılamaz");
+      return;
+    }
+
+    const deger = Number.parseInt(draft.trim(), 10);
+    if (!Number.isFinite(deger) || deger < 1 || deger > 100) {
+      toast.error("Puan 1 ile 100 arasında olmalı");
+      setDraft(String(points));
+      return;
+    }
+
+    setPending(true);
+    try {
+      const result = await setExamQuestionPoints(examId, questionId, deger);
+      if (!result.ok) throw new Error(result.error);
+
+      toast.success(`Puan: ${result.data.points}`);
+      router.refresh();
+    } catch (caught) {
+      setDraft(String(points));
+      toast.error("Puan kaydedilemedi", {
+        description: caught instanceof Error ? caught.message : "Tekrar deneyin.",
+      });
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <div className="flex shrink-0 items-center gap-1">
+      <Input
+        type="number"
+        min={1}
+        max={100}
+        inputMode="numeric"
+        value={draft}
+        disabled={disabled || pending}
+        onChange={(event) => setDraft(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" && dirty) void kaydet();
+        }}
+        aria-label="Soru puanı"
+        className="h-9 w-16 text-center"
+      />
+      <span className="text-xs text-muted-foreground">puan</span>
+
+      {dirty ? (
+        <Button
+          size="icon"
+          className="h-9 w-9 shrink-0"
+          disabled={pending}
+          onClick={() => void kaydet()}
+          aria-label="Puanı kaydet"
+        >
+          {pending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Check className="h-4 w-4" />
+          )}
+        </Button>
+      ) : null}
     </div>
   );
 }

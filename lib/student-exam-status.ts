@@ -1,3 +1,4 @@
+import { effectiveDeadline } from "./exam-time.ts";
 import type { Exam, ExamAttemptStatus } from "@/lib/types";
 
 /**
@@ -18,13 +19,15 @@ export const STUDENT_EXAM_STATUSES = [
 export type StudentExamStatus = (typeof STUDENT_EXAM_STATUSES)[number];
 
 export interface StudentExamStatusInput {
-  exam: Pick<Exam, "starts_at" | "ends_at">;
+  exam: Pick<Exam, "starts_at" | "ends_at" | "duration_minutes">;
   questionCount: number;
   answeredCount: number;
   /** AI on degerlendirmesine gonderilmis cevap sayisi. */
   evaluatedCount: number;
   approvedCount: number;
   attemptStatus?: ExamAttemptStatus | null;
+  /** Denemenin baslama ani; sure siniri buradan isler. */
+  attemptStartedAt?: string | null;
   /** Testlerde sabit zaman kullanilabilmesi icin disaridan verilebilir. */
   now?: Date;
 }
@@ -40,6 +43,7 @@ export function getStudentExamStatus({
   evaluatedCount,
   approvedCount,
   attemptStatus = null,
+  attemptStartedAt = null,
   now = new Date(),
 }: StudentExamStatusInput): StudentExamStatus {
   if (attemptStatus === "sonuclandi") return "sonuclandi";
@@ -52,10 +56,17 @@ export function getStudentExamStatus({
 
   const nowTime = now.getTime();
   const startsAt = parseTime(exam.starts_at);
-  const endsAt = parseTime(exam.ends_at);
+
+  // Pencere ve kisiye ozel sure birlikte degerlendirilir; hangisi once
+  // biterse o baglar (bkz. lib/exam-time.ts).
+  const deadline = effectiveDeadline({
+    endsAt: exam.ends_at,
+    durationMinutes: exam.duration_minutes,
+    startedAt: attemptStartedAt,
+  });
 
   if (startsAt !== null && nowTime < startsAt) return "yaklasan";
-  if (endsAt !== null && nowTime >= endsAt) return "suresi_doldu";
+  if (deadline !== null && nowTime >= deadline.getTime()) return "suresi_doldu";
 
   if (attemptStatus === "devam_ediyor") return "devam_ediyor";
 

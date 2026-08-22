@@ -160,6 +160,14 @@ export type Exam = {
    * sinav boyunca akis kapanirsa cevap veremez.
    */
   proctored: boolean;
+  /**
+   * Ogrenci basina sinav suresi (dakika).
+   *
+   * Pencereden (starts_at/ends_at) farkli: pencere sinavin ACIK OLDUGU
+   * araligi, bu ise her ogrenciye denemesini baslattigi andan itibaren
+   * taninan sureyi tanimlar. Bos ise yalnizca pencere gecerlidir.
+   */
+  duration_minutes: number | null;
   instructor_id: string;
   is_published: boolean;
   starts_at: string | null;
@@ -400,6 +408,7 @@ export interface Database {
           | "ends_at"
           | "subject"
           | "proctored"
+          | "duration_minutes"
         >
       >;
       exam_questions: TableDefinition<
@@ -502,6 +511,10 @@ export interface Database {
       set_instructor_subjects: {
         Args: { target_user: string; subjects: string[] };
         Returns: string[];
+      };
+      exam_attempt_deadline: {
+        Args: { target_exam: string; target_student: string };
+        Returns: string | null;
       };
       my_subjects: {
         Args: Record<string, never>;

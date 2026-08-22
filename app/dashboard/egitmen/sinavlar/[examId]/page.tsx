@@ -5,7 +5,7 @@ import { ArrowLeft } from "lucide-react";
 
 import { ExamBuilder } from "@/components/shared/exam-builder";
 import { ExamClassroomAssign } from "@/components/shared/exam-classroom-assign";
-import { ExamSubjectField } from "@/components/shared/exam-subject-field";
+import { ExamSettingsPanel } from "@/components/shared/exam-settings-panel";
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
 import { isSupabaseConfigured } from "@/lib/env";
@@ -89,17 +89,20 @@ export default async function SinavDetayPage({
         }
       />
 
-      <ExamSubjectField
+      <ExamSettingsPanel
         examId={examId}
         subject={detail.exam.subject}
+        durationMinutes={detail.exam.duration_minutes}
+        proctored={detail.exam.proctored}
         subjectOptions={subjectOptions}
+        questionCount={detail.questions.length}
+        totalPoints={detail.questions.reduce((sum, q) => sum + q.points, 0)}
         canPersist={isSupabaseConfigured}
       />
 
       <ExamClassroomAssign
         examId={examId}
         classrooms={classrooms}
-        proctored={detail.exam.proctored}
         canPersist={isSupabaseConfigured}
       />
 

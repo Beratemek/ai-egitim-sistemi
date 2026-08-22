@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { serverEnv } from "@/lib/env";
+import { effectiveDeadline } from "@/lib/exam-time";
 import { getStudentExamDetail } from "@/lib/queries";
 import { getCurrentUser } from "@/lib/supabase-server";
 import {
@@ -88,6 +89,18 @@ export default async function OgrenciSinavPage({
     evaluatedCount: evaluated,
     approvedCount: approved,
     attemptStatus: attempt?.status,
+    attemptStartedAt: attempt?.started_at ?? null,
+  });
+
+  /**
+   * Ogrenciyi baglayan etkin bitis: pencere ile kisiye ozel sureden hangisi
+   * once biterse o. Sayac ve "Bitis" satiri bunu gosterir, aksi halde
+   * ogrenci 2 saatlik pencereyi gorup 40 dakikasi oldugunu bilmezdi.
+   */
+  const deadline = effectiveDeadline({
+    endsAt: exam.ends_at,
+    durationMinutes: exam.duration_minutes,
+    startedAt: attempt?.started_at ?? null,
   });
   const canAnswer = canAnswerStudentExam(status);
   const lockReason = getLockReason(status, exam.starts_at, exam.ends_at);
@@ -164,16 +177,21 @@ export default async function OgrenciSinavPage({
               value={questionCount > 0 ? (answered / questionCount) * 100 : 0}
               className="h-2"
             />
-            {exam.ends_at ? (
+            {deadline ? (
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                   <CalendarClock className="h-3.5 w-3.5" />
-                  Bitis: {formatDateTime(exam.ends_at)}
+                  Bitiş: {formatDateTime(deadline.toISOString())}
+                  {exam.duration_minutes !== null ? (
+                    <span className="text-muted-foreground/80">
+                      · {exam.duration_minutes} dk süre
+                    </span>
+                  ) : null}
                 </p>
                 {attempt?.status === "devam_ediyor" ? (
                   <ExamCountdown
                     examId={exam.id}
-                    endsAt={exam.ends_at}
+                    endsAt={deadline.toISOString()}
                     autoSubmit
                   />
                 ) : null}
