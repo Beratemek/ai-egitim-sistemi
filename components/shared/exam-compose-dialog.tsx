@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { createExamWithQuestions } from "@/app/actions/exams";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -25,91 +26,117 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { pickBalancedByType, type TopicGroup } from "@/lib/question-pool";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { pickBalancedByType, type SubjectGroup } from "@/lib/question-pool";
 import { cn } from "@/lib/utils";
 
 /**
- * Havuzdan yeni sinav kurma penceresi.
+ * Sinav kurma penceresi.
  *
- * Iki calisma bicimi var ve ikisi de ayni pencerede:
+ * Pencere sinavi KENDISI kuruyor: ders, konu ve soru sayisini burada
+ * soruyor. Onceki surumde yalnizca listeden isaretlenmis sorulari aliyordu,
+ * yani egitmen zaten butun secim isini yapmis oluyordu ve pencerenin
+ * yaptigi bir sey kalmiyordu.
  *
- *   SECILI SORULARLA — egitmen listeden tek tek secmisse, sinav dogrudan o
- *   sorularla kurulur.
+ * Konu secimi ISTEGE BAGLI ve COKLU: bos birakilirsa dersin tum konulari
+ * kapsama girer. Bir donem sinavi genelde birkac konuyu birden kapsar;
+ * tek konu secmeye zorlamak gercek kullanimi karsilamazdi.
  *
- *   OTOMATIK — hic secim yoksa (ya da egitmen otomatige gecerse) "kac test,
- *   kac klasik" kotasi verilir ve sorular bulunulan kademeden, konular
- *   arasinda dengeli dagitilarak secilir. Boylece 10 testin hepsi tek
- *   konudan gelmez.
- *
- * Kota havuzda karsilanamazsa SESSIZCE az soruyla devam edilmez; eksik
- * sayilar kullaniciya soylenir.
+ * Sorular konular arasinda DENGELI dagitilir - 10 testin hepsi tek konudan
+ * gelmez. Bu kural tabanli bir secim; soru metinlerini yapay zeka uretiyor
+ * ama sinavi kuran bu adim deterministik.
  */
 
 export interface ExamComposeDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Egitmenin listeden isaretledigi sorular. */
-  selectedIds: readonly string[];
-  /** Otomatik secimin kapsami: bulunulan kademenin konulari. */
-  scopeTopics: readonly TopicGroup[];
-  /** Kapsamin okunabilir adi ("Elektronik ve IoT dersi" gibi). */
-  scopeLabel: string;
-  /** Sinava atanacak ders; bulunulan kademeden gelir. */
-  subject?: string | null;
+  /** Havuzun tamami: ders -> konu -> soru. */
+  subjects: readonly SubjectGroup[];
+  /** Egitmenin listeden isaretledigi sorular; varsa ayri bir secenek olur. */
+  selectedIds?: readonly string[];
+  /** Pencere acilirken on secili gelecek ders. */
+  defaultSubject?: string | null;
   onCreated?: () => void;
 }
 
-type Kaynak = "secili" | "otomatik";
+type Kaynak = "otomatik" | "secili";
 
 export function ExamComposeDialog({
   open,
   onOpenChange,
-  selectedIds,
-  scopeTopics,
-  scopeLabel,
-  subject = null,
+  subjects,
+  selectedIds = [],
+  defaultSubject = null,
   onCreated,
 }: ExamComposeDialogProps) {
   const router = useRouter();
 
   const [baslik, setBaslik] = React.useState("");
-  const [sure, setSure] = React.useState("60");
+  const [ders, setDers] = React.useState<string>("");
+  const [konular, setKonular] = React.useState<ReadonlySet<string>>(new Set());
   const [testSayisi, setTestSayisi] = React.useState("10");
   const [klasikSayisi, setKlasikSayisi] = React.useState("5");
-  const [kaynak, setKaynak] = React.useState<Kaynak>(
-    selectedIds.length > 0 ? "secili" : "otomatik",
-  );
+  const [sure, setSure] = React.useState("60");
+  const [kaynak, setKaynak] = React.useState<Kaynak>("otomatik");
   const [pending, setPending] = React.useState(false);
 
-  // Pencere her acilista mevcut duruma gore baslasin.
+  // Pencere her acilista temiz baslasin; onceki denemenin artiklari kalmasin.
   React.useEffect(() => {
     if (!open) return;
-    setKaynak(selectedIds.length > 0 ? "secili" : "otomatik");
     setBaslik("");
-  }, [open, selectedIds.length]);
+    setKonular(new Set());
+    setKaynak("otomatik");
+    setDers(defaultSubject ?? subjects[0]?.subject ?? "");
+  }, [open, defaultSubject, subjects]);
 
-  /** Kapsamda tip basina kac soru var? Kota alanlarinin ustunde gosterilir. */
+  const acikDers = React.useMemo(
+    () => subjects.find((group) => group.subject === ders) ?? null,
+    [subjects, ders],
+  );
+
+  /** Kapsam: konu secilmediyse dersin TUM konulari. */
+  const kapsam = React.useMemo(() => {
+    if (!acikDers) return [];
+    if (konular.size === 0) return acikDers.topics;
+    return acikDers.topics.filter((topic) => konular.has(topic.topic));
+  }, [acikDers, konular]);
+
   const mevcut = React.useMemo(() => {
     let test = 0;
     let acik = 0;
-    for (const group of scopeTopics) {
+    for (const group of kapsam) {
       for (const question of group.questions) {
         if (question.type === "test") test += 1;
         else acik += 1;
       }
     }
     return { test, acik };
-  }, [scopeTopics]);
+  }, [kapsam]);
 
   const istenenTest = Number.parseInt(testSayisi, 10);
   const istenenKlasik = Number.parseInt(klasikSayisi, 10);
   const toplamIstenen =
-    (Number.isFinite(istenenTest) ? istenenTest : 0) +
-    (Number.isFinite(istenenKlasik) ? istenenKlasik : 0);
+    (Number.isFinite(istenenTest) ? Math.max(0, istenenTest) : 0) +
+    (Number.isFinite(istenenKlasik) ? Math.max(0, istenenKlasik) : 0);
 
   const gecerli =
     baslik.trim().length > 0 &&
-    (kaynak === "secili" ? selectedIds.length > 0 : toplamIstenen > 0);
+    (kaynak === "secili" ? selectedIds.length > 0 : Boolean(acikDers) && toplamIstenen > 0);
+
+  function konuDegistir(konu: string) {
+    setKonular((mevcut) => {
+      const next = new Set(mevcut);
+      if (next.has(konu)) next.delete(konu);
+      else next.add(konu);
+      return next;
+    });
+  }
 
   async function olustur() {
     if (!gecerli) return;
@@ -119,7 +146,7 @@ export function ExamComposeDialog({
     if (kaynak === "secili") {
       ids = [...selectedIds];
     } else {
-      const sonuc = pickBalancedByType(scopeTopics, {
+      const sonuc = pickBalancedByType(kapsam, {
         test: Number.isFinite(istenenTest) ? Math.max(0, istenenTest) : 0,
         acikUclu: Number.isFinite(istenenKlasik) ? Math.max(0, istenenKlasik) : 0,
       });
@@ -134,14 +161,14 @@ export function ExamComposeDialog({
           .filter(Boolean)
           .join(" ve ");
 
-        toast.warning(`Havuzda ${eksikler} soru eksik`, {
+        toast.warning(`Seçtiğiniz kapsamda ${eksikler} soru eksik`, {
           description: "Sınav elde edilen sorularla kurulacak.",
         });
       }
 
       if (ids.length === 0) {
         toast.error("Bu kapsamda uygun soru yok", {
-          description: "Üst kademeye çıkın veya kotayı düşürün.",
+          description: "Konu seçimini genişletin veya soru sayısını düşürün.",
         });
         return;
       }
@@ -154,16 +181,19 @@ export function ExamComposeDialog({
     try {
       const result = await createExamWithQuestions({
         title: baslik,
-        description: `${scopeLabel} kapsamından oluşturuldu.`,
-        ...(subject ? { subject } : {}),
+        description:
+          kaynak === "secili"
+            ? "Soru havuzundan seçilerek hazırlandı."
+            : `${ders} dersinden hazırlandı.`,
+        ...(kaynak === "otomatik" && ders ? { subject: ders } : {}),
         ...(Number.isFinite(dakika) ? { durationMinutes: dakika } : {}),
         questionIds: ids,
       });
 
       if (!result.ok) throw new Error(result.error);
 
-      toast.success("Sınav oluşturuldu", {
-        description: `${result.data.added} soru eklendi. Puanlar 100 üzerinden dağıtıldı.`,
+      toast.success("Sınav hazır", {
+        description: `${result.data.added} soru eklendi, puanlar 100 üzerinden dağıtıldı.`,
       });
 
       onOpenChange(false);
@@ -180,15 +210,15 @@ export function ExamComposeDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-4.5 w-4.5 text-primary" />
-            Yeni sınav oluştur
+            Sınav oluştur
           </DialogTitle>
           <DialogDescription>
-            Sorular <span className="font-medium text-foreground">{scopeLabel}</span>{" "}
-            kapsamından alınır. Puanlar 100 üzerinden kendiliğinden dağıtılır.
+            Dersi ve kaç soru istediğinizi söyleyin; sınav konular arasında
+            dengeli dağıtılarak hazırlansın.
           </DialogDescription>
         </DialogHeader>
 
@@ -205,70 +235,146 @@ export function ExamComposeDialog({
             />
           </div>
 
-          {/* ---------- Soru kaynağı ---------- */}
-          <div className="space-y-2">
-            <Label>Sorular nereden gelsin?</Label>
-
+          {/* ---------- Kaynak: yalnizca secim varsa secenek sunulur ---------- */}
+          {selectedIds.length > 0 ? (
             <div className="grid gap-2 sm:grid-cols-2">
               <KaynakSecenegi
-                secili={kaynak === "secili"}
-                devreDisi={selectedIds.length === 0}
-                baslik="Seçtiklerim"
-                aciklama={
-                  selectedIds.length === 0
-                    ? "Listeden soru işaretlemediniz"
-                    : `${selectedIds.length} soru işaretli`
-                }
-                onSelect={() => setKaynak("secili")}
-              />
-
-              <KaynakSecenegi
                 secili={kaynak === "otomatik"}
-                devreDisi={false}
-                baslik="Otomatik seç"
-                aciklama="Konular arasında dengeli dağıtılır"
+                baslik="Ders ve konudan"
+                aciklama="Sistem dengeli seçsin"
                 onSelect={() => setKaynak("otomatik")}
               />
+              <KaynakSecenegi
+                secili={kaynak === "secili"}
+                baslik="İşaretlediklerimden"
+                aciklama={`${selectedIds.length} soru işaretli`}
+                onSelect={() => setKaynak("secili")}
+              />
             </div>
-          </div>
+          ) : null}
 
-          {/* ---------- Kota ---------- */}
           {kaynak === "otomatik" ? (
-            <div className="grid gap-4 sm:grid-cols-2">
+            <>
+              {/* ---------- Ders ---------- */}
               <div className="space-y-2">
-                <Label htmlFor="compose-test" className="flex items-center gap-1.5">
-                  <ListChecks className="h-3.5 w-3.5 text-muted-foreground" />
-                  Test sorusu
-                </Label>
-                <Input
-                  id="compose-test"
-                  type="number"
-                  min={0}
-                  value={testSayisi}
-                  onChange={(event) => setTestSayisi(event.target.value)}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Kapsamda {mevcut.test} test sorusu var
-                </p>
+                <Label htmlFor="compose-ders">Ders</Label>
+                <Select
+                  value={ders}
+                  onValueChange={(value) => {
+                    setDers(value);
+                    // Ders degisince onceki konu secimi anlamsiz kalir.
+                    setKonular(new Set());
+                  }}
+                >
+                  <SelectTrigger id="compose-ders">
+                    <SelectValue placeholder="Ders seçin" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {subjects.map((group) => (
+                      <SelectItem key={group.subject} value={group.subject}>
+                        {group.subject} · {group.questionCount} soru
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="compose-klasik" className="flex items-center gap-1.5">
-                  <FileText className="h-3.5 w-3.5 text-muted-foreground" />
-                  Klasik (açık uçlu)
-                </Label>
-                <Input
-                  id="compose-klasik"
-                  type="number"
-                  min={0}
-                  value={klasikSayisi}
-                  onChange={(event) => setKlasikSayisi(event.target.value)}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Kapsamda {mevcut.acik} açık uçlu soru var
-                </p>
+              {/* ---------- Konular (istege bagli, coklu) ---------- */}
+              {acikDers ? (
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <Label>
+                      Konular{" "}
+                      <span className="font-normal text-muted-foreground">
+                        (isteğe bağlı)
+                      </span>
+                    </Label>
+
+                    {konular.size > 0 ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs text-muted-foreground"
+                        onClick={() => setKonular(new Set())}
+                      >
+                        Seçimi temizle
+                      </Button>
+                    ) : null}
+                  </div>
+
+                  <div className="max-h-52 space-y-0.5 overflow-y-auto rounded-lg border p-2">
+                    {acikDers.topics.map((topic) => {
+                      const id = `konu-${topic.topic}`;
+                      const secili = konular.has(topic.topic);
+
+                      return (
+                        <label
+                          key={topic.topic}
+                          htmlFor={id}
+                          className={cn(
+                            "flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 transition-colors",
+                            secili ? "bg-primary/5" : "hover:bg-accent/60",
+                          )}
+                        >
+                          <Checkbox
+                            id={id}
+                            checked={secili}
+                            onChange={() => konuDegistir(topic.topic)}
+                          />
+                          <span className="min-w-0 flex-1 text-sm">{topic.topic}</span>
+                          <span className="shrink-0 text-xs text-muted-foreground">
+                            {topic.questions.length}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+
+                  <p className="text-xs leading-relaxed text-muted-foreground">
+                    {konular.size === 0
+                      ? `Konu seçmezseniz ${acikDers.subject} dersinin tüm konuları kapsama girer.`
+                      : `${konular.size} konu seçildi.`}
+                  </p>
+                </div>
+              ) : null}
+
+              {/* ---------- Soru sayilari ---------- */}
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="compose-test" className="flex items-center gap-1.5">
+                    <ListChecks className="h-3.5 w-3.5 text-muted-foreground" />
+                    Test sorusu
+                  </Label>
+                  <Input
+                    id="compose-test"
+                    type="number"
+                    min={0}
+                    value={testSayisi}
+                    onChange={(event) => setTestSayisi(event.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Kapsamda {mevcut.test} tane var
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="compose-klasik" className="flex items-center gap-1.5">
+                    <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+                    Klasik (açık uçlu)
+                  </Label>
+                  <Input
+                    id="compose-klasik"
+                    type="number"
+                    min={0}
+                    value={klasikSayisi}
+                    onChange={(event) => setKlasikSayisi(event.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Kapsamda {mevcut.acik} tane var
+                  </p>
+                </div>
               </div>
-            </div>
+            </>
           ) : null}
 
           {/* ---------- Süre ---------- */}
@@ -286,10 +392,6 @@ export function ExamComposeDialog({
               onChange={(event) => setSure(event.target.value)}
               className="sm:w-40"
             />
-            <p className="text-xs leading-relaxed text-muted-foreground">
-              Her öğrenci sınava başladığı andan itibaren bu süreyi alır.
-              Ayarlardan sonradan değiştirilebilir.
-            </p>
           </div>
 
           {/* ---------- Özet ---------- */}
@@ -299,13 +401,18 @@ export function ExamComposeDialog({
               {kaynak === "secili" ? selectedIds.length : toplamIstenen} soru
             </Badge>
             <Badge variant="soft">{sure || "60"} dk</Badge>
-            {subject ? <Badge variant="soft">{subject}</Badge> : null}
+            {kaynak === "otomatik" && ders ? (
+              <Badge variant="soft">{ders}</Badge>
+            ) : null}
+            {kaynak === "otomatik" && konular.size > 0 ? (
+              <Badge variant="soft">{konular.size} konu</Badge>
+            ) : null}
 
             {kaynak === "otomatik" &&
             (istenenTest > mevcut.test || istenenKlasik > mevcut.acik) ? (
               <span className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-500">
                 <TriangleAlert className="h-3.5 w-3.5" />
-                Kapsam yetersiz olabilir
+                Kapsam yetersiz
               </span>
             ) : null}
           </div>
@@ -329,13 +436,11 @@ export function ExamComposeDialog({
 
 function KaynakSecenegi({
   secili,
-  devreDisi,
   baslik,
   aciklama,
   onSelect,
 }: {
   secili: boolean;
-  devreDisi: boolean;
   baslik: string;
   aciklama: string;
   onSelect: () => void;
@@ -344,13 +449,11 @@ function KaynakSecenegi({
     <button
       type="button"
       onClick={onSelect}
-      disabled={devreDisi}
       aria-pressed={secili}
       className={cn(
         "rounded-lg border p-3 text-left transition-colors",
         "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
         secili ? "border-primary bg-primary/5" : "hover:bg-accent/40",
-        devreDisi && "cursor-not-allowed opacity-50",
       )}
     >
       <p className="text-sm font-medium">{baslik}</p>

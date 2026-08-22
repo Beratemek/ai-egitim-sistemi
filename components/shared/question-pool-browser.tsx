@@ -126,26 +126,6 @@ export function QuestionPoolBrowser({
 
   /* ------------------------------ gezinme -------------------------------- */
 
-  /**
-   * Otomatik secimin kapsami: bulunulan kademe.
-   * Konudayken o konu, derste o dersin konulari, en ustte gorunen her sey.
-   */
-  const scopeTopics = React.useMemo(
-    () =>
-      openTopic
-        ? [openTopic]
-        : openSubject
-          ? openSubject.topics
-          : visibleSubjects.flatMap((group) => group.topics),
-    [openTopic, openSubject, visibleSubjects],
-  );
-
-  const scopeLabel = openTopic
-    ? `${openTopic.topic} konusu`
-    : openSubject
-      ? `${openSubject.subject} dersi`
-      : "görünen tüm dersler";
-
   function backToSubjects() {
     setActiveSubject(null);
     setActiveTopic(null);
@@ -217,6 +197,7 @@ export function QuestionPoolBrowser({
         onSearchChange={setSearch}
         typeFilter={typeFilter}
         onTypeFilterChange={setTypeFilter}
+        onCreateExam={() => setComposeOpen(true)}
       />
 
         {openSubject === null ? (
@@ -309,10 +290,9 @@ export function QuestionPoolBrowser({
       <ExamComposeDialog
         open={composeOpen}
         onOpenChange={setComposeOpen}
+        subjects={allSubjects}
         selectedIds={[...selectedIds]}
-        scopeTopics={scopeTopics}
-        scopeLabel={scopeLabel}
-        subject={openSubject?.subject ?? null}
+        defaultSubject={openSubject?.subject ?? null}
         onCreated={() => setSelectedIds(new Set())}
       />
     </div>
@@ -796,11 +776,13 @@ function PoolToolbar({
   onSearchChange,
   typeFilter,
   onTypeFilterChange,
+  onCreateExam,
 }: {
   search: string;
   onSearchChange: (value: string) => void;
   typeFilter: TypeFilter;
   onTypeFilterChange: (value: TypeFilter) => void;
+  onCreateExam: () => void;
 }) {
   return (
     <div className="flex flex-col gap-2 sm:flex-row">
@@ -829,6 +811,16 @@ function PoolToolbar({
           <SelectItem value="acik_uclu">Açık uçlu</SelectItem>
         </SelectContent>
       </Select>
+
+      {/*
+        Sinav kurma dugmesi SECIMDEN BAGIMSIZ. Onceden yalnizca soru
+        isaretlendikten sonra beliriyordu; oysa egitmen cogu zaman tek tek
+        secmek degil "su dersten 20 soruluk sinav" demek istiyor.
+      */}
+      <Button className="gap-2 whitespace-nowrap" onClick={onCreateExam}>
+        <Sparkles className="h-4 w-4" />
+        Sınav oluştur
+      </Button>
     </div>
   );
 }
@@ -923,7 +915,7 @@ function SelectionBar({
 
         <Button size="sm" className="gap-1.5" onClick={onCreate}>
           <Sparkles className="h-3.5 w-3.5" />
-          Yeni sınav oluştur
+          Yeni sınav
         </Button>
       </div>
     </div>
