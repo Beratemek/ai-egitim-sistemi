@@ -1,6 +1,7 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Fraunces, Inter } from "next/font/google";
 
+import { NativeBridge } from "@/components/shared/native-bridge";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 
@@ -36,6 +37,27 @@ export const metadata: Metadata = {
     "Yapay zeka ile soru üreten, açık uçlu cevapları rubriğe göre puanlayan ve eğitmen onayıyla çalışan ölçme-değerlendirme platformu.",
 };
 
+/**
+ * Mobil goruntu alani.
+ *
+ * `viewportFit: "cover"` centikli ekranlarda sayfanin kenarlara kadar
+ * uzanmasini saglar; guvenli alan bosluklari CSS'te `env(safe-area-inset-*)`
+ * ile veriliyor. Bu tanim olmadan native kabukta ust serit centigin altinda
+ * kaliyordu.
+ *
+ * Yakinlastirma KAPATILMADI: sinavda kucuk yazi okuyan ogrencinin buyutme
+ * hakki, denetim kaygisindan once gelir.
+ */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "hsl(42 36% 96%)" },
+    { media: "(prefers-color-scheme: dark)", color: "hsl(202 42% 8%)" },
+  ],
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
@@ -48,6 +70,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
+          <NativeBridge />
           {children}
           <Toaster richColors position="top-right" />
         </ThemeProvider>

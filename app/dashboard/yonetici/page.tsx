@@ -116,7 +116,9 @@ export default async function YoneticiPage() {
             gorunumu. Yukaridaki grafiklerin sayısal karsiligi.
           </CardDescription>
         </CardHeader>
-        <CardContent className="px-0 sm:px-6">
+        {/* Bes sutunlu tablo telefon genisligine sigmaz; yatay kaydirma
+            kutunun ICINDE kalmali, sayfanin tamami kaymamali. */}
+        <CardContent className="overflow-x-auto px-0 sm:px-6">
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">

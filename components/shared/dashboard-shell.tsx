@@ -96,7 +96,7 @@ export function DashboardShell({
       {/* ---------- İçerik sutunu ---------- */}
       <div className="relative z-10 lg:pl-[264px]">
         {/* ---------- Üst cubuk ---------- */}
-        <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b bg-background/80 px-4 backdrop-blur-md sm:px-6">
+        <header className="safe-top sticky top-0 z-20 flex h-16 items-center gap-3 border-b bg-background/80 px-4 backdrop-blur-md sm:px-6">
           {/* Mobil cekmece */}
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
             <SheetTrigger asChild>

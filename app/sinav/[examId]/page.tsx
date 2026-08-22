@@ -101,7 +101,7 @@ export default async function SinavCozPage({ params }: PageProps) {
         Onceden sayfanin basindaydi ve ogrenci kalan sureyi gormek icin
         yukari kaydirmak zorundaydi.
       */}
-      <header className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur">
+      <header className="safe-top sticky top-0 z-30 border-b bg-background/95 backdrop-blur">
         <div className="mx-auto w-full max-w-[1560px] px-4 py-3 sm:px-8">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0">
@@ -144,7 +144,7 @@ export default async function SinavCozPage({ params }: PageProps) {
         {exam.proctored ? <ProctoringGate>{govde}</ProctoringGate> : govde}
       </main>
 
-      <footer className="border-t">
+      <footer className="safe-bottom border-t">
         <div className="mx-auto w-full max-w-[1560px] px-4 py-3 sm:px-8">
           <Link
             href={`/dashboard/ogrenci/sinav/${examId}`}
