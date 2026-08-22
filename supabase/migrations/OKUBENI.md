@@ -40,7 +40,8 @@ Atlanan bir adım "function does not exist" hatası verir.
 
 ## Şu an bekleyenler
 
-**Yok.** Bütün migration'lar uygulandı.
+| Dosya | Ne yapar | Neden önemli |
+|---|---|---|
+| `BEKLEYEN-1-tum-dersler-yetkisi.sql` | Eğitmene "Tüm dersler" yetkisi verilebilir | Bunsuz seçenek arayüzde görünür ama kaydedilse de işe yaramaz |
 
-Yeni bir tane yazıldığında bu klasörde `BEKLEYEN-<n>-...sql` adıyla belirir;
-çalıştırdıktan sonra `uygulandi/` klasörüne taşınır.
+Çalıştırıp çalıştırmadığından emin değilsen tekrar çalıştır — zararı yok.

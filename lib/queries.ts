@@ -9,7 +9,7 @@
 import { cache } from "react";
 
 import { isSupabaseConfigured } from "@/lib/env";
-import { subjectKey } from "@/lib/subjects";
+import { ALL_SUBJECTS, subjectKey } from "@/lib/subjects";
 import {
   MOCK_EXAMS,
   MOCK_OUTCOMES,
@@ -1216,14 +1216,15 @@ export async function getSubjectOptions(): Promise<string[]> {
   const seen = new Map<string, string>();
   for (const question of questions) {
     const subject = question.subject?.trim();
-    if (!subject) continue;
+    // Joker deger bir ders adi degil; secenek listesine dusmemeli.
+    if (!subject || subject === ALL_SUBJECTS) continue;
     // Tekillestirme kurali VERITABANIYLA ayni olmali; bkz. lib/subjects.ts.
     seen.set(subjectKey(subject), subject);
   }
 
   for (const exam of exams) {
     const subject = exam.subject?.trim();
-    if (!subject) continue;
+    if (!subject || subject === ALL_SUBJECTS) continue;
     seen.set(subjectKey(subject), subject);
   }
 

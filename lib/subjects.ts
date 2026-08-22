@@ -42,3 +42,26 @@ export function canonicalizeSubject(
   const key = subjectKey(trimmed);
   return options.find((option) => subjectKey(option) === key) ?? trimmed;
 }
+
+/**
+ * "Tum dersler" yetkisini temsil eden joker deger.
+ *
+ * `instructor_subjects` icinde bu degeri tasiyan satir "her derse yetkili"
+ * demektir. Tek tek her dersi isaretlemekten farki: ders listesinden BAGIMSIZ
+ * oldugu icin YARIN EKLENEN dersi de kapsar. Icerik uzmani yeni bir ders
+ * adiyla soru urettiginde "her derse yetkili" hocanin kapsami kendiliginden
+ * genisler.
+ *
+ * Veritabanindaki karsiligi: public.all_subjects_token()
+ */
+export const ALL_SUBJECTS = "*";
+
+/** Bu kullaniciya "tum dersler" yetkisi verilmis mi? */
+export function hasAllSubjects(subjects: readonly string[]): boolean {
+  return subjects.includes(ALL_SUBJECTS);
+}
+
+/** Ekranda gosterilecek ad; joker deger okunabilir metne cevrilir. */
+export function subjectLabel(subject: string): string {
+  return subject === ALL_SUBJECTS ? "Tüm dersler" : subject;
+}
