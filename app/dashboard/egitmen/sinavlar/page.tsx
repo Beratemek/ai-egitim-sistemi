@@ -65,7 +65,7 @@ export default async function SinavlarPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-2 sm:gap-4">
           {exams.map((exam) => (
             <Link
               key={exam.id}

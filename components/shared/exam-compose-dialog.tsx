@@ -394,7 +394,7 @@ export function ExamComposeDialog({
               ) : null}
 
               {/* ---------- Soru sayilari ---------- */}
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-3 sm:grid-cols-2 sm:gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="compose-test" className="flex items-center gap-1.5">
                     <ListChecks className="h-3.5 w-3.5 text-muted-foreground" />

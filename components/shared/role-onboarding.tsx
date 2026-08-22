@@ -111,7 +111,7 @@ export function RoleOnboarding({
           <h2 className="text-sm font-medium">Profil bilgileriniz</h2>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-2 sm:gap-4">
           <div className="space-y-2">
             <Label htmlFor="onboarding-name">Ad Soyad</Label>
             <Input

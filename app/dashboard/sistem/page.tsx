@@ -57,7 +57,7 @@ export default async function SistemPage() {
         description="Rol taleplerini karara bağlayın, kullanıcıların rolünü belirleyin ve öğrencileri sınıflara yerleştirin."
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-4 xl:grid-cols-4">
         <StatCard label="Kullanıcı" value={users.length} icon={Users} accent="primary" />
         <StatCard
           label="Rol onayı bekleyen"

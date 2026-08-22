@@ -146,9 +146,9 @@ export function ProctoringGate({ children }: ProctoringGateProps) {
             : "border-amber-500/40 bg-amber-500/5",
         )}
       >
-        <CardContent className="flex flex-wrap items-center gap-4 py-4">
+        <CardContent className="flex flex-wrap items-center gap-3 py-3 sm:gap-4 sm:py-4">
           {/* Kendini gorme penceresi */}
-          <div className="relative h-[120px] w-[160px] shrink-0 overflow-hidden rounded-lg bg-slate-900 ring-1 ring-border">
+          <div className="relative h-[84px] w-[112px] shrink-0 overflow-hidden rounded-lg bg-slate-900 ring-1 ring-border sm:h-[120px] sm:w-[160px]">
             <video
               ref={videoRef}
               autoPlay

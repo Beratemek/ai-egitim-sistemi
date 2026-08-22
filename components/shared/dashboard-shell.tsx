@@ -207,7 +207,7 @@ export function DashboardShell({
           </div>
         </header>
 
-        <main className="animate-kitap-yukselir mx-auto w-full max-w-[1400px] space-y-6 px-4 py-6 sm:px-6 sm:py-8">
+        <main className="animate-kitap-yukselir mx-auto w-full max-w-[1400px] space-y-4 px-3 py-4 sm:space-y-6 sm:px-6 sm:py-8">
           {children}
         </main>
       </div>

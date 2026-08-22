@@ -23,7 +23,7 @@ export function PageSkeleton({ stats = 4, blocks = 2 }: PageSkeletonProps) {
       </div>
 
       {stats > 0 ? (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2.5 sm:gap-4 xl:grid-cols-4">
           {Array.from({ length: stats }, (_, index) => (
             <Card key={index}>
               <CardContent className="space-y-3 p-5">
