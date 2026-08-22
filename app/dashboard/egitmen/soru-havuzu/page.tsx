@@ -28,7 +28,7 @@ export default async function SoruHavuzuPage() {
         description="Havuz ders, konu ve soru olarak kırılır. Derse girin, konuyu açın, soruları işaretleyip sınavınıza ekleyin."
         actions={
           isSupabaseConfigured ? null : (
-            <Badge variant="warning">Demo — değişiklikler kaydedilmez</Badge>
+            <Badge variant="warning">Tanıtım modu</Badge>
           )
         }
       />

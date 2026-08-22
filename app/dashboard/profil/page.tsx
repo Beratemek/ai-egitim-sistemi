@@ -21,7 +21,7 @@ const DEMO_PROFILE = {
   role_reviewed_by: null,
   role_reviewed_at: null,
   classroom: null,
-  full_name: "Demo Kullanıcı",
+  full_name: "Örnek Kullanıcı",
   email: "demo@t3.com",
   created_at: new Date(0).toISOString(),
   updated_at: new Date(0).toISOString(),

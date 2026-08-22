@@ -24,33 +24,33 @@ import { cn } from "@/lib/utils";
 const PIPELINE: readonly { icon: LucideIcon; title: string; body: string }[] = [
   {
     icon: FileUp,
-    title: "İçerik yüklenir",
-    body: "İçerik uzmanı kaynak metni ve kazanımı sisteme girer.",
+    title: "Kaynağınızı verin",
+    body: "Ders notunuzu ve kazanımı girin; gerisini sistem hazırlar.",
   },
   {
     icon: BrainCircuit,
-    title: "AI soru üretir",
-    body: "Model kazanıma uygun test ve açık uçlu taslakları şema zorlamalı JSON olarak döndürür.",
+    title: "Sorular hazır gelsin",
+    body: "Kazanıma uygun çoktan seçmeli ve açık uçlu taslaklar dakikalar içinde hazır olur.",
   },
   {
     icon: ClipboardCheck,
-    title: "Eğitmen onaylar",
-    body: "Taslaklar incelenir; onaylananlar soru havuzuna girer, diğerleri reddedilir.",
+    title: "Son söz sizde",
+    body: "Öğretmen taslakları gözden geçirir; onayladıkları havuza girer.",
   },
   {
     icon: GraduationCap,
-    title: "Öğrenci cevaplar",
-    body: "Sınav sırasında açık uçlu cevaplar toplanır.",
+    title: "Sınav çevrimiçi",
+    body: "Öğrenciler sınavı kendi cihazından çözer, kâğıt toplamak yok.",
   },
   {
     icon: ShieldCheck,
-    title: "AI puanlar, eğitmen doğrular",
-    body: "Cevap rubriğe göre puanlanır; nihai puanı her zaman eğitmen onaylar.",
+    title: "Okuma yükü azalsın",
+    body: "Açık uçlu cevaplar ölçütlere göre puanlanır; son sözü öğretmen söyler.",
   },
   {
     icon: LineChart,
-    title: "Yönetici raporlar",
-    body: "Sınav bazlı ortalama, katılım ve onay oranları izlenir.",
+    title: "Sonuçlar tek ekranda",
+    body: "Sınıf ortalaması, katılım ve gelişim raporları hazır bekler.",
   },
 ];
 
@@ -130,7 +130,7 @@ export default function HomePage() {
               */}
               <Card className="border-2 shadow-sm">
                 <CardContent className="space-y-5 p-6">
-                  <p className="font-display text-xl">Nasıl işliyor?</p>
+                  <p className="font-display text-xl">Neyi kolaylaştırır?</p>
 
                   <ol className="space-y-4">
                     {PIPELINE.slice(0, 4).map((step, index) => (
@@ -151,7 +151,7 @@ export default function HomePage() {
                   </ol>
 
                   <p className="border-t pt-4 text-sm text-muted-foreground">
-                    Kalan adımlar aşağıda.
+                    Dahası aşağıda.
                   </p>
                 </CardContent>
               </Card>
@@ -201,10 +201,10 @@ export default function HomePage() {
           <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
             <div className="max-w-2xl">
               <h2 className="font-display text-2xl sm:text-3xl">
-                Uçtan uca akış
+                Öğretmenin kazandığı zaman
               </h2>
               <p className="mt-2 text-muted-foreground">
-                Yapay zeka isin yorucu kismini yapar; karar insanda kalir.
+                Soru hazırlamak, çoğaltmak ve okumak yerine derse odaklanın.
               </p>
             </div>
 
@@ -241,7 +241,7 @@ export default function HomePage() {
       <footer className="border-t">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-4 py-8 text-sm text-muted-foreground sm:flex-row sm:px-6">
           <BrandMark />
-          <p>Next.js &middot; Supabase &middot; AI SDK &middot; shadcn/ui</p>
+          <p>Ölçme ve değerlendirmede öğretmenin yanında.</p>
         </div>
       </footer>
     </div>

@@ -17,7 +17,7 @@ export default async function DashboardLayout({
     const role: UserRole = roleForPath(pathname) ?? "egitmen";
 
     return (
-      <DashboardShell role={role} fullName="Demo Kullanıcı" demoMode>
+      <DashboardShell role={role} fullName="Örnek Kullanıcı" demoMode>
         {children}
       </DashboardShell>
     );

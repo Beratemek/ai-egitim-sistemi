@@ -91,7 +91,7 @@ export function ExamSettingsPanel({
   const dersDirty = ders.trim() !== (subject ?? "");
 
   function demoUyarisi() {
-    toast.error("Demo modunda kayıt yapılamaz");
+    toast.error("Tanıtım modunda kayıt yapılmaz");
   }
 
   async function kamerayiDegistir(deger: boolean) {

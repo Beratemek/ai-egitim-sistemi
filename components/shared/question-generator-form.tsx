@@ -455,7 +455,7 @@ export function QuestionGeneratorForm({
                 disabled={saving || selected.size === 0 || !canPersist}
                 onClick={() => void handleSaveSelected()}
                 title={
-                  canPersist ? undefined : "Kaydetmek için Supabase baglantisi gerekiyor"
+                  canPersist ? undefined : "Tanıtım modunda kayıt yapılmaz"
                 }
               >
                 {saving ? (

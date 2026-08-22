@@ -148,7 +148,7 @@ export function DashboardShell({
           <div className="flex items-center gap-2">
             {demoMode ? (
               <Badge variant="warning" className="hidden sm:inline-flex">
-                Demo modu
+                Tanıtım modu
               </Badge>
             ) : null}
 

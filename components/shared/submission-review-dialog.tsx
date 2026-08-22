@@ -238,7 +238,7 @@ export function SubmissionReviewDialog({
           {canPersist ? null : (
             <p className="flex items-start gap-2 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2.5 text-xs text-warning">
               <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-              Demo modu: onay ekranini inceleyebilirsiniz ama puan kaydedilemez.
+              Tanıtım modu: ekranı inceleyebilirsiniz, puan kaydedilmez.
             </p>
           )}
 

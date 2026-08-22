@@ -251,8 +251,7 @@ export function ExamBuilder({
 
           {canPersist ? null : (
             <p className="rounded-lg bg-warning/10 px-3 py-2 text-xs text-warning">
-              Demo modu: bu ekrandaki değişiklikler kaydedilmez. Supabase
-              baglantisini tanimladiktan sonra kalici hale gelir.
+              Tanıtım modu: bu ekrandaki değişiklikler kaydedilmez.
             </p>
           )}
 
@@ -397,7 +396,7 @@ function PuanAlani({
 
   async function kaydet() {
     if (!canPersist) {
-      toast.error("Demo modunda kayıt yapılamaz");
+      toast.error("Tanıtım modunda kayıt yapılmaz");
       return;
     }
 

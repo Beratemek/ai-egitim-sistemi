@@ -43,7 +43,7 @@ export default async function SinavlarPage() {
         actions={
           <div className="flex items-center gap-2">
             {isSupabaseConfigured ? null : (
-              <Badge variant="warning">Demo — kayıt yapılamaz</Badge>
+              <Badge variant="warning">Tanıtım modu</Badge>
             )}
             <ExamCreateDialog
               canPersist={isSupabaseConfigured}

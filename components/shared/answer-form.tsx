@@ -134,7 +134,7 @@ export function AnswerForm({
       {
         description: response.data.persisted
           ? "Sınavı bitirene kadar cevabınızı değiştirebilirsiniz."
-          : "Demo modu: sonuç gösterildi ama veritabanına yazılmadı.",
+          : "Tanıtım modu: sonuç gösterildi, kayıt yapılmadı.",
       },
     );
 
@@ -448,7 +448,7 @@ function GradePanel({
         <p className="rounded-lg bg-warning/10 px-3 py-2 text-xs text-warning">
           {persisted
             ? "Bu puan geçicidir; eğitmen onayından sonra kesinleşir."
-            : "Demo modu: sonuç veritabanına yazılmadı."}
+            : "Tanıtım modu: sonuç kaydedilmedi."}
         </p>
       )}
     </div>

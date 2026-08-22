@@ -84,7 +84,7 @@ export default async function SinavDetayPage({
         }
         actions={
           isSupabaseConfigured ? null : (
-            <Badge variant="warning">Demo — değişiklikler kaydedilmez</Badge>
+            <Badge variant="warning">Tanıtım modu</Badge>
           )
         }
       />

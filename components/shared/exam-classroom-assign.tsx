@@ -207,7 +207,7 @@ export function ExamClassroomAssign({
 
         {canPersist ? null : (
           <p className="mt-3 text-xs text-muted-foreground">
-            Demo modunda atama kaydedilmez.
+            Tanıtım modunda atama kaydedilmez.
           </p>
         )}
       </CardContent>

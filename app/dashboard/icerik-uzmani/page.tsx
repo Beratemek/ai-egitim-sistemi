@@ -85,7 +85,7 @@ export default async function IcerikUzmaniPage() {
           <CardDescription>
             Onayladiginiz sorular eğitmenin havuzuna düşer ve sınavlarda
             kullanılabilir hale gelir. Reddedilenler havuza girmez.
-            {isSupabaseConfigured ? null : " Demo modunda değişiklikler kaydedilmez."}
+            {isSupabaseConfigured ? null : " Tanıtım modunda kayıt yapılmaz."}
           </CardDescription>
         </CardHeader>
         <CardContent>

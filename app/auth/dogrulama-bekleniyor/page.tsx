@@ -60,9 +60,7 @@ export default async function DogrulamaBekleniyorPage() {
 
             <div className="border-t pt-4 text-xs leading-relaxed text-muted-foreground">
               <p>
-                Baglantiyi, uygulamanin calistigi bilgisayarda acmalisiniz - adres
-                <code className="mx-1 font-mono">localhost</code> uzerinden geldigi
-                için telefondan acilmaz.
+                Bağlantıyı, giriş yapmaya çalıştığınız cihazda açın.
               </p>
               <p className="mt-2">
                 Başka bir hesapla devam etmek için{" "}

@@ -78,7 +78,7 @@ export default async function LoginPage({
         </div>
 
         <p className="relative text-xs text-white/60">
-          Hackathon MVP &middot; Next.js + Supabase + AI SDK
+          Ölçme ve değerlendirmede öğretmenin yanında.
         </p>
       </aside>
 
@@ -113,9 +113,7 @@ export default async function LoginPage({
             <LoginForm callbackError={callbackError} />
 
             <p className="text-center text-xs text-muted-foreground">
-              Sorun mu yasiyorsunuz?{" "}
-              <code className="font-mono">supabase/schema.sql</code> dosyasinin
-              calistirildigindan emin olun.
+              Giriş yapamıyorsanız okulunuzun sistem yöneticisine başvurun.
             </p>
           </div>
         </div>
