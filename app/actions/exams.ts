@@ -476,8 +476,18 @@ export interface CreateExamWithQuestionsInput {
   subject?: string;
   /** Ogrenci basina sure (dakika). Verilmezse sutun varsayilani (60) uygulanir. */
   durationMinutes?: number;
+  /** Kamera+mikrofon zorunlulugu. */
+  proctored?: boolean;
   /** Sinava eklenecek soru kimlikleri. */
   questionIds: readonly string[];
+  /**
+   * Soru basina puan (soru kimligi -> puan).
+   *
+   * Verilirse otomatik dagitim KAPATILIR: egitmen puanlari elle belirlemis
+   * demektir ve sonradan soru eklemek onun girdigi degerleri silmemeli.
+   * Verilmezse puanlar 100 uzerinden kendiliginden dagitilir.
+   */
+  points?: Readonly<Record<string, number>>;
 }
 
 /**
@@ -516,6 +526,8 @@ export async function createExamWithQuestions(
 
   const supabase = await createServerSupabaseClient();
 
+  const elle = input.points ?? null;
+
   const { data: exam, error } = await supabase
     .from("exams")
     .insert({
@@ -523,9 +535,13 @@ export async function createExamWithQuestions(
       description: input.description?.trim() ?? "",
       subject: subject || null,
       instructor_id: current.user.id,
+      ...(input.proctored === undefined ? {} : { proctored: input.proctored }),
       ...(input.durationMinutes === undefined
         ? {}
         : { duration_minutes: input.durationMinutes }),
+      // Elle puan verildiyse otomatik dagitim bastan kapali olmali; aksi
+      // halde tetikleyici sorular eklenirken puanlari esitleyip yazardi.
+      ...(elle ? { points_auto: false } : {}),
     })
     .select("id")
     .single();
@@ -538,6 +554,37 @@ export async function createExamWithQuestions(
     // Sorusuz sinav birakma: olusturulani geri al.
     await supabase.from("exams").delete().eq("id", exam.id);
     return { ok: false, error: added.error };
+  }
+
+  if (elle) {
+    // Ayni puani alan sorular tek istekte guncellenir; soru basina istek
+    // 40 soruluk bir sinavda 40 gidis-donus demek olurdu.
+    const gruplar = new Map<number, string[]>();
+
+    for (const id of ids) {
+      const puan = elle[id];
+      if (!Number.isInteger(puan) || puan === undefined || puan < 1 || puan > 100) {
+        continue;
+      }
+      const bucket = gruplar.get(puan) ?? [];
+      bucket.push(id);
+      gruplar.set(puan, bucket);
+    }
+
+    for (const [puan, grup] of gruplar) {
+      const { error: puanError } = await supabase
+        .from("exam_questions")
+        .update({ points: puan })
+        .eq("exam_id", exam.id)
+        .in("question_id", grup);
+
+      if (puanError) {
+        return {
+          ok: false,
+          error: `Sinav olusturuldu ama puanlar yazilamadi: ${puanError.message}`,
+        };
+      }
+    }
   }
 
   revalidateExamPaths(exam.id);

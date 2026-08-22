@@ -215,10 +215,10 @@ export function ExamComposeDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
+      <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-4xl">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="h-4.5 w-4.5 text-primary" />
+          <DialogTitle className="flex items-center gap-2 font-display text-xl">
+            <Sparkles className="h-5 w-5 text-primary" />
             Sınav oluştur
           </DialogTitle>
           <DialogDescription>
@@ -227,7 +227,14 @@ export function ExamComposeDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-5">
+        {/*
+          Iki sutun: sol tarafta sinavin kimligi ve zamani, sagda kapsam
+          (ders + konular). Tek sutunda konu listesi asagida kaliyor,
+          egitmen soru sayisini girerken hangi konularin secili oldugunu
+          goremiyordu.
+        */}
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)]">
+          <div className="space-y-5">
           {/* ---------- Başlık ---------- */}
           <div className="space-y-2">
             <Label htmlFor="compose-title">Sınav adı</Label>
@@ -258,6 +265,28 @@ export function ExamComposeDialog({
             </div>
           ) : null}
 
+          {/* ---------- Süre ---------- */}
+          <div className="space-y-2">
+            <Label htmlFor="compose-sure" className="flex items-center gap-1.5">
+              <Clock3 className="h-3.5 w-3.5 text-muted-foreground" />
+              Süre (dakika)
+            </Label>
+            <Input
+              id="compose-sure"
+              type="number"
+              min={1}
+              max={600}
+              value={sure}
+              onChange={(event) => setSure(event.target.value)}
+              className="w-32"
+            />
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              Her öğrenci sınava başladığı andan itibaren bu süreyi alır.
+            </p>
+          </div>
+          </div>
+
+          <div className="space-y-5">
           {kaynak === "otomatik" ? (
             <>
               {/* ---------- Ders ---------- */}
@@ -312,7 +341,7 @@ export function ExamComposeDialog({
                     ) : null}
                   </div>
 
-                  <div className="max-h-52 space-y-0.5 overflow-y-auto rounded-lg border p-2">
+                  <div className="max-h-[38vh] space-y-0.5 overflow-y-auto rounded-lg border p-2">
                     {acikDers.topics.map((topic) => {
                       const id = `konu-${topic.topic}`;
                       const secili = konular.has(topic.topic);
@@ -414,23 +443,6 @@ export function ExamComposeDialog({
             </>
           ) : null}
 
-          {/* ---------- Süre ---------- */}
-          <div className="space-y-2">
-            <Label htmlFor="compose-sure" className="flex items-center gap-1.5">
-              <Clock3 className="h-3.5 w-3.5 text-muted-foreground" />
-              Süre (dakika)
-            </Label>
-            <Input
-              id="compose-sure"
-              type="number"
-              min={1}
-              max={600}
-              value={sure}
-              onChange={(event) => setSure(event.target.value)}
-              className="sm:w-40"
-            />
-          </div>
-
           {/* ---------- Özet ---------- */}
           <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2.5 text-sm">
             <span className="text-muted-foreground">Sınav:</span>
@@ -452,6 +464,7 @@ export function ExamComposeDialog({
                 Kapsam yetersiz
               </span>
             ) : null}
+          </div>
           </div>
         </div>
 

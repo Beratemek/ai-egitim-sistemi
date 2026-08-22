@@ -16,12 +16,14 @@ import {
   Plus,
   RotateCcw,
   Search,
+  ClipboardList,
   Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 
 import { addExamQuestions } from "@/app/actions/exams";
 import { ExamComposeDialog } from "@/components/shared/exam-compose-dialog";
+import { ExamManualDialog } from "@/components/shared/exam-manual-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -99,8 +101,21 @@ export function QuestionPoolBrowser({
   const [pending, setPending] = React.useState(false);
   /** Onizlemesi acik olan sorunun kimligi; kapaliyken null. */
   const [openQuestionId, setOpenQuestionId] = React.useState<string | null>(null);
-  /** Yeni sinav penceresi acik mi? */
+  /** Otomatik sinav kurma penceresi (ders/konu/sayi). */
   const [composeOpen, setComposeOpen] = React.useState(false);
+  /** Isaretlenen sorularla elle sinav kurma penceresi. */
+  const [manualOpen, setManualOpen] = React.useState(false);
+
+  /**
+   * Isaretlenen sorular, havuzdaki SIRAYLA.
+   *
+   * Elle kurma penceresi metni ve tipi gosterdigi icin yalnizca kimlik
+   * yetmiyor; sira da onemli cunku sinav kagidinda ayni sirayla cikiyorlar.
+   */
+  const selectedQuestions = React.useMemo(
+    () => questions.filter((question) => selectedIds.has(question.id)),
+    [questions, selectedIds],
+  );
 
   /** Havuzun tamami: ders -> konu -> soru. Filtreden etkilenmez. */
   const allSubjects = React.useMemo(() => groupBySubject(questions), [questions]);
@@ -292,8 +307,17 @@ export function QuestionPoolBrowser({
         canPersist={canPersist}
         pending={pending}
         onAdd={() => void handleAddToExam()}
-        onCreate={() => setComposeOpen(true)}
+        onCreate={() => setManualOpen(true)}
         onClear={() => setSelectedIds(new Set())}
+      />
+
+      <ExamManualDialog
+        open={manualOpen}
+        onOpenChange={setManualOpen}
+        questions={selectedQuestions}
+        subjectOptions={allSubjects.map((group) => group.subject)}
+        defaultSubject={openSubject?.subject ?? null}
+        onCreated={() => setSelectedIds(new Set())}
       />
 
       <ExamComposeDialog
@@ -944,9 +968,14 @@ function SelectionBar({
           </div>
         ) : null}
 
+        {/*
+          Bu dugme "yapay zeka" dugmesi DEGIL: egitmen sorulari zaten kendi
+          secti, burada yapilan is sinavin ayarlarini girmek. Kivilcim ikonu
+          ve o cagrism bilerek kaldirildi.
+        */}
         <Button size="sm" className="gap-1.5" onClick={onCreate}>
-          <Sparkles className="h-3.5 w-3.5" />
-          Yeni sınav
+          <ClipboardList className="h-3.5 w-3.5" />
+          Sınavı kur
         </Button>
       </div>
     </div>
