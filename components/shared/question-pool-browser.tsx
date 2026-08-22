@@ -22,19 +22,14 @@ import {
 import { toast } from "sonner";
 
 import { addExamQuestions } from "@/app/actions/exams";
-import { QuestionPreviewPanel } from "@/components/shared/question-preview-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -42,7 +37,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
 import {
   groupBySubject,
   pickBalanced,
@@ -229,12 +223,16 @@ export function QuestionPoolBrowser({
   if (questions.length === 0) return <EmptyPool />;
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
-      <SelectionPanel
+    <div className="space-y-4">
+      {/* ---------- Ust cubuk: arama, filtre, hedef sinav, otomatik secim ---------- */}
+      <PoolToolbar
+        search={search}
+        onSearchChange={setSearch}
+        typeFilter={typeFilter}
+        onTypeFilterChange={setTypeFilter}
         exams={exams}
         examId={examId}
         onExamChange={setExamId}
-        selectedCount={selectedIds.size}
         targetCount={targetCount}
         onTargetCountChange={setTargetCount}
         onAutoSelect={autoSelect}
@@ -245,40 +243,7 @@ export function QuestionPoolBrowser({
               ? `${openSubject.subject} dersinin konularindan`
               : "görünen tüm derslerden"
         }
-        canPersist={canPersist}
-        pending={pending}
-        onAdd={() => void handleAddToExam()}
-        onClear={() => setSelectedIds(new Set())}
       />
-
-      <div className="space-y-4 lg:order-1">
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <div className="relative flex-1">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              type="search"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Dal, ders, konu veya soru ara..."
-              aria-label="Havuzda ara"
-              className="pl-9"
-            />
-          </div>
-
-          <Select
-            value={typeFilter}
-            onValueChange={(value) => setTypeFilter(value as TypeFilter)}
-          >
-            <SelectTrigger className="sm:w-52" aria-label="Tipe gore filtrele">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="hepsi">Tüm soru tipleri</SelectItem>
-              <SelectItem value="test">Çoktan seçmeli</SelectItem>
-              <SelectItem value="acik_uclu">Açık uçlu</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
 
         {openSubject === null ? (
           /* ------------- 1. kademe: ders kutucuklari --------------------- */
@@ -292,7 +257,7 @@ export function QuestionPoolBrowser({
                 {visibleSubjects.reduce((sum, g) => sum + g.questionCount, 0)} soru
               </p>
 
-              <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                 {visibleSubjects.map((subject) => (
                   <SubjectCard
                     key={subject.subject}
@@ -317,7 +282,7 @@ export function QuestionPoolBrowser({
               meta={`${openSubject.topics.length} konu · ${openSubject.questionCount} soru`}
             />
 
-            <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
               {openSubject.topics.map((topic) => (
                 <TopicCard
                   key={topic.topic}
@@ -353,8 +318,16 @@ export function QuestionPoolBrowser({
             />
           </>
         )}
-      </div>
 
+      {/* ---------- Secim bari ---------- */}
+      <SelectionBar
+        selectedCount={selectedIds.size}
+        examTitle={exams.find((exam) => exam.id === examId)?.title ?? null}
+        canPersist={canPersist}
+        pending={pending}
+        onAdd={() => void handleAddToExam()}
+        onClear={() => setSelectedIds(new Set())}
+      />
     </div>
   );
 }
@@ -572,6 +545,21 @@ function ChipRow({
 /*  3. kademe - soru listesi                                                  */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Konudaki sorular - KAGIT gorunumu.
+ *
+ * Onceki surumde sorular koyu, dar satirlar halinde listeleniyordu ve siklar
+ * yalnizca satiri acinca gorunuyordu; egitmen bir soruyu degerlendirmek icin
+ * once tiklamak zorundaydi. Degerlendirme isi okuma isidir: soru ve siklari
+ * AYNI ANDA, ogrencinin gorecegi duzende gorunmeli.
+ *
+ * Bu yuzden liste beyaz bir kagit uzerinde, genis ve punto tipografisiyle
+ * ciziliyor - koyu temada bile. Dogru sik yesil vurguyla isaretli; bu ekran
+ * yalnizca egitmene acik (bkz. questions_select politikasi).
+ *
+ * Acilir bolum yalnizca RUBRIK icin kaldi: acik uclu sorularin puanlama
+ * olcutu her zaman gorunse liste okunmaz hale gelirdi.
+ */
 function QuestionList({
   group,
   selectedIds,
@@ -591,8 +579,9 @@ function QuestionList({
   const allSelected = selectedCount === group.questions.length;
 
   return (
-    <Card>
-      <CardHeader className="flex-row items-center gap-3 space-y-0 py-3">
+    <div className="space-y-3">
+      {/* ---------- Kagidin ustundeki denetim seridi ---------- */}
+      <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-card px-4 py-2.5">
         <label className="flex cursor-pointer items-center gap-2.5 text-sm font-medium">
           <Checkbox
             checked={allSelected}
@@ -605,101 +594,152 @@ function QuestionList({
         <span className="ml-auto text-sm text-muted-foreground">
           {selectedCount} / {group.questions.length} seçili
         </span>
-      </CardHeader>
+      </div>
 
-      <CardContent className="space-y-2 pt-0">
-        {group.questions.map((question) => (
-          <QuestionRow
-            key={question.id}
-            question={question}
-            checked={selectedIds.has(question.id)}
-            onToggle={() => onToggleQuestion(question.id)}
-            expanded={openQuestionId === question.id}
-            onTogglePreview={() => onTogglePreview(question.id)}
-          />
-        ))}
-      </CardContent>
-    </Card>
+      {/* ---------- Kagit ---------- */}
+      <div className="rounded-xl bg-white px-6 py-5 text-slate-900 shadow-sm ring-1 ring-slate-300 sm:px-10 sm:py-8">
+        <div className="mb-6 border-b border-slate-300 pb-3">
+          <p className="text-[13pt] font-bold leading-tight">{group.topic}</p>
+          <p className="mt-0.5 text-[9.5pt] text-slate-500">
+            {group.questions.length} soru
+          </p>
+        </div>
+
+        <ol className="space-y-7">
+          {group.questions.map((question, index) => (
+            <PaperQuestion
+              key={question.id}
+              question={question}
+              number={index + 1}
+              checked={selectedIds.has(question.id)}
+              onToggle={() => onToggleQuestion(question.id)}
+              expanded={openQuestionId === question.id}
+              onTogglePreview={() => onTogglePreview(question.id)}
+            />
+          ))}
+        </ol>
+      </div>
+    </div>
   );
 }
 
-function QuestionRow({
+/** Kagit uzerindeki tek soru: metin, siklar ve secim kutusu. */
+function PaperQuestion({
   question,
+  number,
   checked,
   onToggle,
   expanded,
   onTogglePreview,
 }: {
   question: Question;
+  number: number;
   checked: boolean;
   onToggle: () => void;
   expanded: boolean;
   onTogglePreview: () => void;
 }) {
-  const Icon = question.type === "test" ? ListChecks : FileText;
+  const isTest = question.type === "test";
+  const options = question.options_json ?? [];
 
   return (
-    <div
+    <li
       className={cn(
-        "overflow-hidden rounded-lg border transition-colors",
-        "focus-within:border-primary/50",
-        checked && "border-primary/50",
-        expanded && "border-primary/40",
+        "-mx-3 rounded-lg px-3 py-2 transition-colors",
+        checked && "bg-emerald-50 ring-1 ring-emerald-300",
       )}
     >
-      <div
-        className={cn(
-          "flex items-start gap-3 p-3 transition-colors",
-          "hover:bg-accent/50",
-          checked && "bg-primary/5",
-        )}
-      >
-        <label className="shrink-0 cursor-pointer p-0.5" title="Sınava eklemek için seç">
-          <Checkbox
+      <div className="flex gap-3">
+        {/* Secim kutusu kagidin disinda kalir: sorunun kendisi degil, onun
+            hakkindaki bir karar. */}
+        <label
+          className="mt-1 shrink-0 cursor-pointer"
+          title="Sınava eklemek için seç"
+        >
+          <input
+            type="checkbox"
             checked={checked}
             onChange={onToggle}
-            aria-label="Soruyu seç"
+            aria-label={`${number}. soruyu seç`}
+            className="h-4 w-4 cursor-pointer rounded border-slate-400 accent-emerald-600"
           />
         </label>
 
-        <button
-          type="button"
-          onClick={onTogglePreview}
-          aria-expanded={expanded}
-          className="min-w-0 flex-1 text-left focus-visible:outline-none"
-        >
-          <span className="flex items-start gap-2">
-            <span className="block text-sm leading-relaxed">{question.text}</span>
-            <ChevronDown
-              className={cn(
-                "mt-0.5 h-4 w-4 shrink-0 text-muted-foreground transition-transform",
-                expanded && "rotate-180",
-              )}
-            />
-          </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-[11.5pt] font-medium leading-[1.5]">
+            <span className="mr-1.5 font-bold tabular-nums">{number}.</span>
+            {question.text}
+          </p>
 
-          <span className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-            <span className="inline-flex items-center gap-1.5 rounded border px-1.5 py-0.5">
-              <Icon className="h-3 w-3" />
-              {question.type === "test" ? "Çoktan seçmeli" : "Açık uçlu"}
-            </span>
+          {isTest ? (
+            <ol className="mt-2.5 space-y-1.5 text-[10.5pt] leading-[1.4]">
+              {options.map((option) => {
+                const isCorrect = option.key === question.correct_answer;
 
-            {question.type === "test" ? (
-              <span>
-                Doğru cevap:{" "}
-                <span className="font-semibold text-foreground">
-                  {question.correct_answer ?? "-"}
-                </span>
-              </span>
-            ) : (
-              <span>{question.rubric ? "Rubrik hazır" : "Rubrik tanımsız"}</span>
-            )}
+                return (
+                  <li
+                    key={option.key}
+                    className={cn(
+                      "flex gap-2 rounded px-2 py-1",
+                      isCorrect && "bg-emerald-100 font-medium",
+                    )}
+                  >
+                    <span className="shrink-0 font-semibold">{option.key})</span>
+                    <span className="min-w-0">{option.text}</span>
+                    {isCorrect ? (
+                      <span className="ml-auto shrink-0 self-center text-[8pt] font-semibold uppercase tracking-wide text-emerald-700">
+                        doğru
+                      </span>
+                    ) : null}
+                  </li>
+                );
+              })}
+
+              {options.length === 0 ? (
+                <li className="text-[10pt] italic text-slate-500">
+                  Bu soruya şık tanımlanmamış.
+                </li>
+              ) : null}
+            </ol>
+          ) : (
+            <>
+              {/* Acik uclu: ogrencinin gorecegi bos satirlar */}
+              <div className="mt-3 space-y-4" aria-hidden>
+                {[0, 1, 2].map((line) => (
+                  <div key={line} className="border-b border-dotted border-slate-400" />
+                ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={onTogglePreview}
+                aria-expanded={expanded}
+                className="mt-3 inline-flex items-center gap-1.5 text-[9.5pt] font-medium text-slate-600 underline-offset-4 hover:text-slate-900 hover:underline"
+              >
+                Puanlama rubriği
+                <ChevronDown
+                  className={cn("h-3.5 w-3.5 transition-transform", expanded && "rotate-180")}
+                />
+              </button>
+
+              {expanded ? (
+                <pre className="mt-2 whitespace-pre-wrap rounded-md bg-slate-100 px-3 py-2 font-sans text-[9.5pt] leading-relaxed text-slate-700">
+                  {question.rubric ?? "Rubrik tanımlanmamış."}
+                </pre>
+              ) : null}
+            </>
+          )}
+        </div>
+
+        {/* Kunye: kagidin sag kenarinda, soruyu bolmeden */}
+        <span className="hidden shrink-0 flex-col items-end gap-1 pt-0.5 text-[8.5pt] text-slate-500 sm:flex">
+          <span className="rounded bg-slate-100 px-1.5 py-0.5 font-medium">
+            {isTest ? "Çoktan seçmeli" : "Açık uçlu"}
           </span>
-        </button>
+          {question.ai_generated ? <span>AI üretti</span> : <span>Elle eklendi</span>}
+        </span>
       </div>
-
-      {expanded ? <QuestionPreviewPanel question={question} /> : null}
-    </div>
+    </li>
   );
 }
 
@@ -755,141 +795,192 @@ function Breadcrumb({
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Sag panel                                                                 */
+/*  Ust cubuk                                                                 */
 /* -------------------------------------------------------------------------- */
 
-function SelectionPanel({
+/**
+ * Arama, tip filtresi, hedef sinav ve otomatik secim.
+ *
+ * Bu denetimler onceden sagda 340 piksellik bir sutunda duruyordu; kutucuklar
+ * kalan dar alana sikisiyor, soru listesi de okunmaz hale geliyordu. Denetimler
+ * ust cubuga alininca havuz TAM GENISLIK kullaniyor.
+ */
+function PoolToolbar({
+  search,
+  onSearchChange,
+  typeFilter,
+  onTypeFilterChange,
   exams,
   examId,
   onExamChange,
-  selectedCount,
   targetCount,
   onTargetCountChange,
   onAutoSelect,
   autoSelectScope,
+}: {
+  search: string;
+  onSearchChange: (value: string) => void;
+  typeFilter: TypeFilter;
+  onTypeFilterChange: (value: TypeFilter) => void;
+  exams: readonly Exam[];
+  examId: string;
+  onExamChange: (value: string) => void;
+  targetCount: string;
+  onTargetCountChange: (value: string) => void;
+  onAutoSelect: () => void;
+  autoSelectScope: string;
+}) {
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-col gap-2 lg:flex-row">
+        <div className="relative min-w-0 flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            type="search"
+            value={search}
+            onChange={(event) => onSearchChange(event.target.value)}
+            placeholder="Ders, konu veya soru ara..."
+            aria-label="Havuzda ara"
+            className="pl-9"
+          />
+        </div>
+
+        <Select
+          value={typeFilter}
+          onValueChange={(value) => onTypeFilterChange(value as TypeFilter)}
+        >
+          <SelectTrigger className="lg:w-44" aria-label="Tipe gore filtrele">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="hepsi">Tüm soru tipleri</SelectItem>
+            <SelectItem value="test">Çoktan seçmeli</SelectItem>
+            <SelectItem value="acik_uclu">Açık uçlu</SelectItem>
+          </SelectContent>
+        </Select>
+
+        {exams.length > 0 ? (
+          <Select value={examId} onValueChange={onExamChange}>
+            <SelectTrigger className="lg:w-56" aria-label="Hedef sınav">
+              <SelectValue placeholder="Hedef sınav" />
+            </SelectTrigger>
+            <SelectContent>
+              {exams.map((exam) => (
+                <SelectItem key={exam.id} value={exam.id}>
+                  {exam.title}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : null}
+
+        <div className="flex gap-2">
+          <Input
+            type="number"
+            min={1}
+            value={targetCount}
+            onChange={(event) => onTargetCountChange(event.target.value)}
+            aria-label="Otomatik seçilecek soru sayısı"
+            className="w-20"
+          />
+          <Button
+            variant="outline"
+            className="gap-2 whitespace-nowrap"
+            onClick={onAutoSelect}
+            title={`Bulunduğunuz kademeden seçer: ${autoSelectScope}`}
+          >
+            <Wand2 className="h-4 w-4" />
+            Dengeli seç
+          </Button>
+        </div>
+      </div>
+
+      {exams.length === 0 ? (
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          Henüz sınavınız yok. Önce{" "}
+          <Link
+            href="/dashboard/egitmen/sinavlar"
+            className="font-medium text-primary underline-offset-4 hover:underline"
+          >
+            Sınavlar
+          </Link>{" "}
+          ekranından bir sınav oluşturun, sonra buradan soru ekleyin.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Secim bari                                                                */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Ekranin altina yapisan secim seridi.
+ *
+ * Yalnizca secim varken gorunur: bos dururken yer kaplamasi, havuzda gezinen
+ * egitmenin ekranindan bir serit calardi. Secim yapildiginda ise nerede
+ * olursa olsun elinin altinda olmali - listenin sonuna kadar kaydirip
+ * dugme aramak zorunda kalmasin.
+ */
+function SelectionBar({
+  selectedCount,
+  examTitle,
   canPersist,
   pending,
   onAdd,
   onClear,
 }: {
-  exams: readonly Exam[];
-  examId: string;
-  onExamChange: (value: string) => void;
   selectedCount: number;
-  targetCount: string;
-  onTargetCountChange: (value: string) => void;
-  onAutoSelect: () => void;
-  autoSelectScope: string;
+  examTitle: string | null;
   canPersist: boolean;
   pending: boolean;
   onAdd: () => void;
   onClear: () => void;
 }) {
+  if (selectedCount === 0) return null;
+
   return (
-    <Card className="lg:order-2 lg:sticky lg:top-20 lg:self-start">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base">Secilenleri sinava ekle</CardTitle>
-        <CardDescription>
-          Sınavın kendisi Sınavlar ekranindan yonetilir; buradan yalnızca soru
-          eklenir.
-        </CardDescription>
-      </CardHeader>
+    <div className="sticky bottom-4 z-20 mx-auto w-fit max-w-full">
+      <div className="flex flex-wrap items-center gap-3 rounded-full border bg-card/95 px-4 py-2.5 shadow-lg backdrop-blur">
+        <span className="text-sm font-medium">
+          {selectedCount} soru seçili
+          {examTitle ? (
+            <span className="font-normal text-muted-foreground">
+              {" "}
+              → {examTitle}
+            </span>
+          ) : null}
+        </span>
 
-      <CardContent className="space-y-4">
-        <div className="space-y-1.5">
-          <Label htmlFor="pool-exam">Hedef sınav</Label>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="gap-1.5 text-muted-foreground"
+          onClick={onClear}
+        >
+          <RotateCcw className="h-3.5 w-3.5" />
+          Temizle
+        </Button>
 
-          {exams.length === 0 ? (
-            <div className="rounded-lg border border-dashed p-3 text-xs leading-relaxed text-muted-foreground">
-              Henüz sınavınız yok. Önce{" "}
-              <Link
-                href="/dashboard/egitmen/sinavlar"
-                className="font-medium text-primary underline-offset-4 hover:underline"
-              >
-                Sınavlar
-              </Link>{" "}
-              ekranindan bir sınav oluşturun, sonra buradan soru ekleyin.
-            </div>
+        <Button
+          size="sm"
+          className="gap-1.5"
+          disabled={pending || !examTitle || !canPersist}
+          onClick={onAdd}
+        >
+          {pending ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
           ) : (
-            <Select value={examId} onValueChange={onExamChange}>
-              <SelectTrigger id="pool-exam">
-                <SelectValue placeholder="Sınav seçin" />
-              </SelectTrigger>
-              <SelectContent>
-                {exams.map((exam) => (
-                  <SelectItem key={exam.id} value={exam.id}>
-                    {exam.title}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Plus className="h-3.5 w-3.5" />
           )}
-        </div>
-
-        <Separator />
-
-        <div className="space-y-2">
-          <Label htmlFor="pool-target">Otomatik seçim</Label>
-          <div className="flex gap-2">
-            <Input
-              id="pool-target"
-              type="number"
-              min={1}
-              value={targetCount}
-              onChange={(event) => onTargetCountChange(event.target.value)}
-              className="w-20"
-            />
-            <Button variant="outline" className="flex-1" onClick={onAutoSelect}>
-              <Wand2 />
-              Dengeli seç
-            </Button>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Bulundugunuz kademeden secer: su an{" "}
-            <strong className="font-medium text-foreground">{autoSelectScope}</strong>{" "}
-            alir.
-          </p>
-        </div>
-
-        <Separator />
-
-        <div className="flex items-baseline justify-between gap-3 text-sm">
-          <span className="text-muted-foreground">Secili soru</span>
-          <span className="font-semibold tabular">{selectedCount} soru</span>
-        </div>
-
-        <div className="flex gap-2">
-          <Button
-            className="flex-1"
-            disabled={selectedCount === 0 || exams.length === 0 || pending}
-            onClick={onAdd}
-          >
-            {pending ? <Loader2 className="animate-spin" /> : <Plus />}
-            Sınava ekle
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            disabled={selectedCount === 0}
-            onClick={onClear}
-            aria-label="Seçimi temizle"
-          >
-            <RotateCcw />
-          </Button>
-        </div>
-
-        {canPersist ? null : (
-          <p className="text-xs text-muted-foreground">
-            Demo modunda ekleme kaydedilmez.
-          </p>
-        )}
-      </CardContent>
-    </Card>
+          Sınava ekle
+        </Button>
+      </div>
+    </div>
   );
 }
 
-/* -------------------------------------------------------------------------- */
-/*  Boş durumlar                                                              */
 /* -------------------------------------------------------------------------- */
 
 function EmptyPool() {
