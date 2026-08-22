@@ -102,7 +102,7 @@ export default async function SinavCozPage({ params }: PageProps) {
         yukari kaydirmak zorundaydi.
       */}
       <header className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur">
-        <div className="mx-auto w-full max-w-4xl px-4 py-3 sm:px-6">
+        <div className="mx-auto w-full max-w-[1560px] px-4 py-3 sm:px-8">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0">
               <h1 className="truncate font-display text-lg leading-tight">
@@ -135,12 +135,17 @@ export default async function SinavCozPage({ params }: PageProps) {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-4xl flex-1 space-y-4 px-4 py-5 sm:px-6">
+      {/*
+        Genis kalip: sinav ekraninda okunacak metin ve 50 dugmelik gezinti
+        yan yana duruyor. Dar bir kolona sikistirmak iki yanda koca bosluk
+        birakip gezintiyi gereksiz yere uzatiyordu.
+      */}
+      <main className="mx-auto w-full max-w-[1560px] flex-1 space-y-4 px-4 py-5 sm:px-8">
         {exam.proctored ? <ProctoringGate>{govde}</ProctoringGate> : govde}
       </main>
 
       <footer className="border-t">
-        <div className="mx-auto w-full max-w-4xl px-4 py-3 sm:px-6">
+        <div className="mx-auto w-full max-w-[1560px] px-4 py-3 sm:px-8">
           <Link
             href={`/dashboard/ogrenci/sinav/${examId}`}
             className={cn(

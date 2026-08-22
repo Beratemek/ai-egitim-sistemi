@@ -194,11 +194,12 @@ export function ProctoringGate({ children }: ProctoringGateProps) {
                     />
                   </div>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Konuşunca çubuk hareket etmeli. Görüntü ve ses{" "}
-                  <span className="font-medium text-foreground">kaydedilmiyor</span>,
-                  yalnızca sınav boyunca açık kalması gerekiyor.
-                </p>
+                {/*
+                  Izin ALINDIKTAN sonra uzun aciklama yok: canli goruntu ve
+                  hareket eden mikrofon cubugu zaten durumu soyluyor. Kayit
+                  yapilmadigi bilgisi izin ISTENIRKEN veriliyor - bilgilendirmenin
+                  anlamli oldugu an orasi.
+                */}
               </div>
             ) : (
               <p className="text-xs leading-relaxed text-muted-foreground">

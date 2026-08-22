@@ -34,8 +34,13 @@ export function ExamFinalizePanel({
   const [pending, setPending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
+  /*
+    Sinav BOS SORUYLA da teslim edilebilir - kagit sinavinda da oyle.
+    Onceden her sorunun cevaplanmis olmasi sart kosuluyordu; bilmedigi
+    soruyu bos birakan ogrenci kagidi elinde kaliyordu.
+  */
   const remaining = Math.max(0, questionCount - answeredCount);
-  const ready = questionCount > 0 && remaining === 0;
+  const ready = questionCount > 0;
 
   async function handleFinalize() {
     setPending(true);
@@ -56,23 +61,19 @@ export function ExamFinalizePanel({
     router.refresh();
   }
 
-  if (!ready) {
-    return (
-      <div className="rounded-xl border border-dashed bg-card px-4 py-3 text-sm text-muted-foreground">
-        Sinavi bitirebilmek icin kalan <strong className="text-foreground">{remaining}</strong>{" "}
-        sorunun cevabini kaydedin.
-      </div>
-    );
-  }
+  if (!ready) return null;
 
   return (
     <div className="flex flex-col gap-4 rounded-xl border border-primary/30 bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex items-start gap-3">
         <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
         <div>
-          <p className="text-sm font-semibold">Tum cevaplariniz kaydedildi</p>
+          <p className="text-sm font-semibold">Sınavı teslim et</p>
           <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-            Cevaplarınızı kontrol edin. Teslim ettikten sonra degisiklik yapamazsiniz.
+            {remaining > 0
+              ? `${remaining} soruyu boş bıraktınız. `
+              : "Tüm soruları cevapladınız. "}
+            Teslim ettikten sonra değişiklik yapamazsınız.
           </p>
         </div>
       </div>

@@ -3,9 +3,6 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import {
-  Check,
-  CheckCircle2,
-  Circle,
   Loader2,
   Lock,
   Sparkles,
@@ -64,7 +61,6 @@ export function AnswerForm({
   const [answer, setAnswer] = React.useState(persistedAnswer);
   const [savedAnswer, setSavedAnswer] = React.useState(persistedAnswer);
   const [draftReady, setDraftReady] = React.useState(false);
-  const [restoredDraft, setRestoredDraft] = React.useState(false);
   const [pending, setPending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [result, setResult] = React.useState<SubmitAnswerResult | null>(null);
@@ -81,7 +77,6 @@ export function AnswerForm({
     const stored = window.sessionStorage.getItem(draftKey);
     if (stored !== null && stored !== persistedAnswer) {
       setAnswer(stored);
-      setRestoredDraft(true);
     }
     setDraftReady(true);
   }, [draftKey, existing, isDraft, persistedAnswer]);
@@ -92,7 +87,6 @@ export function AnswerForm({
       window.sessionStorage.setItem(draftKey, answer);
     } else {
       window.sessionStorage.removeItem(draftKey);
-      setRestoredDraft(false);
     }
   }, [answer, draftKey, draftReady, existing, isDraft, savedAnswer]);
 
@@ -135,7 +129,6 @@ export function AnswerForm({
 
     if (response.data.persisted) {
       setSavedAnswer(metin);
-      setRestoredDraft(false);
       window.sessionStorage.removeItem(draftKey);
     }
 
@@ -211,29 +204,14 @@ export function AnswerForm({
   return (
     <div className="space-y-4">
       <form onSubmit={(event) => event.preventDefault()} className="space-y-3">
-        {hasChanged && answer.trim() ? (
-          <div className="flex items-start gap-2 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning">
-            <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            <span>
-              {restoredDraft
-                ? "Kaydedilmemiş taslağınız bu sekmede geri yüklendi. Veritabanına kaydetmek için Cevabı kaydet'e basın."
-                : "Kaydedilmemiş değişiklikleriniz var."}
-            </span>
-          </div>
-        ) : savedAnswer ? (
-          <div className="flex items-center gap-2 rounded-lg bg-success/10 px-3 py-2 text-xs text-success">
-            <CheckCircle2 className="h-3.5 w-3.5" />
-            Bu sorunun son değişiklikleri kaydedildi.
-          </div>
-        ) : null}
+        {/*
+          Kaydetme durumu icin serit YOK.
 
-        {isDraft ? (
-          <div className="flex items-center justify-between rounded-lg bg-primary/5 px-3 py-2 text-xs text-primary">
-            <span>Cevabınız kaydedildi; sınavı bitirene kadar düzenleyebilirsiniz.</span>
-            <SubmissionStatusBadge status="gonderildi" />
-          </div>
-        ) : null}
-
+          Cevap kendiliginden kaydediliyor ve secilen sikkin yesil yanmasi
+          ogrenciye zaten "cevabin alindi" diyor. Ustune "kaydedildi",
+          "kaydedilmemis degisiklik var" gibi seritler koymak sinav boyunca
+          her soruda tekrar eden bir gurultuydu.
+        */}
         {type === "test" ? (
           <fieldset className="space-y-2">
             <legend className="mb-2 text-sm font-medium">Dogru sikki secin</legend>
@@ -305,32 +283,20 @@ export function AnswerForm({
           ogrenci cevabinin gittigini gormeli, ama bunun icin bir dugmeye
           basmak zorunda kalmamali.
         */}
-        <p
-          className="flex items-center gap-1.5 text-xs text-muted-foreground"
-          aria-live="polite"
-        >
-          {pending ? (
-            <>
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              Kaydediliyor...
-            </>
-          ) : hasChanged ? (
-            <>
-              <Circle className="h-3 w-3" />
-              Kaydedilmeyi bekliyor
-            </>
-          ) : savedAnswer ? (
-            <>
-              <Check className="h-3.5 w-3.5 text-success" />
-              Kaydedildi · sınavı bitirene kadar değiştirebilirsiniz
-            </>
-          ) : (
-            <>
-              <Circle className="h-3 w-3" />
-              {isTest ? "Bir şık seçin" : "En az 10 karakter yazın"}
-            </>
-          )}
-        </p>
+        {/*
+          Yalnizca istek SURERKEN gorunur. Basarili kayitta hicbir sey
+          yazmiyoruz - yesil sik zaten yeterli geri bildirim. Yavas bir
+          baglantida ekranin donmus gibi gorunmemesi icin bu kadari kaliyor.
+        */}
+        {pending ? (
+          <p
+            className="flex items-center gap-1.5 text-xs text-muted-foreground"
+            aria-live="polite"
+          >
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            Kaydediliyor...
+          </p>
+        ) : null}
       </form>
 
       {result ? (
