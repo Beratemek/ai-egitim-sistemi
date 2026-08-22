@@ -9,7 +9,9 @@ const Card = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      "rounded-xl border bg-card text-card-foreground shadow",
+      // Golge azaltildi, kenarlik one cikti: hazir sablonlarin agir "yuzen kart"
+    // gorunumu yerine basili bir foy hissi.
+    "rounded-xl border bg-card text-card-foreground shadow-[0_1px_2px_hsl(var(--foreground)/0.06)]",
       className
     )}
     {...props}

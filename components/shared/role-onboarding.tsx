@@ -92,7 +92,7 @@ export function RoleOnboarding({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+        <h1 className="font-display text-2xl sm:text-3xl">
           {rejected ? "Başka bir rol seçin" : `Hoş geldiniz${firstName(trimmedName)}`}
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">

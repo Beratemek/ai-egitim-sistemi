@@ -643,12 +643,11 @@ function PaperQuestion({
           className="mt-1 shrink-0 cursor-pointer"
           title="Sınava eklemek için seç"
         >
-          <input
-            type="checkbox"
+          <Checkbox
+            tone="paper"
             checked={checked}
             onChange={onToggle}
             aria-label={`${number}. soruyu seç`}
-            className="h-4 w-4 cursor-pointer rounded border-slate-400 accent-emerald-600"
           />
         </label>
 

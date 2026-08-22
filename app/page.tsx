@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {
   ArrowRight,
+  BookOpen,
   BrainCircuit,
   ClipboardCheck,
   FileUp,
@@ -10,6 +11,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
+import { BookshelfBackdrop } from "@/components/shared/bookshelf-backdrop";
 import { BrandMark } from "@/components/shared/brand-mark";
 import { ROLE_ICONS } from "@/components/shared/role-icons";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
@@ -71,48 +73,88 @@ export default function HomePage() {
 
       <main>
         {/* ---------- Kahraman bolum ---------- */}
+        {/*
+          Duzen bilerek ASIMETRIK: ortalanmis baslik + arkasinda dairesel
+          parlama, hazir sablonlarin en tanidik kalibi. Burada metin solda,
+          gorsel anlati sagda; altta ise kitap rafi duruyor.
+        */}
         <section className="relative overflow-hidden border-b">
-          <div className="bg-grid absolute inset-0 opacity-40" aria-hidden />
-          <div
-            className="absolute left-1/2 top-0 h-[420px] w-[720px] -translate-x-1/2 rounded-full bg-primary/15 blur-[120px]"
-            aria-hidden
-          />
+          <div className="bg-paper absolute inset-0 opacity-70" aria-hidden />
+          <BookshelfBackdrop className="opacity-90" />
 
-          <div className="relative mx-auto max-w-6xl px-4 py-20 sm:px-6 sm:py-28">
-            <div className="mx-auto max-w-3xl text-center">
-              <Badge variant="soft" className="gap-1.5">
-                <BrainCircuit className="h-3.5 w-3.5" />
-                Hackathon MVP
-              </Badge>
+          <div className="relative mx-auto max-w-6xl px-4 pb-40 pt-16 sm:px-6 sm:pb-52 sm:pt-24">
+            <div className="grid items-start gap-10 lg:grid-cols-[1.15fr_1fr]">
+              <div>
+                <Badge variant="soft" className="gap-1.5">
+                  <BookOpen className="h-3.5 w-3.5" />
+                  Ölçme &amp; değerlendirme platformu
+                </Badge>
 
-              <h1 className="mt-5 text-4xl font-semibold tracking-tight sm:text-6xl">
-                Yapay Zeka Destekli{" "}
-                <span className="text-primary">Egitim Sistemi</span>
-              </h1>
+                <h1 className="mt-5 font-display text-4xl leading-[1.08] sm:text-6xl">
+                  Kazanımdan soruya,
+                  <br />
+                  cevaptan{" "}
+                  <span className="marker font-semibold">puana</span> kadar
+                </h1>
 
-              <p className="mx-auto mt-5 max-w-2xl text-lg leading-relaxed text-muted-foreground">
-                Kazanımdan soruya, cevaptan puana kadar tüm değerlendirme surecini
-                yapay zeka ile hizlandirin — son sozu her zaman eğitmen soylesin.
-              </p>
+                <p className="mt-6 max-w-xl text-lg leading-relaxed text-muted-foreground">
+                  Yapay zekâ soruyu üretir, açık uçlu cevabı rubriğe göre
+                  puanlar; son sözü her zaman eğitmen söyler. Siz derse
+                  odaklanın, kırtasiyeyi sistem üstlensin.
+                </p>
 
-              <div className="mt-8 flex flex-wrap justify-center gap-3">
-                <Link
-                  href="/login"
-                  className={cn(buttonVariants({ size: "lg" }), "gap-2")}
-                >
-                  Hemen başla
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-                <Link
-                  href="/dashboard/egitmen/soru-havuzu"
-                  className={cn(
-                    buttonVariants({ variant: "outline", size: "lg" }),
-                    "gap-2",
-                  )}
-                >
-                  Soru havuzunu incele
-                </Link>
+                <div className="mt-8 flex flex-wrap gap-3">
+                  <Link
+                    href="/login"
+                    className={cn(buttonVariants({ size: "lg" }), "gap-2")}
+                  >
+                    Hemen başla
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                  <Link
+                    href="/dashboard/egitmen/soru-havuzu"
+                    className={cn(
+                      buttonVariants({ variant: "outline", size: "lg" }),
+                      "gap-2",
+                    )}
+                  >
+                    Soru havuzunu incele
+                  </Link>
+                </div>
               </div>
+
+              {/*
+                Sag sutun: urunun vaadini rakamla anlatan kucuk bir kunye.
+                Ekran goruntusu koymak yerine metin secildi - sahte bir
+                arayuz gorseli urunu oldugundan buyuk gosterirdi.
+              */}
+              <Card className="border-2 shadow-sm">
+                <CardContent className="space-y-5 p-6">
+                  <p className="font-display text-xl">Nasıl işliyor?</p>
+
+                  <ol className="space-y-4">
+                    {PIPELINE.slice(0, 4).map((step, index) => (
+                      <li key={step.title} className="flex gap-3">
+                        <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary tabular">
+                          {index + 1}
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block text-sm font-medium">
+                            {step.title}
+                          </span>
+                          <span className="mt-0.5 block text-sm leading-relaxed text-muted-foreground">
+                            {step.body}
+                          </span>
+                        </span>
+                      </li>
+                    ))}
+                  </ol>
+
+                  <p className="border-t pt-4 text-sm text-muted-foreground">
+                    Kalan adımlar aşağıda.
+                  </p>
+                </CardContent>
+              </Card>
             </div>
           </div>
         </section>
@@ -120,11 +162,11 @@ export default function HomePage() {
         {/* ---------- Roller ---------- */}
         <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
           <div className="max-w-2xl">
-            <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-              Dort rol, dort panel
+            <h2 className="font-display text-2xl sm:text-3xl">
+              Dört rol, dört panel
             </h2>
             <p className="mt-2 text-muted-foreground">
-              Her kullanıcı yalnızca kendi isine odaklanan bir arayuz gorur.
+              Her kullanıcı yalnızca kendi işine odaklanan bir arayüz görür.
             </p>
           </div>
 
@@ -158,8 +200,8 @@ export default function HomePage() {
         <section className="border-t bg-muted/30">
           <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
             <div className="max-w-2xl">
-              <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-                Uctan uca akis
+              <h2 className="font-display text-2xl sm:text-3xl">
+                Uçtan uca akış
               </h2>
               <p className="mt-2 text-muted-foreground">
                 Yapay zeka isin yorucu kismini yapar; karar insanda kalir.

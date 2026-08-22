@@ -161,10 +161,13 @@ export function NavLinks({ role, onNavigate }: NavLinksProps) {
             onClick={onNavigate}
             aria-current={isActive ? "page" : undefined}
             className={cn(
-              "group flex items-start gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors",
+              // Aktif oge sol kenarindan bir seritle isaretleniyor: yalnizca
+              // arka plan rengiyle ayirmak koyu temada zayif kaliyordu.
+              "group relative flex items-start gap-3 rounded-lg py-2.5 pl-4 pr-3 text-sm transition-colors",
+              "before:absolute before:left-0 before:top-1/2 before:h-6 before:w-[3px] before:-translate-y-1/2 before:rounded-r-full before:transition-colors",
               isActive
-                ? "bg-primary/10 text-primary"
-                : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                ? "bg-primary/10 text-primary before:bg-primary"
+                : "text-muted-foreground before:bg-transparent hover:bg-accent hover:text-foreground",
             )}
           >
             <Icon

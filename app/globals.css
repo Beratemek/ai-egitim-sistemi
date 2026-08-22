@@ -2,71 +2,103 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ---------------------------------------------------------------------------
+ * "Kitaplık" tasarım dili
+ *
+ * Palet, varsayılan shadcn slate + indigo'dan bilinçli olarak uzaklaşıyor:
+ * o kombinasyon her şablonda görüldüğü için ürüne "hazır tema" havası
+ * veriyordu. Yerine bir ders kitabı kapağının mantığı kuruldu:
+ *
+ *   ZEMİN   sıcak kâğıt (düz beyaz değil) — ekran uzun okumaya davet etsin
+ *   MÜREKKEP derin petrol-lacivert — saf siyah yerine, kâğıtla uyumlu
+ *   MARKA   koyu zümrüt — akademik ama canlı; mavi/mor klişesinden uzak
+ *   VURGU   sıcak kehribar — dikkat çeken az sayıda nokta için
+ *
+ * Zümrüt + kehribar çifti sıcak kâğıt üzerinde iyi bir ders kitabı kapağı
+ * gibi okunur ve iki renk de birbirinin tamamlayıcısı olduğu için ekran
+ * "renkli" görünürken kirli görünmez.
+ *
+ * Kontrastlar WCAG AA'ya göre seçildi; metin/zemin çiftleri en az 4.5:1.
+ * ------------------------------------------------------------------------- */
+
 @layer base {
   :root {
-    /* Yuzeyler */
-    --background: 210 40% 98%;
-    --foreground: 222 47% 11%;
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
+    /* --- Yüzeyler: kâğıt --- */
+    --background: 42 36% 96%;
+    --foreground: 202 44% 13%;
+    --card: 40 50% 99%;
+    --card-foreground: 202 44% 13%;
+    --popover: 40 50% 99%;
+    --popover-foreground: 202 44% 13%;
 
-    /* Marka */
-    --primary: 243 75% 58%;
-    --primary-foreground: 210 40% 98%;
+    /* --- Marka: zümrüt mürekkep --- */
+    --primary: 168 62% 26%;
+    --primary-foreground: 45 60% 98%;
 
-    --secondary: 214 32% 95%;
-    --secondary-foreground: 222 47% 11%;
-    --muted: 214 32% 95%;
-    --muted-foreground: 215 16% 45%;
-    --accent: 214 32% 95%;
-    --accent-foreground: 222 47% 11%;
+    /* --- Vurgu: kehribar --- */
+    --accent: 36 84% 92%;
+    --accent-foreground: 26 68% 24%;
+    --highlight: 34 90% 48%;
+    --highlight-foreground: 30 60% 12%;
 
-    /* Durum (dataviz status paleti ile ayni) */
-    --destructive: 0 61% 52%;
-    --destructive-foreground: 210 40% 98%;
-    --success: 120 86% 28%;
-    --success-foreground: 0 0% 100%;
-    --warning: 32 81% 39%;
-    --warning-foreground: 0 0% 100%;
+    --secondary: 42 26% 91%;
+    --secondary-foreground: 202 44% 16%;
+    --muted: 42 26% 92%;
+    --muted-foreground: 202 18% 38%;
 
-    /* Cizgiler */
-    --border: 214 32% 91%;
-    --input: 214 32% 88%;
-    --ring: 243 75% 58%;
+    /* --- Durum --- */
+    --destructive: 358 62% 44%;
+    --destructive-foreground: 45 60% 98%;
+    --success: 158 66% 26%;
+    --success-foreground: 45 60% 98%;
+    --warning: 28 78% 38%;
+    --warning-foreground: 45 60% 98%;
 
-    --radius: 0.65rem;
+    /* --- Çizgiler --- */
+    --border: 40 22% 85%;
+    --input: 40 20% 80%;
+    --ring: 168 62% 32%;
+
+    /* Kitap sırtı motifinin rengi; temaya göre değişir. */
+    --spine: 202 44% 13%;
+
+    --radius: 0.6rem;
   }
 
   .dark {
-    --background: 222 47% 7%;
-    --foreground: 210 40% 98%;
-    --card: 222 45% 11%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222 45% 13%;
-    --popover-foreground: 210 40% 98%;
+    /* Koyu tema slate değil: kâğıdın gece hâli, sıcak lacivert. */
+    --background: 202 42% 8%;
+    --foreground: 44 34% 94%;
+    --card: 202 36% 11%;
+    --card-foreground: 44 34% 94%;
+    --popover: 202 34% 13%;
+    --popover-foreground: 44 34% 94%;
 
-    --primary: 243 75% 68%;
-    --primary-foreground: 222 47% 11%;
+    --primary: 166 54% 52%;
+    --primary-foreground: 202 46% 8%;
 
-    --secondary: 217 33% 17%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217 33% 17%;
-    --muted-foreground: 215 20% 65%;
-    --accent: 217 33% 19%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 202 30% 18%;
+    --accent-foreground: 44 34% 94%;
+    --highlight: 36 90% 60%;
+    --highlight-foreground: 202 46% 8%;
 
-    --destructive: 0 61% 55%;
-    --destructive-foreground: 210 40% 98%;
-    --success: 120 60% 45%;
-    --success-foreground: 222 47% 11%;
-    --warning: 41 96% 54%;
-    --warning-foreground: 222 47% 11%;
+    --secondary: 202 28% 17%;
+    --secondary-foreground: 44 34% 94%;
+    --muted: 202 26% 17%;
+    --muted-foreground: 44 14% 68%;
 
-    --border: 217 33% 20%;
-    --input: 217 33% 24%;
-    --ring: 243 75% 68%;
+    --destructive: 358 68% 62%;
+    --destructive-foreground: 202 46% 8%;
+    --success: 158 52% 50%;
+    --success-foreground: 202 46% 8%;
+    --warning: 36 88% 58%;
+    --warning-foreground: 202 46% 8%;
+
+    --border: 202 24% 21%;
+    --input: 202 24% 26%;
+    --ring: 166 54% 52%;
+
+    --spine: 44 34% 94%;
   }
 
   * {
@@ -78,6 +110,22 @@
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
 
+  /*
+   * Başlıklar serif.
+   *
+   * Tek fontlu arayüzler tarafsız ama karaktersiz durur. Başlıkta bir
+   * serif kullanmak metne kitap sayfası tonu veriyor ve ürünün ne olduğunu
+   * daha ilk bakışta söylüyor; gövde ise okunabilirlik için sans kalıyor.
+   */
+  h1,
+  h2,
+  h3,
+  .font-display {
+    font-family: var(--font-display), Georgia, "Times New Roman", serif;
+    font-optical-sizing: auto;
+    letter-spacing: -0.011em;
+  }
+
   /* Tablolarda ve eksenlerde rakamlarin dikey hizalanmasi icin */
   .tabular {
     font-variant-numeric: tabular-nums;
@@ -85,11 +133,81 @@
 }
 
 @layer utilities {
-  /* Panel arka planindaki yumusak marka parlamasi */
+  /*
+   * Kâğıt dokusu.
+   *
+   * Çok ince bir gürültü katmanı: düz renk zemin ekranda "boş" durur,
+   * dokulu zemin ise basılı bir sayfayı andırır. Opaklık bilerek çok
+   * düşük - fark edilmemeli, yalnızca hissedilmeli.
+   */
+  .bg-paper {
+    background-image:
+      radial-gradient(hsl(var(--foreground) / 0.035) 1px, transparent 1px),
+      radial-gradient(hsl(var(--foreground) / 0.025) 1px, transparent 1px);
+    background-size: 22px 22px, 34px 34px;
+    background-position: 0 0, 11px 17px;
+  }
+
+  /*
+   * Kitap sırtı deseni.
+   *
+   * Rafa dizilmiş kitapların sırtı: farklı genişlikte dikey şeritler ve
+   * aralarındaki boşluk. Tekrar eden bir gradient olduğu için hiçbir
+   * görsel dosyası gerekmiyor; tema değişince rengi de kendiliğinden
+   * değişiyor.
+   */
+  .bg-shelf {
+    background-image: repeating-linear-gradient(
+      90deg,
+      hsl(var(--spine) / 0.16) 0px,
+      hsl(var(--spine) / 0.16) 7px,
+      transparent 7px,
+      transparent 11px,
+      hsl(var(--spine) / 0.1) 11px,
+      hsl(var(--spine) / 0.1) 21px,
+      transparent 21px,
+      transparent 25px,
+      hsl(var(--spine) / 0.14) 25px,
+      hsl(var(--spine) / 0.14) 30px,
+      transparent 30px,
+      transparent 36px,
+      hsl(var(--spine) / 0.08) 36px,
+      hsl(var(--spine) / 0.08) 50px,
+      transparent 50px,
+      transparent 55px
+    );
+  }
+
+  /* Çizgili defter zemini - form ve boş durumlarda. */
+  .bg-ruled {
+    background-image: linear-gradient(
+      hsl(var(--border) / 0.6) 1px,
+      transparent 1px
+    );
+    background-size: 100% 30px;
+  }
+
+  /* Panel arka planindaki izgara (mevcut kullanim korunuyor). */
   .bg-grid {
     background-image:
       linear-gradient(to right, hsl(var(--border) / 0.5) 1px, transparent 1px),
       linear-gradient(to bottom, hsl(var(--border) / 0.5) 1px, transparent 1px);
     background-size: 56px 56px;
+  }
+
+  /*
+   * Fosforlu kalem vurgusu.
+   *
+   * Metnin altına, satırın alt yarısını kaplayan yumuşak bir şerit. Düz
+   * arka plan rengiyle vurgulamaktan farkı: harfleri boğmuyor, elle
+   * çizilmiş izlenimi veriyor.
+   */
+  .marker {
+    background-image: linear-gradient(
+      to top,
+      hsl(var(--highlight) / 0.45) 0.42em,
+      transparent 0.42em
+    );
+    padding-inline: 0.1em;
   }
 }

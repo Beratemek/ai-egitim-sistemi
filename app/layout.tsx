@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Fraunces, Inter } from "next/font/google";
 
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
@@ -10,6 +10,21 @@ const inter = Inter({
   subsets: ["latin", "latin-ext"],
   variable: "--font-sans",
   display: "swap",
+});
+
+/**
+ * Baslik fontu.
+ *
+ * Fraunces degisken bir serif: optik boyut ekseni sayesinde buyuk
+ * basliklarda karakterli, kucuk boyutlarda okunakli duruyor. Tek fontlu
+ * arayuz tarafsiz ama karaktersiz olurdu; serif baslik urune kitap sayfasi
+ * tonu veriyor.
+ */
+const fraunces = Fraunces({
+  subsets: ["latin", "latin-ext"],
+  variable: "--font-display",
+  display: "swap",
+  axes: ["SOFT", "WONK", "opsz"],
 });
 
 export const metadata: Metadata = {
@@ -26,7 +41,7 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="tr" suppressHydrationWarning>
-      <body className={`${inter.variable} min-h-screen font-sans`}>
+      <body className={`${inter.variable} ${fraunces.variable} min-h-screen bg-paper font-sans`}>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"

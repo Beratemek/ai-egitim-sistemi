@@ -28,9 +28,13 @@ export default async function LoginPage({
     <main className="grid min-h-screen lg:grid-cols-2">
       {/* ---------- Sol: marka paneli (yalnızca genis ekran) ---------- */}
       <aside className="relative hidden flex-col justify-between overflow-hidden bg-primary p-12 text-primary-foreground lg:flex">
-        <div className="bg-grid absolute inset-0 opacity-[0.07]" aria-hidden />
+        {/*
+          Izgara + bulanik kure yerine kitap rafi. O ikili neredeyse her
+          hazir sablonda var; raf ise urunun ne oldugunu soyluyor.
+        */}
+        <div className="bg-paper absolute inset-0 opacity-[0.12]" aria-hidden />
         <div
-          className="absolute -right-24 -top-24 h-96 w-96 rounded-full bg-white/10 blur-3xl"
+          className="bg-shelf pointer-events-none absolute inset-x-0 bottom-0 h-64 opacity-[0.22]"
           aria-hidden
         />
 
@@ -46,8 +50,8 @@ export default async function LoginPage({
         </div>
 
         <div className="relative space-y-8">
-          <h1 className="max-w-md text-4xl font-semibold leading-tight tracking-tight">
-            Degerlendirmenin yorucu kismini yapay zekaya bırakın.
+          <h1 className="max-w-md font-display text-4xl leading-[1.12]">
+            Değerlendirmenin yorucu kısmını yapay zekâya bırakın.
           </h1>
 
           <ul className="space-y-3">
@@ -85,7 +89,7 @@ export default async function LoginPage({
             </div>
 
             <div>
-              <h2 className="text-2xl font-semibold tracking-tight">
+              <h2 className="font-display text-2xl">
                 Hesabiniza giriş yapın
               </h2>
               <p className="mt-1.5 text-sm text-muted-foreground">
