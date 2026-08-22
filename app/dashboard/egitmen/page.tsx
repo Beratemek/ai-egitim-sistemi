@@ -6,15 +6,12 @@ import {
   FileCheck2,
   Layers,
   Library,
-  Sparkles,
 } from "lucide-react";
 
 import { AiMockNotice } from "@/components/shared/ai-mock-notice";
 import { PageHeader } from "@/components/shared/page-header";
+import { PendingByClassroom } from "@/components/shared/pending-by-classroom";
 import { StatCard } from "@/components/shared/stat-card";
-import { SubmissionReviewDialog } from "@/components/shared/submission-review-dialog";
-import { SubmissionStatusBadge } from "@/components/shared/status-badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import {
@@ -24,30 +21,24 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
-import { Separator } from "@/components/ui/separator";
-import { isSupabaseConfigured, serverEnv } from "@/lib/env";
+import { serverEnv } from "@/lib/env";
 import {
+  getClassroomExamReviews,
   getExams,
   getQuestions,
   getSubmissions,
-  getUserNameMap,
 } from "@/lib/queries";
 import { cn, formatDateTime } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Eğitmen" };
 
 export default async function EgitmenPage() {
-  const [questions, exams, submissions, userNames] =
-    await Promise.all([
-      getQuestions(),
-      getExams(),
-      getSubmissions(),
-      getUserNameMap(),
-    ]);
-
-  // Cevap -> soru metni eşleşmesi: onay diyalogunda soruyu da gosterebilmek için.
-  const questionTextById = new Map(questions.map((q) => [q.id, q.text]));
+  const [questions, exams, submissions, classroomReviews] = await Promise.all([
+    getQuestions(),
+    getExams(),
+    getSubmissions(),
+    getClassroomExamReviews(),
+  ]);
 
   // Eğitmen yalnızca havuza dusmus (onaylı) sorularla ilgilenir; taslak
   // inceleme ve onay/red içerik uzmaninin ekranindadir.
@@ -109,100 +100,7 @@ export default async function EgitmenPage() {
 
       {serverEnv.aiMockMode ? <AiMockNotice capability="puanlama" /> : null}
 
-      {/* ---------- Puan onayı bekleyen cevaplar ---------- */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Sparkles className="h-4.5 w-4.5 text-primary" />
-            Puan onayı bekleyen cevaplar
-          </CardTitle>
-          <CardDescription>
-            AI on puan verdi; nihai puanı siz belirlersiniz.
-          </CardDescription>
-        </CardHeader>
-
-        <CardContent className="space-y-3">
-          {submissions.map((submission) => {
-            const studentName = userNames[submission.student_id] ?? "Bilinmiyor";
-            const initials = studentName
-              .split(" ")
-              .slice(0, 2)
-              .map((part) => part[0]?.toLocaleUpperCase("tr") ?? "")
-              .join("");
-            const finalScore =
-              submission.instructor_approved_score ?? submission.ai_score ?? 0;
-            const isApproved = submission.status === "egitmen_onayli";
-
-            return (
-              <div key={submission.id} className="rounded-xl border p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <Avatar className="h-9 w-9">
-                      <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">
-                        {initials}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="text-sm font-medium">{studentName}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatDateTime(submission.created_at)}
-                      </p>
-                    </div>
-                  </div>
-
-                  <SubmissionStatusBadge status={submission.status} />
-                </div>
-
-                <p className="mt-3 line-clamp-3 text-sm leading-relaxed text-muted-foreground">
-                  {submission.answer_text}
-                </p>
-
-                {submission.ai_feedback ? (
-                  <p className="mt-3 rounded-lg bg-muted/60 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
-                    <span className="font-medium text-foreground">AI gerekcesi: </span>
-                    {submission.ai_feedback}
-                  </p>
-                ) : null}
-
-                <Separator className="my-3" />
-
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="min-w-[180px] flex-1 space-y-1.5">
-                    <div className="flex items-baseline justify-between text-sm">
-                      <span className="text-muted-foreground">
-                        {isApproved ? "Onaylanan puan" : "AI on puanı"}
-                      </span>
-                      <span className="font-semibold tabular">{finalScore} / 100</span>
-                    </div>
-                    <Progress value={finalScore} className="h-1.5" />
-                  </div>
-
-                  {isApproved ? (
-                    <Badge variant="success" className="gap-1.5">
-                      <FileCheck2 className="h-3.5 w-3.5" />
-                      Onaylandı
-                    </Badge>
-                  ) : (
-                    <SubmissionReviewDialog
-                      submission={submission}
-                      studentName={studentName}
-                      canPersist={isSupabaseConfigured}
-                      {...(submission.question_id &&
-                      questionTextById.has(submission.question_id)
-                        ? {
-                            questionText: questionTextById.get(
-                              submission.question_id,
-                            ) as string,
-                          }
-                        : {})}
-                    />
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </CardContent>
-      </Card>
+      <PendingByClassroom reviews={classroomReviews} />
 
       {/* ---------- Sınavlar ---------- */}
       <Card>
