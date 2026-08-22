@@ -194,7 +194,7 @@ export function QuestionPoolBrowser({
                 )}
               </p>
 
-              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+              <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3 2xl:grid-cols-4">
                 {visibleSubjects.map((subject) => (
                   <SubjectCard
                     key={subject.subject}
@@ -219,7 +219,7 @@ export function QuestionPoolBrowser({
               meta={`${openSubject.topics.length} konu · ${openSubject.questionCount} soru · ${formatTypeCounts(countTopicsByType(openSubject.topics))}`}
             />
 
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+            <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3 2xl:grid-cols-4">
               {openSubject.topics.map((topic) => (
                 <TopicCard
                   key={topic.topic}
@@ -423,7 +423,7 @@ function SelectableCard({
   return (
     <div
       className={cn(
-        "group flex gap-3 rounded-xl border bg-card p-4 shadow-sm transition-colors",
+        "group flex gap-3 rounded-xl border bg-card p-3 shadow-sm transition-colors sm:p-4",
         "hover:border-primary/50 hover:bg-accent/40 focus-within:border-primary/50",
         selectedCount > 0 && "border-primary/40",
       )}
@@ -572,7 +572,7 @@ function QuestionList({
       </div>
 
       {/* ---------- Kagit ---------- */}
-      <div className="rounded-xl bg-white px-6 py-5 text-slate-900 shadow-sm ring-1 ring-slate-300 sm:px-10 sm:py-8">
+      <div className="rounded-xl bg-white px-3.5 py-4 text-slate-900 shadow-sm ring-1 ring-slate-300 sm:px-10 sm:py-8">
         <div className="mb-6 border-b border-slate-300 pb-3">
           <p className="text-[13pt] font-bold leading-tight">{group.topic}</p>
           <p className="mt-0.5 text-[9.5pt] text-slate-500">
@@ -580,7 +580,7 @@ function QuestionList({
           </p>
         </div>
 
-        <ol className="space-y-7">
+        <ol className="space-y-5 sm:space-y-7">
           {group.questions.map((question, index) => (
             <PaperQuestion
               key={question.id}

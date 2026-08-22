@@ -76,7 +76,7 @@ export default async function YoneticiPage() {
         description="Sınav bazlı katılım, ortalama puan ve eğitmen onay oranları."
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-4 xl:grid-cols-4">
         <StatCard
           label="Öğrenci"
           value={totalStudents}
@@ -116,7 +116,9 @@ export default async function YoneticiPage() {
             gorunumu. Yukaridaki grafiklerin sayısal karsiligi.
           </CardDescription>
         </CardHeader>
-        <CardContent className="px-0 sm:px-6">
+        {/* Bes sutunlu tablo telefon genisligine sigmaz; yatay kaydirma
+            kutunun ICINDE kalmali, sayfanin tamami kaymamali. */}
+        <CardContent className="overflow-x-auto px-0 sm:px-6">
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">

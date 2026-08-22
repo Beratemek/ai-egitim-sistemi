@@ -139,6 +139,22 @@
   }
 
   /*
+   * Çentik ve alt çubuk boşluğu.
+   *
+   * `viewport-fit=cover` sayfayı ekranın kenarlarına kadar uzatıyor;
+   * yapışkan üst/alt şeritlerin çentiğin altında kalmaması için güvenli
+   * alan kadar iç boşluk veriliyor. Tarayıcıda `env()` sıfır döner, yani
+   * web görünümü etkilenmez.
+   */
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /*
    * Başlıklar serif.
    *
    * Tek fontlu arayüzler tarafsız ama karaktersiz durur. Başlıkta bir

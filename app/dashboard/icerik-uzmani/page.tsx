@@ -41,7 +41,7 @@ export default async function IcerikUzmaniPage() {
         description="Kaynak metinleri yükleyin, AI ile soru taslağı üretin, onaylayarak havuza gönderin."
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-4 xl:grid-cols-4">
         <StatCard
           label="Kazanim"
           value={outcomes.length}

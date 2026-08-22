@@ -30,12 +30,12 @@ export function StatCard({
 }: StatCardProps) {
   return (
     <Card className={cn("overflow-hidden", className)}>
-      <CardContent className="flex items-start justify-between gap-3 p-5">
+      <CardContent className="flex items-start justify-between gap-3 p-3.5 sm:p-5">
         <div className="min-w-0">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             {label}
           </p>
-          <p className="tabular mt-2 font-display text-3xl">{value}</p>
+          <p className="tabular mt-1 font-display text-2xl sm:mt-2 sm:text-3xl">{value}</p>
           {hint ? (
             <p className="mt-1 truncate text-xs text-muted-foreground">{hint}</p>
           ) : null}
@@ -44,7 +44,7 @@ export function StatCard({
         {Icon ? (
           <span
             className={cn(
-              "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg",
+              "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg sm:h-10 sm:w-10",
               ACCENT_STYLES[accent],
             )}
           >
