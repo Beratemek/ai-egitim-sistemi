@@ -31,6 +31,14 @@ import {
   CardContent,
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -174,8 +182,17 @@ export function QuestionPoolBrowser({
     });
   }
 
-  async function handleAddToExam() {
-    if (!examId) {
+  /**
+   * Secili sorulari bir sinava ekler.
+   *
+   * Hedef sinav ARGUMAN olarak aliniyor: menuden secim yapildiginda durum
+   * guncellemesi bir sonraki render'da gecerli olur, o ana kadar `examId`
+   * hala eski degeri tasir ve sorular yanlis sinava giderdi.
+   */
+  async function handleAddToExam(hedefId?: string) {
+    const target = hedefId ?? examId;
+
+    if (!target) {
       toast.error("Önce bir sınav seçin.");
       return;
     }
@@ -183,10 +200,10 @@ export function QuestionPoolBrowser({
     setPending(true);
 
     try {
-      const result = await addExamQuestions(examId, [...selectedIds]);
+      const result = await addExamQuestions(target, [...selectedIds]);
       if (!result.ok) throw new Error(result.error);
 
-      const exam = exams.find((item) => item.id === examId);
+      const exam = exams.find((item) => item.id === target);
       toast.success(`${result.data.added} soru eklendi`, {
         description: exam ? `"${exam.title}" sinavina eklendi.` : undefined,
       });
@@ -302,11 +319,10 @@ export function QuestionPoolBrowser({
       <SelectionBar
         selectedCount={selectedIds.size}
         exams={exams}
-        examId={examId}
         onExamChange={setExamId}
         canPersist={canPersist}
         pending={pending}
-        onAdd={() => void handleAddToExam()}
+        onAdd={(hedef) => void handleAddToExam(hedef)}
         onCreate={() => setManualOpen(true)}
         onClear={() => setSelectedIds(new Set())}
       />
@@ -895,7 +911,6 @@ function PoolToolbar({
 function SelectionBar({
   selectedCount,
   exams,
-  examId,
   onExamChange,
   canPersist,
   pending,
@@ -905,11 +920,12 @@ function SelectionBar({
 }: {
   selectedCount: number;
   exams: readonly Exam[];
-  examId: string;
+  /** Secilen sinav durumda da tutulur; sonraki eklemede on secili gelir. */
   onExamChange: (value: string) => void;
   canPersist: boolean;
   pending: boolean;
-  onAdd: () => void;
+  /** Hedef sinav dogrudan gecirilir; durum guncellemesini beklemek gerekmesin. */
+  onAdd: (examId: string) => void;
   onCreate: () => void;
   onClear: () => void;
 }) {
@@ -934,48 +950,58 @@ function SelectionBar({
 
         <Separator orientation="vertical" className="mx-1 h-6" />
 
-        {/* Var olan sinava ekle: sinav secimi burada, cunku karar ancak
-            secim yapildiktan sonra anlamli. */}
+        {/*
+          Sinav secici + "Ekle" iki ayri denetimdi: once listeden sinav sec,
+          sonra dugmeye bas. Ikisi tek dugmede birlestirildi - menuden bir
+          sinav secmek zaten "oraya ekle" demek, ikinci bir onay adimina
+          gerek yok.
+        */}
         {exams.length > 0 ? (
-          <div className="flex items-center gap-1.5">
-            <Select value={examId} onValueChange={onExamChange}>
-              <SelectTrigger className="h-9 w-44" aria-label="Var olan sınav">
-                <SelectValue placeholder="Sınav seçin" />
-              </SelectTrigger>
-              <SelectContent>
-                {exams.map((exam) => (
-                  <SelectItem key={exam.id} value={exam.id}>
-                    {exam.title}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5"
+                disabled={pending || !canPersist}
+              >
+                {pending ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Plus className="h-3.5 w-3.5" />
+                )}
+                Sınava ekle
+                <ChevronDown className="h-3.5 w-3.5 opacity-60" />
+              </Button>
+            </DropdownMenuTrigger>
 
-            <Button
-              size="sm"
-              variant="outline"
-              className="gap-1.5"
-              disabled={pending || !examId || !canPersist}
-              onClick={onAdd}
-            >
-              {pending ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Plus className="h-3.5 w-3.5" />
-              )}
-              Ekle
-            </Button>
-          </div>
+            <DropdownMenuContent align="end" className="max-h-72 w-60 overflow-y-auto">
+              <DropdownMenuLabel>Hangi sınava eklensin?</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {exams.map((exam) => (
+                <DropdownMenuItem
+                  key={exam.id}
+                  onSelect={() => {
+                    onExamChange(exam.id);
+                    // Secim durumu bir sonraki render'da yazilacagi icin
+                    // hedef sinav dogrudan gecirilir.
+                    onAdd(exam.id);
+                  }}
+                >
+                  <span className="truncate">{exam.title}</span>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
         ) : null}
 
         {/*
           Bu dugme "yapay zeka" dugmesi DEGIL: egitmen sorulari zaten kendi
-          secti, burada yapilan is sinavin ayarlarini girmek. Kivilcim ikonu
-          ve o cagrism bilerek kaldirildi.
+          secti, burada yapilan is sinavin ayarlarini girmek.
         */}
         <Button size="sm" className="gap-1.5" onClick={onCreate}>
           <ClipboardList className="h-3.5 w-3.5" />
-          Sınavı kur
+          Yeni sınav
         </Button>
       </div>
     </div>
