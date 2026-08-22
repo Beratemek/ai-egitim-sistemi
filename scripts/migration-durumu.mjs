@@ -76,7 +76,67 @@ const ADIMLAR = [
   ["kamera-zorunlulugu", () => sutun("exams", "proctored")],
   ["sinav-suresi", () => fonksiyon("exam_attempt_deadline", { target_exam: BOS_ID, target_student: BOS_ID })],
   ["varsayilan-sure-ve-puan", () => sutun("exams", "points_auto")],
+  ["bos-birakilan-sorular", bosSoruKontrolu],
 ];
+
+/**
+ * Bos soru birakilabiliyor mu?
+ *
+ * Bu migration yeni bir sutun ya da fonksiyon EKLEMIYOR, yalnizca iki
+ * fonksiyonun govdesini degistiriyor - dolayisiyla varlik kontrolu ise
+ * yaramaz. Ayrimi DAVRANIS veriyor: eski surum, cevaplari eksik bir sinav
+ * icin "Tum cevaplar degerlendirmeye gonderilmeden..." hatasi firlatiyordu.
+ *
+ * Kontrol veri DEGISTIRMEZ: denemesi olmayan bir atama seciliyor, o yuzden
+ * yeni surumde guncellenecek satir bulunmuyor ve null donuyor.
+ */
+async function bosSoruKontrolu() {
+  const oku = async (yol) =>
+    (await fetch(`${BASE}/rest/v1/${yol}`, { headers: H })).json();
+
+  const [ogrenciler, atamalar, denemeler] = await Promise.all([
+    oku("users?select=id,email&email=like.*test.local"),
+    oku("exam_assignments?select=exam_id,student_id"),
+    oku("exam_attempts?select=exam_id,student_id"),
+  ]);
+
+  const aday = atamalar.find(
+    (a) =>
+      ogrenciler.some((u) => u.id === a.student_id) &&
+      !denemeler.some(
+        (t) => t.exam_id === a.exam_id && t.student_id === a.student_id,
+      ),
+  );
+
+  // Uygun ornek yoksa kontrol edilemiyor; "eksik" demek yaniltici olurdu.
+  if (!aday) return true;
+
+  const ogrenci = ogrenciler.find((u) => u.id === aday.student_id);
+  const anon = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+
+  const giris = await (
+    await fetch(`${BASE}/auth/v1/token?grant_type=password`, {
+      method: "POST",
+      headers: { apikey: anon, "Content-Type": "application/json" },
+      body: JSON.stringify({ email: ogrenci.email, password: "Test1234!" }),
+    })
+  ).json();
+
+  if (!giris.access_token) return true;
+
+  const r = await fetch(`${BASE}/rest/v1/rpc/submit_exam_attempt`, {
+    method: "POST",
+    headers: {
+      apikey: anon,
+      Authorization: `Bearer ${giris.access_token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ target_exam: aday.exam_id }),
+  });
+
+  const govde = await r.text();
+  return !govde.includes("Tum cevaplar degerlendirmeye gonderilmeden");
+}
 
 const sonuclar = await Promise.all(
   ADIMLAR.map(async ([ad, kontrol]) => {
