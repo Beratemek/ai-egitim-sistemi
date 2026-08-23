@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Fraunces, Inter } from "next/font/google";
+import { Figtree, STIX_Two_Text } from "next/font/google";
 
 import { NativeBridge } from "@/components/shared/native-bridge";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -7,7 +7,7 @@ import { Toaster } from "@/components/ui/sonner";
 
 import "./globals.css";
 
-const inter = Inter({
+const figtree = Figtree({
   subsets: ["latin", "latin-ext"],
   variable: "--font-sans",
   display: "swap",
@@ -16,16 +16,14 @@ const inter = Inter({
 /**
  * Baslik fontu.
  *
- * Fraunces degisken bir serif: optik boyut ekseni sayesinde buyuk
- * basliklarda karakterli, kucuk boyutlarda okunakli duruyor. Tek fontlu
- * arayuz tarafsiz ama karaktersiz olurdu; serif baslik urune kitap sayfasi
- * tonu veriyor.
+ * STIX Two Text eğitim ve yayıncılık tonunu korurken küçük başlıklarda da
+ * rahat okunur. Gövde ve panel arayüzünde daha açık formlu Figtree kullanılır.
  */
-const fraunces = Fraunces({
+const stix = STIX_Two_Text({
   subsets: ["latin", "latin-ext"],
   variable: "--font-display",
   display: "swap",
-  axes: ["SOFT", "WONK", "opsz"],
+  weight: ["400", "500", "600", "700"],
 });
 
 export const metadata: Metadata = {
@@ -63,7 +61,7 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="tr" suppressHydrationWarning>
-      <body className={`${inter.variable} ${fraunces.variable} min-h-screen bg-paper font-sans`}>
+      <body className={`${figtree.variable} ${stix.variable} min-h-screen bg-paper font-sans`}>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"

@@ -1,196 +1,149 @@
+import Checklist from "@solar-icons/react/ssr/list/Checklist";
+import ClipboardCheck from "@solar-icons/react/ssr/notes/ClipboardCheck";
+import DocumentText from "@solar-icons/react/ssr/notes/DocumentText";
+import SquareAcademicCap from "@solar-icons/react/ssr/school/SquareAcademicCap";
 import Link from "next/link";
-import {
-  ArrowRight,
-  BrainCircuit,
-  CheckCircle2,
-  GraduationCap,
-  Target,
-  UsersRound,
-} from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 import { BrandMark } from "@/components/shared/brand-mark";
-import { LandingBentoCanvas } from "@/components/shared/landing-bento-canvas";
-import { LandingScrollStory } from "@/components/shared/landing-scroll-story";
-import { ROLE_ICONS } from "@/components/shared/role-icons";
+import { LandingRoleShowcase } from "@/components/shared/landing-role-showcase";
+import { LandingWorkflowOrbit } from "@/components/shared/landing-workflow-orbit";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { buttonVariants } from "@/components/ui/button";
-import { SELECTABLE_ROLES } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 
-const FLOW_STEPS: readonly {
-  number: string;
-  title: string;
-  description: string;
-  width: string;
-  icon: LucideIcon;
-  tone: string;
-}[] = [
+const FLOW_STEPS = [
   {
     number: "01",
-    title: "Kazanımı belirle",
-    description: "Kaynak, ders ve ölçülecek kazanım aynı yerde tanımlanır.",
-    width: "lg:w-[58%]",
-    icon: Target,
-    tone: "bg-primary text-primary-foreground",
+    title: "Kaynak ve kazanım",
+    description: "Ders içeriğini yükleyin; hangi kazanımın, hangi düzeyde ölçüleceğini belirleyin.",
+    icon: DocumentText,
   },
   {
     number: "02",
-    title: "Soruyu birlikte hazırla",
-    description: "AI taslak üretir; içerik uzmanı ve eğitmen son hâlini verir.",
-    width: "lg:w-[72%]",
-    icon: BrainCircuit,
-    tone: "bg-[#dce8e2] text-[#193f35] dark:bg-primary/25 dark:text-foreground",
+    title: "Soru ve rubrik",
+    description: "Kaynağa bağlı soru taslaklarını hazırlayın, rubriği düzenleyin ve havuza alın.",
+    icon: Checklist,
   },
   {
     number: "03",
-    title: "Sınavı uygula",
-    description: "Öğrenci kendi panelinden sınava girer, cevaplar otomatik kaydolur.",
-    width: "lg:w-[86%]",
-    icon: GraduationCap,
-    tone: "bg-[#edd7cf] text-[#5b3024] dark:bg-warning/25 dark:text-foreground",
+    title: "Sınav deneyimi",
+    description: "Sınavı sınıfa atayın; öğrencinin güvenli ve kesintisiz biçimde tamamlamasını sağlayın.",
+    icon: SquareAcademicCap,
   },
   {
     number: "04",
-    title: "Sonucu onayla",
-    description: "Rubrik tabanlı ön değerlendirme eğitmen kararıyla kesinleşir.",
-    width: "lg:w-full",
-    icon: CheckCircle2,
-    tone: "bg-foreground text-background",
+    title: "Kontrol ve gelişim",
+    description: "Ön değerlendirmeyi eğitmen kararıyla kesinleştirin, gelişimi sınıf ve kazanım düzeyinde izleyin.",
+    icon: ClipboardCheck,
   },
-];
-
-const ROLE_VISUAL_STYLES = [
-  "bg-[#dce8e2] text-[#193f35]",
-  "bg-[#177765] text-[#fffdf8]",
-  "bg-[#f3e4bb] text-[#34271e]",
-  "bg-[#aec9c2] text-[#193f35]",
 ] as const;
+
+const PRINCIPLES = ["Kaynağa dayalı", "İnsan onaylı", "Rol bazlı"] as const;
 
 export default function HomePage() {
   return (
     <div className="min-h-screen overflow-x-clip bg-background">
-      <header className="fixed inset-x-0 top-0 z-50 px-3 pt-3 sm:px-5 sm:pt-4">
-        <nav className="mx-auto flex h-[4.75rem] min-w-0 max-w-[112rem] items-center gap-3 rounded-[1.45rem] border bg-background/95 px-5 shadow-[0_14px_38px_hsl(var(--foreground)/0.08)] backdrop-blur-md sm:h-[5.5rem] sm:px-8">
-          <BrandMark className="shrink-0 [&>span:first-child]:h-11 [&>span:first-child]:w-11 [&>span:first-child]:rounded-[13px] [&>span:first-child>svg]:h-5 [&>span:first-child>svg]:w-5 [&>span:last-child]:hidden sm:[&>span:last-child]:flex sm:[&>span:last-child>span:first-child]:text-[17px] sm:[&>span:last-child>span:last-child]:text-xs" />
-          <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-3">
+      <header className="pointer-events-none fixed inset-x-0 top-3 z-50 px-3 sm:top-4 sm:px-6 lg:top-5 lg:px-8">
+        <nav className="mx-auto flex max-w-7xl items-center justify-between gap-3">
+          <div className="pointer-events-auto rounded-xl border bg-background/88 px-3 py-2 shadow-[0_8px_24px_-14px_hsl(var(--foreground)/0.3)] backdrop-blur-xl">
+            <BrandMark />
+          </div>
+
+          <div className="pointer-events-auto flex items-center gap-1 rounded-full border bg-background/88 p-1.5 shadow-[0_8px_24px_-14px_hsl(var(--foreground)/0.3)] backdrop-blur-xl sm:gap-1.5">
+            <a className="hidden rounded-full px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:block" href="#nasil-calisir">
+              Nasıl çalışır?
+            </a>
+            <a className="hidden rounded-full px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:block" href="#roller">
+              Roller
+            </a>
             <ThemeToggle />
             <Link
               href="/auth/signout-and-login?mode=giris"
-              className={cn(
-                buttonVariants({ variant: "ghost", size: "lg" }),
-                "hidden h-12 rounded-full px-6 sm:inline-flex",
-              )}
+              className={cn(buttonVariants({ variant: "ghost" }), "hidden rounded-full px-4 sm:inline-flex")}
             >
               Giriş yap
             </Link>
             <Link
               href="/auth/signout-and-login?mode=kayit"
-              className={cn(
-                buttonVariants({ size: "lg" }),
-                "h-12 rounded-full px-5 sm:px-7",
-              )}
+              className={cn(buttonVariants(), "rounded-full px-4 sm:px-5")}
             >
               <span className="sm:hidden">Başla</span>
-              <span className="hidden sm:inline">Hemen başla</span>
-              <ArrowRight className="hidden h-4 w-4 sm:block" />
+              <span className="hidden sm:inline">Çalışma alanını aç</span>
+              <ArrowRight />
             </Link>
           </div>
         </nav>
       </header>
 
       <main>
-        <section className="academic-hero relative overflow-hidden border-b pt-[5.5rem] sm:pt-[6.5rem]">
-          <div className="academic-paper-field absolute inset-0" aria-hidden />
-
-          <div className="relative mx-auto w-full pt-14 sm:pt-20 lg:pt-24">
-            <div className="relative z-10 mx-auto flex max-w-[92rem] animate-kitap-yukselir flex-col items-center px-5 text-center sm:px-8">
-              <h1 className="font-sans text-[clamp(4rem,9vw,10.5rem)] font-normal leading-[0.86] tracking-[-0.065em]">
+        <section className="landing-hero relative overflow-hidden border-b">
+          <div className="landing-paper-field absolute inset-0" aria-hidden />
+          <div className="relative mx-auto grid min-h-[100svh] w-full max-w-7xl grid-cols-1 gap-8 px-5 pb-14 pt-28 sm:px-8 sm:pb-20 sm:pt-32 lg:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)] lg:items-stretch lg:gap-4 lg:pb-8 lg:pt-24">
+            <div className="relative z-10 flex min-w-0 flex-col justify-center lg:py-14">
+              <p className="landing-kicker">Ölçme ve değerlendirme, tek akışta.</p>
+              <h1 className="mt-5 max-w-[11ch] font-sans text-[clamp(3.25rem,6.2vw,6.75rem)] font-semibold leading-[0.9] tracking-[-0.065em]">
                 Öğrenmeyi
-                <span className="relative mx-auto mt-[0.08em] block w-fit text-primary">
-                  görünür kıl.
-                </span>
+                <span className="mt-1 block font-display font-medium italic tracking-[-0.045em] text-primary">görünür kıl.</span>
               </h1>
+              <p className="mt-7 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg">
+                Soru hazırlama, sınav, değerlendirme ve gelişim takibi. Her rol için ayrı bir çalışma alanı;
+                tüm eğitim süreci için ortak bir düzen.
+              </p>
 
-              <div className="mt-10 flex flex-wrap justify-center gap-3">
+              <div className="mt-8 flex flex-col items-start gap-4 sm:flex-row sm:items-center">
                 <Link
                   href="/auth/signout-and-login?mode=kayit"
                   className={cn(
                     buttonVariants({ size: "lg" }),
-                    "h-14 rounded-full px-9 text-base shadow-[0_10px_24px_hsl(var(--primary)/0.22)] transition-transform hover:-translate-y-0.5",
+                    "h-[3.25rem] rounded-xl px-6 shadow-[0_14px_28px_-14px_hsl(var(--primary)/0.65)]",
                   )}
                 >
-                  Başlayın
-                  <ArrowRight className="h-4 w-4" />
+                  Sistemi keşfedin
+                  <ArrowRight />
                 </Link>
-                <a
-                  href="#nasil-calisir"
-                  className={cn(
-                    buttonVariants({ variant: "outline", size: "lg" }),
-                    "h-14 rounded-full border-primary/30 bg-background/80 px-9 text-base shadow-sm transition-transform hover:-translate-y-0.5 hover:border-primary/60",
-                  )}
-                >
-                  Nasıl çalışır?
+                <a className="group inline-flex items-center gap-2 border-b border-foreground/25 py-2 text-sm font-semibold transition-colors hover:border-primary hover:text-primary" href="#nasil-calisir">
+                  Süreci inceleyin
+                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                 </a>
               </div>
 
+              <div className="mt-12 flex flex-wrap border-y border-border/70 py-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground sm:mt-14">
+                {PRINCIPLES.map((item) => (
+                  <span key={item} className="mr-4 border-r pr-4 last:mr-0 last:border-0 last:pr-0">{item}</span>
+                ))}
+              </div>
             </div>
 
-            <div className="mt-12 w-full sm:mt-16">
-              <LandingBentoCanvas />
-            </div>
+            <LandingWorkflowOrbit />
           </div>
         </section>
 
-        <LandingScrollStory />
-
-        <section id="nasil-calisir" className="px-5 py-24 sm:px-8 sm:py-32">
+        <section id="nasil-calisir" className="scroll-mt-24 px-5 py-24 sm:px-8 sm:py-32">
           <div className="mx-auto max-w-7xl">
-            <div className="grid gap-8 lg:grid-cols-[0.75fr_1.25fr] lg:gap-20">
+            <div className="grid gap-12 lg:grid-cols-[0.7fr_1.3fr] lg:gap-24">
               <div className="lg:sticky lg:top-32 lg:self-start">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
-                  Nasıl çalışır?
-                </p>
-                <h2 className="mt-4 max-w-lg font-display text-4xl leading-tight sm:text-5xl">
-                  Karmaşık süreç,
-                  <br /> dört net adım.
+                <p className="landing-section-label">Süreç</p>
+                <h2 className="mt-5 max-w-lg font-display text-4xl leading-[1.02] sm:text-5xl lg:text-6xl">
+                  Dört adım.
+                  <br /> Tek, kesintisiz kayıt.
                 </h2>
-                <p className="mt-5 max-w-md leading-relaxed text-muted-foreground">
-                  Her adımın sahibi ve çıktısı belli. Yapay zekâ süreci hızlandırır;
-                  pedagojik kontrolü devralmaz.
+                <p className="mt-6 max-w-md leading-relaxed text-muted-foreground">
+                  Her aşamanın sahibi ve çıktısı belli. Sistem işleri birbirine bağlar; eğitim kararının sahibi değişmez.
                 </p>
               </div>
 
-              <ol className="space-y-4">
+              <ol className="border-t border-foreground/20">
                 {FLOW_STEPS.map((step) => {
                   const Icon = step.icon;
                   return (
-                    <li
-                      key={step.number}
-                      className={cn(
-                        "ml-auto rounded-[1.5rem] p-5 shadow-sm sm:p-6",
-                        step.width,
-                        step.tone,
-                      )}
-                    >
-                      <div className="flex items-start gap-4">
-                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-current/15 bg-white/20">
-                          <Icon className="h-4.5 w-4.5" />
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center justify-between gap-4">
-                            <h3 className="font-sans text-lg font-semibold tracking-normal">
-                              {step.title}
-                            </h3>
-                            <span className="text-xs font-semibold opacity-55 tabular">
-                              {step.number}
-                            </span>
-                          </div>
-                          <p className="mt-2 max-w-xl text-sm leading-relaxed opacity-75">
-                            {step.description}
-                          </p>
-                        </div>
+                    <li key={step.number} className="group grid grid-cols-[2.75rem_1fr_auto] gap-4 border-b border-foreground/20 py-7 sm:grid-cols-[4rem_1fr_auto] sm:gap-6 sm:py-9">
+                      <span className="font-mono text-[11px] text-primary">{step.number}</span>
+                      <div>
+                        <h3 className="font-sans text-lg font-semibold tracking-[-0.02em] sm:text-xl">{step.title}</h3>
+                        <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">{step.description}</p>
                       </div>
+                      <Icon className="h-7 w-7 text-primary transition-transform duration-300 group-hover:-translate-y-1 group-hover:rotate-[-4deg] sm:h-8 sm:w-8" weight="LineDuotone" />
                     </li>
                   );
                 })}
@@ -199,96 +152,59 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section id="roller" className="border-y bg-[#efede6] px-5 py-24 dark:bg-card sm:px-8 sm:py-28">
+        <section id="roller" className="scroll-mt-24 border-y bg-muted/45 px-5 py-24 sm:px-8 sm:py-28">
           <div className="mx-auto max-w-7xl">
-            <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
+            <div className="grid gap-6 lg:grid-cols-[1fr_0.72fr] lg:items-end">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
-                  Dört rol, tek sistem
-                </p>
-                <h2 className="mt-4 font-display text-4xl sm:text-5xl">
-                  Herkes yalnızca ihtiyacını görür.
+                <p className="landing-section-label">Çalışma alanları</p>
+                <h2 className="mt-5 max-w-3xl font-display text-4xl leading-[1.02] sm:text-5xl lg:text-6xl">
+                  Aynı sistem. Her role göre başka bir görünüm.
                 </h2>
               </div>
-              <p className="max-w-md text-sm leading-relaxed text-muted-foreground sm:text-right">
-                Rolünüzü seçin. Kayıt ve onay sürecinden sonra size ait çalışma
-                alanı otomatik olarak açılsın.
+              <p className="max-w-md text-sm leading-relaxed text-muted-foreground lg:justify-self-end lg:text-right">
+                İçerik uzmanından öğrenciye kadar herkes yalnızca kendi işine odaklanır; veri ve süreç kopmadan devam eder.
               </p>
             </div>
 
-            <div className="mt-12 space-y-6">
-              {SELECTABLE_ROLES.map((definition, index) => {
-                const Icon = ROLE_ICONS[definition.role];
-                return (
-                  <Link
-                    key={definition.role}
-                    href={`/auth/signout-and-login?mode=kayit&role=${definition.role}`}
-                    className="group grid min-h-[24rem] overflow-hidden rounded-[2rem] bg-background shadow-[0_18px_55px_hsl(var(--foreground)/0.07)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_25px_65px_hsl(var(--foreground)/0.12)] lg:grid-cols-[1.05fr_0.95fr]"
-                  >
-                    <span className="flex min-h-[22rem] flex-col p-7 sm:p-10 lg:min-h-[26rem] lg:p-12">
-                      <span className="block max-w-xl font-display text-4xl leading-[0.95] sm:text-6xl">
-                        {definition.label} paneli
-                      </span>
-
-                      <span className="mt-auto block max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg">
-                        {definition.description}
-                      </span>
-
-                      <span className="mt-8 flex w-fit items-center gap-3 rounded-full bg-[#102a30] px-7 py-3.5 text-sm font-semibold text-white shadow-[0_9px_24px_rgb(16_42_48/0.2)] transition-all group-hover:gap-5 group-hover:bg-primary sm:text-base">
-                        Bu rolle başlayın
-                        <ArrowRight className="h-4 w-4" />
-                      </span>
-                    </span>
-
-                    <span
-                      className={cn(
-                        "relative flex min-h-[20rem] items-center justify-center overflow-hidden p-8 lg:min-h-[26rem]",
-                        ROLE_VISUAL_STYLES[index],
-                      )}
-                    >
-                      <span className="absolute left-6 top-6 rounded-full bg-white/75 px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#193f35]">
-                        {definition.label}
-                      </span>
-                      <span className="relative flex h-40 w-40 rotate-[-3deg] items-center justify-center rounded-[2.25rem] bg-white/25 shadow-[0_24px_55px_rgb(16_39_47/0.12)] backdrop-blur-sm transition-transform duration-500 group-hover:rotate-[2deg] group-hover:scale-105 sm:h-52 sm:w-52">
-                        <Icon className="h-20 w-20 sm:h-28 sm:w-28" strokeWidth={1.15} />
-                      </span>
-                      <span className="absolute bottom-7 right-7 font-display text-2xl opacity-55">
-                        Çalışma alanı
-                      </span>
-                    </span>
-                  </Link>
-                );
-              })}
-            </div>
+            <LandingRoleShowcase />
           </div>
         </section>
 
-        <section className="px-5 py-20 sm:px-8 sm:py-28">
-          <div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-8 rounded-[2rem] bg-primary p-7 text-primary-foreground sm:p-12 lg:flex-row lg:items-end">
-            <div>
-              <UsersRound className="h-6 w-6 text-primary-foreground/65" />
-              <h2 className="mt-6 max-w-3xl font-display text-4xl leading-tight sm:text-6xl">
-                Değerlendirmeyi yük olmaktan çıkarın.
-              </h2>
+        <section className="border-b px-5 py-20 sm:px-8 sm:py-28">
+          <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[1.2fr_0.8fr] lg:items-end">
+            <h2 className="max-w-4xl font-display text-4xl leading-[1.02] sm:text-6xl lg:text-7xl">
+              Değerlendirme yükünü azaltın. Öğrenciyi daha yakından izleyin.
+            </h2>
+            <div className="border-l border-foreground/20 pl-6">
+              <p className="max-w-md text-sm leading-relaxed text-muted-foreground sm:text-base">
+                Ekibiniz aynı akışta çalışsın; öğrencinin gelişimi sınav sonuçlarının arasında kaybolmasın.
+              </p>
+              <Link
+                href="/auth/signout-and-login?mode=kayit"
+                className={cn(buttonVariants({ size: "lg" }), "mt-6 rounded-xl px-6")}
+              >
+                Çalışma alanını aç
+                <ArrowRight />
+              </Link>
             </div>
-            <Link
-              href="/auth/signout-and-login?mode=kayit"
-              className={cn(
-                buttonVariants({ variant: "secondary", size: "lg" }),
-                "h-12 shrink-0 rounded-full px-6",
-              )}
-            >
-              Kayıt oluşturun
-              <ArrowRight className="h-4 w-4" />
-            </Link>
           </div>
         </section>
       </main>
 
-      <footer className="border-t px-5 py-8 sm:px-8">
-        <div className="mx-auto flex max-w-7xl flex-col gap-4 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+      <footer className="px-5 py-8 sm:px-8">
+        <div className="mx-auto flex max-w-7xl flex-col gap-4 text-sm text-muted-foreground sm:flex-row sm:items-end sm:justify-between">
           <BrandMark />
-          <p>Yapay zekâ hızlandırır, eğitmen karar verir.</p>
+          <div className="sm:text-right">
+            <p>Ölçme, değerlendirme ve gelişim tek çalışma alanında.</p>
+            <a
+              className="mt-1 inline-block text-[10px] opacity-60 transition-opacity hover:opacity-100"
+              href="https://www.figma.com/community/file/1166831539721848736"
+              rel="noreferrer"
+              target="_blank"
+            >
+              Solar Icons · 480 Design · CC BY 4.0
+            </a>
+          </div>
         </div>
       </footer>
     </div>
