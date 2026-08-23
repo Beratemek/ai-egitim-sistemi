@@ -21,7 +21,6 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { isSupabaseConfigured, publicEnv } from "@/lib/env";
 import { SELECTABLE_ROLES, dashboardPathFor } from "@/lib/roles";
-import { createClient } from "@/lib/supabase";
 import { isUserRole, type UserRole } from "@/lib/types";
 
 type Mode = "giris" | "kayit";
@@ -52,6 +51,17 @@ export function LoginForm({ callbackError = null }: LoginFormProps) {
     setPending(true);
 
     try {
+      /*
+        Supabase istemcisi TALEP UZERINE yukleniyor.
+
+        Statik import edildiginde `@supabase/ssr` + `@supabase/supabase-js`
+        giris sayfasinin ILK YUKLEMESINE giriyordu (~79 kB rota boyutu).
+        Oysa istemciye yalnizca kullanici formu gonderdiginde ihtiyac var;
+        sayfayi acip bakan herkes bedelini odemek zorunda degil. Giris
+        sayfasi uygulamanin en cok acilan sayfasi oldugu icin bu fark
+        dogrudan ilk acilis suresine yansiyor.
+      */
+      const { createClient } = await import("@/lib/supabase");
       const supabase = createClient();
 
       if (mode === "kayit") {
