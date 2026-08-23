@@ -11,6 +11,10 @@ const nextConfig = {
    *
    * NEXT_DIST_DIR ile dogrulama build'i ayri bir klasore alinabilir:
    *   NEXT_DIST_DIR=.next-verify npx next build
+   *
+   * KURAL: dev sunucusu acikken ALINAN HER BUILD bu degiskeni set etmeli.
+   * Aksi halde tarayici stilsiz kalir (CSS 404) ve sayfa devasa bir SVG
+   * gibi gorunur - sebebi anlasilmasi zor, belirtisi ise dramatik.
    */
   distDir: process.env.NEXT_DIST_DIR || ".next",
 };
