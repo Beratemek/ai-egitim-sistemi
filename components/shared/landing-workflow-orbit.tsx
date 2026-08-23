@@ -11,12 +11,10 @@ import Calendar from "@solar-icons/react/ssr/time/Calendar";
 import ClockCircle from "@solar-icons/react/ssr/time/ClockCircle";
 import UserCheckRounded from "@solar-icons/react/ssr/users/UserCheckRounded";
 import UsersGroupRounded from "@solar-icons/react/ssr/users/UsersGroupRounded";
-import { Pause, Play } from "lucide-react";
 import {
   useCallback,
   useEffect,
   useRef,
-  useState,
   type KeyboardEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
@@ -24,7 +22,7 @@ import {
 
 const CARD_COUNT = 7;
 const INITIAL_PROGRESS = 0.357;
-const AUTO_SPEED = 0.000038;
+const AUTO_SPEED = 0.000016;
 
 type ProductCardProps = {
   children: ReactNode;
@@ -43,15 +41,15 @@ function ProductCard({ children, className, label }: ProductCardProps) {
 function SourcePanel() {
   return (
     <ProductCard className="workflow-card--source" label="Kaynak kütüphanesi önizlemesi">
-      <header className="workflow-card-header border-white/12">
-        <span className="workflow-card-icon bg-white/10 text-[#dbe9e4]">
+      <header className="workflow-card-header border-foreground/10">
+        <span className="workflow-card-icon bg-primary/10 text-primary">
           <Book2 size={22} weight="LineDuotone" />
         </span>
         <span>
           <strong>Kaynak kütüphanesi</strong>
           <small>Fen Bilimleri · 8. sınıf</small>
         </span>
-        <span className="ml-auto font-mono text-[10px] text-white/45">03 DOSYA</span>
+        <span className="ml-auto font-mono text-[10px] text-muted-foreground">03 DOSYA</span>
       </header>
       <div className="space-y-2.5 p-5">
         {[
@@ -59,15 +57,15 @@ function SourcePanel() {
           ["DNA ve Genetik Kod", "18 sayfa", "İşlendi"],
           ["Basınç", "12 sayfa", "Yeni"],
         ].map(([name, pages, status], index) => (
-          <div key={name} className="grid grid-cols-[2.25rem_1fr_auto] items-center gap-3 border-b border-white/10 pb-2.5 last:border-0">
-            <span className="flex h-9 w-9 items-center justify-center bg-white/[0.07] text-[#c7ddd5]">
+          <div key={name} className="grid grid-cols-[2.25rem_1fr_auto] items-center gap-3 border-b border-foreground/10 pb-2.5 last:border-0">
+            <span className="flex h-9 w-9 items-center justify-center bg-background/60 text-primary">
               <DocumentText size={19} weight="LineDuotone" />
             </span>
             <span className="min-w-0">
               <strong className="block truncate text-xs font-semibold">{name}</strong>
-              <small className="mt-0.5 block text-[10px] text-white/45">{pages}</small>
+              <small className="mt-0.5 block text-[10px] text-muted-foreground">{pages}</small>
             </span>
-            <span className={index === 2 ? "text-[#e6ca82]" : "text-[#9ec7ba]"}>{status}</span>
+            <span className={index === 2 ? "text-primary" : "text-muted-foreground"}>{status}</span>
           </div>
         ))}
       </div>
@@ -88,31 +86,31 @@ function QuestionPanel() {
         </span>
         <span className="ml-auto font-mono text-[10px] text-muted-foreground">04 / 12</span>
       </header>
-      <div className="p-5">
-        <div className="flex items-center justify-between border-b pb-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+      <div className="p-4">
+        <div className="flex items-center justify-between border-b pb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
           <span>Açık uçlu</span>
           <span>10 puan</span>
         </div>
-        <p className="mt-4 max-w-[32rem] font-display text-xl font-medium leading-snug sm:text-2xl">
+        <p className="mt-3 max-w-[32rem] font-display text-lg font-medium leading-snug sm:text-xl">
           Mitoz bölünmenin canlılar için önemini iki örnekle açıklayın.
         </p>
-        <div className="mt-5 grid grid-cols-3 border">
+        <div className="mt-3 grid grid-cols-3 border">
           {[
             ["Kavram", "4"],
             ["Gerekçe", "4"],
             ["Açıklık", "2"],
           ].map(([label, value]) => (
-            <div key={label} className="border-r p-3 last:border-0">
+            <div key={label} className="border-r p-2.5 last:border-0">
               <span className="block text-[9px] text-muted-foreground">{label}</span>
               <strong className="mt-1 block text-sm tabular">{value} puan</strong>
             </div>
           ))}
         </div>
-        <div className="mt-4 flex items-center justify-between">
+        <div className="mt-3 flex items-center justify-between">
           <span className="flex items-center gap-2 text-[10px] text-muted-foreground">
             <span className="h-1.5 w-1.5 rounded-full bg-primary" /> Kaynakla eşleşti
           </span>
-          <span className="bg-foreground px-3 py-2 text-[10px] font-semibold text-background">İncelemeye hazır</span>
+          <span className="bg-foreground px-2.5 py-1.5 text-[10px] font-semibold text-background">İncelemeye hazır</span>
         </div>
       </div>
     </ProductCard>
@@ -122,15 +120,15 @@ function QuestionPanel() {
 function ExamPanel() {
   return (
     <ProductCard className="workflow-card--exam" label="Sınav planlama önizlemesi">
-      <header className="workflow-card-header border-[#102a30]/15">
-        <span className="workflow-card-icon bg-[#102a30] text-[#fffdf8]">
+      <header className="workflow-card-header">
+        <span className="workflow-card-icon bg-primary text-primary-foreground">
           <Calendar size={22} weight="LineDuotone" />
         </span>
         <span>
           <strong>Sınav planı</strong>
           <small>8-A · Fen Bilimleri</small>
         </span>
-        <span className="ml-auto text-[10px] font-semibold text-[#70402f]">YAYINDA</span>
+        <span className="ml-auto text-[10px] font-semibold text-primary">YAYINDA</span>
       </header>
       <div className="grid grid-cols-[1fr_0.9fr] gap-4 p-5">
         <div>
@@ -141,10 +139,10 @@ function ExamPanel() {
             <span className="flex items-center gap-2"><UsersGroupRounded size={17} weight="Linear" /> 28 öğrenci</span>
           </div>
         </div>
-        <div className="flex flex-col justify-between border-l border-[#102a30]/15 pl-4">
-          <span className="text-[10px] uppercase tracking-[0.12em] text-[#70402f]">Kapsam</span>
+        <div className="flex flex-col justify-between border-l border-border pl-4">
+          <span className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Kapsam</span>
           <strong className="text-4xl font-semibold tabular">12</strong>
-          <span className="text-xs text-[#70402f]">8 test · 4 açık uçlu</span>
+          <span className="text-xs text-muted-foreground">8 test · 4 açık uçlu</span>
         </div>
       </div>
     </ProductCard>
@@ -155,7 +153,7 @@ function ReviewPanel() {
   return (
     <ProductCard className="workflow-card--review" label="Eğitmen değerlendirme önizlemesi">
       <header className="workflow-card-header">
-        <span className="workflow-card-icon bg-[#e8ded3] text-[#5a392e]">
+        <span className="workflow-card-icon bg-primary/10 text-primary">
           <ClipboardCheck size={22} weight="LineDuotone" />
         </span>
         <span>
@@ -190,25 +188,25 @@ function ReviewPanel() {
 function StudentPanel() {
   return (
     <ProductCard className="workflow-card--student" label="Öğrenci gelişim önizlemesi">
-      <header className="workflow-card-header border-[#102a30]/15">
-        <span className="workflow-card-icon bg-[#102a30] text-[#fffdf8]">
+      <header className="workflow-card-header">
+        <span className="workflow-card-icon bg-primary text-primary-foreground">
           <SquareAcademicCap size={22} weight="LineDuotone" />
         </span>
         <span>
           <strong>Gelişim özeti</strong>
           <small>Son dört değerlendirme</small>
         </span>
-        <GraphUp className="ml-auto text-[#36584f]" size={21} weight="LineDuotone" />
+        <GraphUp className="ml-auto text-primary" size={21} weight="LineDuotone" />
       </header>
       <div className="grid grid-cols-[0.72fr_1.28fr] gap-5 p-5">
-        <div className="border-r border-[#102a30]/15 pr-4">
-          <span className="text-[10px] uppercase tracking-[0.12em] text-[#5a5942]">Genel gelişim</span>
+        <div className="border-r border-border pr-4">
+          <span className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Genel gelişim</span>
           <strong className="mt-3 block text-5xl font-semibold tracking-[-0.06em] tabular">%82</strong>
-          <span className="mt-3 block text-[10px] text-[#5a5942]">Önceki döneme göre +8</span>
+          <span className="mt-3 block text-[10px] text-muted-foreground">Önceki döneme göre +8</span>
         </div>
         <div className="flex items-end gap-2" aria-label="Öğrenci gelişim grafiği">
           {[35, 44, 58, 52, 68, 74, 86].map((height, index) => (
-            <span key={index} className="flex-1 bg-[#102a30]" style={{ height: `${height}%`, opacity: 0.32 + index * 0.08 }} />
+            <span key={index} className="flex-1 bg-primary" style={{ height: `${height}%`, opacity: 0.32 + index * 0.08 }} />
           ))}
         </div>
       </div>
@@ -219,31 +217,31 @@ function StudentPanel() {
 function ManagerPanel() {
   return (
     <ProductCard className="workflow-card--manager" label="Kurum analizi önizlemesi">
-      <header className="workflow-card-header border-white/12">
-        <span className="workflow-card-icon bg-white/10 text-[#dbe9e4]">
+      <header className="workflow-card-header border-foreground/10">
+        <span className="workflow-card-icon bg-primary/10 text-primary">
           <Chart2 size={22} weight="LineDuotone" />
         </span>
         <span>
           <strong>Kurum görünümü</strong>
           <small>12 sınıf · 284 öğrenci</small>
         </span>
-        <span className="ml-auto font-mono text-[10px] text-white/45">AĞUSTOS</span>
+        <span className="ml-auto font-mono text-[10px] text-muted-foreground">AĞUSTOS</span>
       </header>
       <div className="grid grid-cols-[1fr_auto] gap-5 p-5">
         <div>
           <div className="flex items-end justify-between">
-            <span className="text-[10px] uppercase tracking-[0.12em] text-white/45">Kazanım ısı haritası</span>
+            <span className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Kazanım ısı haritası</span>
             <strong className="text-sm tabular">%78</strong>
           </div>
           <div className="mt-4 grid grid-cols-8 gap-1.5">
             {Array.from({ length: 32 }, (_, index) => (
-              <span key={index} className="aspect-square bg-[#8bc0b1]" style={{ opacity: 0.18 + ((index * 7) % 10) / 12 }} />
+              <span key={index} className="aspect-square bg-primary" style={{ opacity: 0.18 + ((index * 7) % 10) / 12 }} />
             ))}
           </div>
         </div>
-        <div className="flex flex-col justify-end gap-2 border-l border-white/10 pl-4 text-right">
+        <div className="flex flex-col justify-end gap-2 border-l border-foreground/10 pl-4 text-right">
           <strong className="text-3xl tabular">03</strong>
-          <span className="max-w-20 text-[10px] leading-tight text-white/50">yakından izlenen kazanım</span>
+          <span className="max-w-20 text-[10px] leading-tight text-muted-foreground">yakından izlenen kazanım</span>
         </div>
       </div>
     </ProductCard>
@@ -254,7 +252,7 @@ function RolesPanel() {
   return (
     <ProductCard className="workflow-card--roles" label="Rol dağılımı önizlemesi">
       <header className="workflow-card-header">
-        <span className="workflow-card-icon bg-secondary text-secondary-foreground">
+        <span className="workflow-card-icon bg-primary/10 text-primary">
           <UsersGroupRounded size={22} weight="LineDuotone" />
         </span>
         <span>
@@ -269,7 +267,7 @@ function RolesPanel() {
           ["Öğrenci", "Sınav & gelişim"],
           ["Eğitim yöneticisi", "Kurum analizi"],
         ].map(([role, task], index) => (
-          <div key={role} className="bg-card p-4">
+          <div key={role} className="bg-card p-3.5">
             <span className="flex h-8 w-8 items-center justify-center bg-muted text-primary">
               {index % 2 === 0 ? <UserCheckRounded size={18} weight="LineDuotone" /> : <UsersGroupRounded size={18} weight="LineDuotone" />}
             </span>
@@ -293,13 +291,11 @@ const PANELS = [
 ] as const;
 
 export function LandingWorkflowOrbit() {
-  const [paused, setPaused] = useState(false);
   const stageRef = useRef<HTMLDivElement>(null);
   const cardRefs = useRef<Array<HTMLElement | null>>([]);
   const progressRef = useRef(INITIAL_PROGRESS);
   const draggingRef = useRef(false);
   const lastPointerRef = useRef({ x: 0, y: 0 });
-  const reducedMotionRef = useRef(false);
   const frontIndexRef = useRef(1);
 
   const layoutCards = useCallback((progress: number) => {
@@ -322,21 +318,21 @@ export function LandingWorkflowOrbit() {
       let x: number;
       let y: number;
 
-      if (t < 0.48) {
-        const segment = t / 0.48;
-        x = 30 - segment * 35;
-        y = -270 + segment * 250;
+      if (t < 0.46) {
+        const segment = t / 0.46;
+        x = 22 - segment * 38;
+        y = -355 + segment * 305;
       } else if (t < 0.68) {
-        const angle = Math.PI + ((t - 0.48) / 0.2) * (Math.PI / 2);
-        x = 105 + 110 * Math.cos(angle);
-        y = -20 - 95 * Math.sin(angle);
+        const angle = Math.PI + ((t - 0.46) / 0.22) * (Math.PI / 2);
+        x = 98 + 114 * Math.cos(angle);
+        y = -50 - 124 * Math.sin(angle);
       } else {
         const segment = (t - 0.68) / 0.32;
-        x = 75 + segment * 105;
-        y = 75 + segment * 180;
+        x = 98 + segment * 128;
+        y = 74 + segment * 284;
       }
 
-      const scale = 0.43 + depth * 0.7;
+      const scale = 0.47 + depth * 0.57;
       const front = depth > 0.955;
       if (front) frontIndexRef.current = index;
 
@@ -349,29 +345,39 @@ export function LandingWorkflowOrbit() {
   }, []);
 
   useEffect(() => {
-    reducedMotionRef.current = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     layoutCards(progressRef.current);
 
     let frame = 0;
     let previous = performance.now();
     const animate = (now: number) => {
-      const delta = now - previous;
+      const delta = Math.min(now - previous, 48);
       previous = now;
-      if (!draggingRef.current && !paused && !reducedMotionRef.current) {
+      if (!draggingRef.current) {
         progressRef.current = (progressRef.current + delta * AUTO_SPEED) % 1;
         layoutCards(progressRef.current);
       }
       frame = window.requestAnimationFrame(animate);
     };
+
+    const resetClock = () => {
+      previous = performance.now();
+    };
+
     frame = window.requestAnimationFrame(animate);
-    return () => window.cancelAnimationFrame(frame);
-  }, [layoutCards, paused]);
+    document.addEventListener("visibilitychange", resetClock);
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      document.removeEventListener("visibilitychange", resetClock);
+    };
+  }, [layoutCards]);
 
   function resetFrontTilt() {
     const frontCard = cardRefs.current[frontIndexRef.current];
     const inner = frontCard?.querySelector<HTMLElement>(".workflow-orbit-card-inner");
     inner?.style.setProperty("--orbit-hover-x", "0deg");
     inner?.style.setProperty("--orbit-hover-y", "0deg");
+    frontCard?.style.setProperty("--orbit-glow-opacity", "0.28");
   }
 
   function handlePointerDown(event: ReactPointerEvent<HTMLDivElement>) {
@@ -405,6 +411,10 @@ export function LandingWorkflowOrbit() {
     }
     inner.style.setProperty("--orbit-hover-x", `${(0.5 - y) * 4}deg`);
     inner.style.setProperty("--orbit-hover-y", `${(x - 0.5) * 5}deg`);
+    const angle = Math.atan2(event.clientY - (bounds.top + bounds.height / 2), event.clientX - (bounds.left + bounds.width / 2)) * (180 / Math.PI) + 90;
+    const edgeProximity = Math.max(Math.abs(x - 0.5) * 2, Math.abs(y - 0.5) * 2);
+    frontCard.style.setProperty("--orbit-glow-angle", `${angle}deg`);
+    frontCard.style.setProperty("--orbit-glow-opacity", String(0.22 + edgeProximity * 0.7));
   }
 
   function endDrag(event: ReactPointerEvent<HTMLDivElement>) {
@@ -425,7 +435,7 @@ export function LandingWorkflowOrbit() {
   }
 
   return (
-    <div className="workflow-showcase" data-paused={paused}>
+    <div className="workflow-showcase" data-landing-reveal data-landing-reveal-delay="2">
       <div className="workflow-mobile-viewport" aria-hidden="true">
         <div className="workflow-mobile-flow">
           {[...PANELS, ...PANELS].map((Panel, index) => (
@@ -436,7 +446,7 @@ export function LandingWorkflowOrbit() {
 
       <div
         ref={stageRef}
-        aria-label="Sistem ekranları. Kartların akışını değiştirmek için fareyle yukarı veya aşağı sürükleyin."
+        aria-label="Aşağı doğru akan sistem ekranları. Kartların akışını değiştirmek için fareyle yukarı veya aşağı sürükleyin."
         className="workflow-orbit-stage"
         onKeyDown={handleKeyDown}
         onPointerCancel={endDrag}
@@ -454,18 +464,6 @@ export function LandingWorkflowOrbit() {
             </div>
           ))}
         </div>
-        <div className="workflow-orbit-hint">
-          <span className="workflow-drag-glyph" aria-hidden><i /><i /><i /></span>
-          yukarı / aşağı sürükle
-        </div>
-        <button
-          aria-label={paused ? "Kart akışını oynat" : "Kart akışını duraklat"}
-          className="workflow-pause"
-          onClick={() => setPaused((value) => !value)}
-          type="button"
-        >
-          {paused ? <Play aria-hidden /> : <Pause aria-hidden />}
-        </button>
       </div>
     </div>
   );

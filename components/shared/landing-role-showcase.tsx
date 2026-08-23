@@ -6,7 +6,7 @@ import DocumentText from "@solar-icons/react/ssr/notes/DocumentText";
 import SquareAcademicCap from "@solar-icons/react/ssr/school/SquareAcademicCap";
 import Link from "next/link";
 import { ArrowRight, CheckCircle2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
 
 import { buttonVariants } from "@/components/ui/button";
 import { SELECTABLE_ROLES } from "@/lib/roles";
@@ -17,6 +17,7 @@ type PublicRole = Exclude<UserRole, "admin">;
 
 type RolePreview = {
   bars: readonly number[];
+  description: string;
   eyebrow: string;
   headline: string;
   metrics: readonly { label: string; value: string }[];
@@ -25,8 +26,9 @@ type RolePreview = {
 
 const ROLE_PREVIEWS: Record<PublicRole, RolePreview> = {
   icerik_uzmani: {
+    description: "Kaynak metni düzenler, soru taslaklarını oluşturur ve havuza onaylar.",
     eyebrow: "Soru üretim masası",
-    headline: "Kaynağa bağlı taslakları onaya hazırlayın.",
+    headline: "Kaynakla eşleşen soruları, rubrikleriyle birlikte hazırlayın.",
     metrics: [
       { label: "Yeni taslak", value: "12" },
       { label: "Onaylanan", value: "08" },
@@ -36,8 +38,9 @@ const ROLE_PREVIEWS: Record<PublicRole, RolePreview> = {
     status: "8 soru havuza hazır",
   },
   egitmen: {
+    description: "Havuzdan sınav oluşturur, öğrenci yanıtlarını inceler ve puanları kesinleştirir.",
     eyebrow: "Sınav ve değerlendirme",
-    headline: "Sınavı kurun, açık uçlu cevapları güvenle değerlendirin.",
+    headline: "Sınavı kurun, açık uçlu yanıtları son karara bağlayın.",
     metrics: [
       { label: "Aktif sınav", value: "03" },
       { label: "Onay bekleyen", value: "18" },
@@ -47,8 +50,9 @@ const ROLE_PREVIEWS: Record<PublicRole, RolePreview> = {
     status: "18 değerlendirme incelenecek",
   },
   ogrenci: {
+    description: "Sınava girer, yanıtlarını tamamlar ve kendisine ait geri bildirimleri takip eder.",
     eyebrow: "Öğrenme alanım",
-    headline: "Sıradaki sınavı, gelişimi ve geri bildirimi görün.",
+    headline: "Sıradaki sınavı, geri bildirimi ve gelişim yönünü görün.",
     metrics: [
       { label: "Gelişim", value: "%82" },
       { label: "Tamamlanan", value: "07" },
@@ -58,6 +62,7 @@ const ROLE_PREVIEWS: Record<PublicRole, RolePreview> = {
     status: "Fen Bilimleri sınavı bugün",
   },
   egitim_yoneticisi: {
+    description: "Sınıf, sınav ve kazanım verilerini karşılaştırarak eğitim sürecini izler.",
     eyebrow: "Kurum görünümü",
     headline: "Sınıfları karşılaştırın, desteğe ihtiyaç duyulan alanı bulun.",
     metrics: [
@@ -70,7 +75,7 @@ const ROLE_PREVIEWS: Record<PublicRole, RolePreview> = {
   },
 };
 
-const ROLE_SHOWCASE_ICONS = {
+const ROLE_ICONS = {
   icerik_uzmani: DocumentText,
   egitmen: ClipboardCheck,
   ogrenci: SquareAcademicCap,
@@ -81,115 +86,130 @@ const FIRST_ROLE = SELECTABLE_ROLES[0]!.role as PublicRole;
 
 export function LandingRoleShowcase() {
   const [activeRole, setActiveRole] = useState<PublicRole>(FIRST_ROLE);
-  const definition = SELECTABLE_ROLES.find((item) => item.role === activeRole) ?? SELECTABLE_ROLES[0]!;
-  const preview = ROLE_PREVIEWS[activeRole];
-  const ActiveIcon = ROLE_SHOWCASE_ICONS[activeRole];
+  const hoverTimerRef = useRef<number | null>(null);
+  const activeIndex = SELECTABLE_ROLES.findIndex((item) => item.role === activeRole);
+
+  useEffect(() => () => {
+    if (hoverTimerRef.current) window.clearTimeout(hoverTimerRef.current);
+  }, []);
+
+  function clearPendingHover() {
+    if (!hoverTimerRef.current) return;
+    window.clearTimeout(hoverTimerRef.current);
+    hoverTimerRef.current = null;
+  }
+
+  function scheduleRole(role: PublicRole) {
+    clearPendingHover();
+    hoverTimerRef.current = window.setTimeout(() => {
+      setActiveRole(role);
+      hoverTimerRef.current = null;
+    }, 90);
+  }
+
+  function activateRole(role: PublicRole) {
+    clearPendingHover();
+    setActiveRole(role);
+  }
+
+  function handleKeyDown(index: number, event: KeyboardEvent<HTMLButtonElement>) {
+    if (!["ArrowRight", "ArrowDown", "ArrowLeft", "ArrowUp", "Home", "End"].includes(event.key)) return;
+    event.preventDefault();
+
+    let nextIndex = index;
+    if (event.key === "ArrowRight" || event.key === "ArrowDown") nextIndex = (index + 1) % SELECTABLE_ROLES.length;
+    if (event.key === "ArrowLeft" || event.key === "ArrowUp") nextIndex = (index - 1 + SELECTABLE_ROLES.length) % SELECTABLE_ROLES.length;
+    if (event.key === "Home") nextIndex = 0;
+    if (event.key === "End") nextIndex = SELECTABLE_ROLES.length - 1;
+
+    const nextRole = SELECTABLE_ROLES[nextIndex]!.role as PublicRole;
+    activateRole(nextRole);
+    document.getElementById(`role-accordion-trigger-${nextRole}`)?.focus();
+  }
 
   return (
-    <div className="mt-12 grid gap-5 lg:grid-cols-[0.72fr_1.28fr] lg:gap-6">
-      <div
-        aria-label="Rol seçimi"
-        className="flex gap-2 overflow-x-auto pb-2 lg:flex-col lg:overflow-visible lg:pb-0"
-        role="tablist"
-      >
-        {SELECTABLE_ROLES.map((item) => {
-          const role = item.role as PublicRole;
-          const Icon = ROLE_SHOWCASE_ICONS[role];
-          const active = role === activeRole;
+    <div className="role-accordion" role="list" aria-label="Sistemdeki çalışma alanları">
+      {SELECTABLE_ROLES.map((definition, index) => {
+        const role = definition.role as PublicRole;
+        const preview = ROLE_PREVIEWS[role];
+        const Icon = ROLE_ICONS[role];
+        const active = role === activeRole;
 
-          return (
+        return (
+          <article
+            key={role}
+            className="role-accordion-panel"
+            data-active={active}
+            onMouseEnter={() => scheduleRole(role)}
+            onMouseLeave={clearPendingHover}
+            role="listitem"
+            style={{ "--role-accent": `hsl(var(--book-${definition.book}))` } as CSSProperties}
+          >
             <button
-              key={role}
-              aria-controls="role-preview-panel"
-              aria-selected={active}
-              className={cn(
-                "group flex min-w-[13.5rem] items-center gap-4 border-b border-x-0 border-t-0 px-2 py-4 text-left transition-[color,border-color] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring lg:min-w-0",
-                active
-                  ? "border-primary text-foreground"
-                  : "border-foreground/15 text-muted-foreground hover:border-foreground/35 hover:text-foreground",
-              )}
-              id={`role-tab-${role}`}
-              onClick={() => setActiveRole(role)}
-              role="tab"
+              id={`role-accordion-trigger-${role}`}
+              aria-controls={`role-accordion-content-${role}`}
+              aria-expanded={active}
+              className="role-accordion-trigger"
+              onClick={() => activateRole(role)}
+              onFocus={() => activateRole(role)}
+              onKeyDown={(event) => handleKeyDown(index, event)}
               type="button"
             >
-              <span
-                className="flex h-10 w-10 shrink-0 items-center justify-center"
-                style={{ color: `hsl(var(--book-${item.book}))` }}
-              >
-                <Icon className="h-7 w-7" weight="LineDuotone" />
-              </span>
-              <span className="min-w-0">
-                <span className="block font-semibold">{item.label}</span>
-                <span className="mt-1 block text-xs text-muted-foreground">
-                  Paneli keşfet
-                </span>
-              </span>
-              <ArrowRight className={cn("ml-auto h-4 w-4 transition-transform", active && "translate-x-0.5")} />
+              <span className="role-accordion-icon"><Icon aria-hidden weight="LineDuotone" /></span>
+              <span className="role-accordion-vertical-label">{definition.label}</span>
+              <span className="role-accordion-index">0{index + 1}</span>
             </button>
-          );
-        })}
-      </div>
 
-      <div
-        key={activeRole}
-        aria-labelledby={`role-tab-${activeRole}`}
-        className="role-preview-enter relative min-h-[32rem] overflow-hidden rounded-xl border border-foreground/15 bg-card p-5 shadow-[0_18px_46px_-34px_hsl(var(--foreground)/0.4)] sm:p-7 lg:p-8"
-        id="role-preview-panel"
-        role="tabpanel"
-      >
-        <div className="relative flex items-start justify-between gap-5">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">{preview.eyebrow}</p>
-            <h3 className="mt-3 max-w-2xl font-display text-3xl leading-tight sm:text-4xl">{preview.headline}</h3>
-          </div>
-          <span className="hidden h-12 w-12 shrink-0 items-center justify-center text-primary sm:flex">
-            <ActiveIcon className="h-9 w-9" weight="LineDuotone" />
-          </span>
-        </div>
+            <div
+              id={`role-accordion-content-${role}`}
+              aria-hidden={!active}
+              className="role-accordion-content"
+            >
+              <div className="role-accordion-copy">
+                <p>{preview.eyebrow}</p>
+                <h3>{preview.headline}</h3>
+                <span>{preview.description}</span>
+              </div>
 
-        <div className="relative mt-7 grid grid-cols-3 gap-px border bg-border">
-          {preview.metrics.map((metric) => (
-            <div key={metric.label} className="bg-background p-3 sm:p-4">
-              <p className="truncate text-[10px] text-muted-foreground sm:text-xs">{metric.label}</p>
-              <p className="mt-2 text-xl font-semibold tabular sm:text-2xl">{metric.value}</p>
+              <div className="role-accordion-dashboard">
+                <div className="role-accordion-metrics">
+                  {preview.metrics.map((metric) => (
+                    <div key={metric.label}>
+                      <small>{metric.label}</small>
+                      <strong>{metric.value}</strong>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="role-accordion-chart">
+                  <div>
+                    <strong>Son 7 ölçüm</strong>
+                    <small>Kazanım başarı eğilimi</small>
+                  </div>
+                  <div className="role-chart-bars" aria-label="Son yedi ölçüm grafiği">
+                    {preview.bars.map((height, barIndex) => (
+                      <span key={barIndex} style={{ height: `${height}%` }} />
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="role-accordion-footer">
+                <span><CheckCircle2 aria-hidden />{preview.status}</span>
+                <Link
+                  className={cn(buttonVariants({ size: "lg" }), "specular-cta rounded-xl px-5")}
+                  href={`/auth/signout-and-login?mode=kayit&role=${role}`}
+                  tabIndex={active ? 0 : -1}
+                >
+                  Bu rolle başlayın
+                  <ArrowRight />
+                </Link>
+              </div>
             </div>
-          ))}
-        </div>
-
-        <div className="relative mt-4 border bg-background p-4 sm:p-5">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="text-sm font-semibold">Son 7 ölçüm</p>
-              <p className="mt-1 text-xs text-muted-foreground">Kazanım başarı eğilimi</p>
-            </div>
-            <span className="rounded-full bg-secondary px-3 py-1.5 text-xs font-semibold text-secondary-foreground">Canlı görünüm</span>
-          </div>
-          <div className="mt-6 flex h-28 items-end gap-2 sm:gap-3" aria-label="Son yedi ölçüm grafiği">
-            {preview.bars.map((height, index) => (
-              <span
-                key={index}
-                className="min-h-2 flex-1 rounded-t-lg bg-primary/20 transition-[height,background-color] duration-500 hover:bg-primary"
-                style={{ height: `${height}%` }}
-              />
-            ))}
-          </div>
-        </div>
-
-        <div className="relative mt-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <span className="flex items-center gap-2 text-sm text-muted-foreground">
-            <CheckCircle2 className="h-4 w-4 text-primary" />
-            {preview.status}
-          </span>
-          <Link
-            className={cn(buttonVariants({ size: "lg" }), "rounded-xl px-6")}
-            href={`/auth/signout-and-login?mode=kayit&role=${definition.role}`}
-          >
-            Bu rolle başlayın
-            <ArrowRight />
-          </Link>
-        </div>
-      </div>
+          </article>
+        );
+      })}
+      <span className="sr-only" aria-live="polite">{SELECTABLE_ROLES[activeIndex]?.label} çalışma alanı gösteriliyor.</span>
     </div>
   );
 }
