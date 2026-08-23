@@ -40,7 +40,7 @@ const FLOW_STEPS: readonly {
     description: "AI taslak üretir; içerik uzmanı ve eğitmen son hâlini verir.",
     width: "lg:w-[72%]",
     icon: BrainCircuit,
-    tone: "bg-[#d7e7df] text-[#123d34] dark:bg-primary/25 dark:text-foreground",
+    tone: "bg-[#dce8e2] text-[#193f35] dark:bg-primary/25 dark:text-foreground",
   },
   {
     number: "03",
@@ -48,7 +48,7 @@ const FLOW_STEPS: readonly {
     description: "Öğrenci kendi panelinden sınava girer, cevaplar otomatik kaydolur.",
     width: "lg:w-[86%]",
     icon: GraduationCap,
-    tone: "bg-[#f2d8c4] text-[#512f20] dark:bg-warning/25 dark:text-foreground",
+    tone: "bg-[#edd7cf] text-[#5b3024] dark:bg-warning/25 dark:text-foreground",
   },
   {
     number: "04",
@@ -61,10 +61,10 @@ const FLOW_STEPS: readonly {
 ];
 
 const ROLE_VISUAL_STYLES = [
-  "bg-[#dfeae4] text-[#173a36]",
-  "bg-[#176f5e] text-[#fffaf0]",
-  "bg-[#f3dfbd] text-[#34271e]",
-  "bg-[#a9c4c4] text-[#173a36]",
+  "bg-[#dce8e2] text-[#193f35]",
+  "bg-[#177765] text-[#fffdf8]",
+  "bg-[#f3e4bb] text-[#34271e]",
+  "bg-[#aec9c2] text-[#193f35]",
 ] as const;
 
 export default function HomePage() {
@@ -105,19 +105,14 @@ export default function HomePage() {
 
           <div className="relative mx-auto w-full pt-14 sm:pt-20 lg:pt-24">
             <div className="relative z-10 mx-auto flex max-w-[92rem] animate-kitap-yukselir flex-col items-center px-5 text-center sm:px-8">
-              <h1 className="font-display text-[clamp(4.4rem,10vw,11.5rem)] leading-[0.76] tracking-[-0.06em]">
+              <h1 className="font-sans text-[clamp(4rem,9vw,10.5rem)] font-normal leading-[0.86] tracking-[-0.065em]">
                 Öğrenmeyi
                 <span className="relative mx-auto mt-[0.08em] block w-fit text-primary">
                   görünür kıl.
                 </span>
               </h1>
 
-              <p className="mt-9 max-w-2xl text-base leading-relaxed text-muted-foreground sm:text-lg">
-                İçerikten değerlendirmeye kadar öğretmenin kontrolünde çalışan,
-                öğrenmeyi izlenebilir kılan ölçme deneyimi.
-              </p>
-
-              <div className="mt-7 flex flex-wrap justify-center gap-3">
+              <div className="mt-10 flex flex-wrap justify-center gap-3">
                 <Link
                   href="/auth/signout-and-login?mode=kayit"
                   className={cn(
@@ -139,15 +134,9 @@ export default function HomePage() {
                 </a>
               </div>
 
-              <div className="mt-8 flex items-start gap-3 text-left text-[10px] leading-4 text-muted-foreground">
-                <span className="mt-1 font-display text-2xl leading-none text-[#c7795c]">*</span>
-                <p className="max-w-sm">
-                  Sistem ilişkiyi kurar, öneriyi hazırlar. Son karar her zaman eğitmendedir.
-                </p>
-              </div>
             </div>
 
-            <div className="mt-14 w-full sm:mt-20">
+            <div className="mt-12 w-full sm:mt-16">
               <LandingBentoCanvas />
             </div>
           </div>
@@ -210,7 +199,7 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section id="roller" className="border-y bg-[#f3f1eb] px-5 py-24 dark:bg-card sm:px-8 sm:py-28">
+        <section id="roller" className="border-y bg-[#efede6] px-5 py-24 dark:bg-card sm:px-8 sm:py-28">
           <div className="mx-auto max-w-7xl">
             <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
               <div>
@@ -245,7 +234,7 @@ export default function HomePage() {
                         {definition.description}
                       </span>
 
-                      <span className="mt-8 flex w-fit items-center gap-3 rounded-full bg-[#111318] px-7 py-3.5 text-sm font-semibold text-white shadow-[0_9px_24px_rgb(17_19_24/0.2)] transition-all group-hover:gap-5 group-hover:bg-primary sm:text-base">
+                      <span className="mt-8 flex w-fit items-center gap-3 rounded-full bg-[#102a30] px-7 py-3.5 text-sm font-semibold text-white shadow-[0_9px_24px_rgb(16_42_48/0.2)] transition-all group-hover:gap-5 group-hover:bg-primary sm:text-base">
                         Bu rolle başlayın
                         <ArrowRight className="h-4 w-4" />
                       </span>
@@ -257,7 +246,7 @@ export default function HomePage() {
                         ROLE_VISUAL_STYLES[index],
                       )}
                     >
-                      <span className="absolute left-6 top-6 rounded-full bg-white/75 px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#173a36]">
+                      <span className="absolute left-6 top-6 rounded-full bg-white/75 px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#193f35]">
                         {definition.label}
                       </span>
                       <span className="relative flex h-40 w-40 rotate-[-3deg] items-center justify-center rounded-[2.25rem] bg-white/25 shadow-[0_24px_55px_rgb(16_39_47/0.12)] backdrop-blur-sm transition-transform duration-500 group-hover:rotate-[2deg] group-hover:scale-105 sm:h-52 sm:w-52">

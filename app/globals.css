@@ -24,43 +24,43 @@
 @layer base {
   :root {
     /* --- Yüzeyler: kâğıt --- */
-    --background: 42 36% 96%;
-    --foreground: 202 44% 13%;
-    --card: 40 50% 99%;
-    --card-foreground: 202 44% 13%;
-    --popover: 40 50% 99%;
-    --popover-foreground: 202 44% 13%;
+    --background: 45 33% 95%;
+    --foreground: 191 50% 13%;
+    --card: 43 100% 99%;
+    --card-foreground: 191 50% 13%;
+    --popover: 43 100% 99%;
+    --popover-foreground: 191 50% 13%;
 
     /* --- Marka: zümrüt mürekkep --- */
-    --primary: 168 62% 26%;
-    --primary-foreground: 45 60% 98%;
+    --primary: 169 68% 28%;
+    --primary-foreground: 43 100% 99%;
 
     /* --- Vurgu: kehribar --- */
-    --accent: 36 84% 92%;
-    --accent-foreground: 26 68% 24%;
-    --highlight: 34 90% 48%;
-    --highlight-foreground: 30 60% 12%;
+    --accent: 43 67% 88%;
+    --accent-foreground: 16 43% 24%;
+    --highlight: 16 51% 57%;
+    --highlight-foreground: 43 100% 99%;
 
-    --secondary: 42 26% 91%;
-    --secondary-foreground: 202 44% 16%;
-    --muted: 42 26% 92%;
-    --muted-foreground: 202 18% 38%;
+    --secondary: 150 21% 89%;
+    --secondary-foreground: 164 43% 17%;
+    --muted: 44 16% 92%;
+    --muted-foreground: 190 11% 40%;
 
     /* --- Durum --- */
     --destructive: 358 62% 44%;
     --destructive-foreground: 45 60% 98%;
-    --success: 158 66% 26%;
-    --success-foreground: 45 60% 98%;
-    --warning: 28 78% 38%;
-    --warning-foreground: 45 60% 98%;
+    --success: 169 68% 28%;
+    --success-foreground: 43 100% 99%;
+    --warning: 16 51% 48%;
+    --warning-foreground: 43 100% 99%;
 
     /* --- Çizgiler --- */
-    --border: 40 22% 85%;
-    --input: 40 20% 80%;
-    --ring: 168 62% 32%;
+    --border: 44 16% 82%;
+    --input: 44 14% 76%;
+    --ring: 169 68% 28%;
 
     /* Kitap sırtı motifinin rengi; temaya göre değişir. */
-    --spine: 202 44% 13%;
+    --spine: 191 50% 13%;
 
     /*
      * Kitap sırtı renkleri.
@@ -446,7 +446,7 @@
     overflow: hidden;
     border: 1px solid hsl(var(--border));
     border-radius: 2rem 0.6rem 2rem 0.6rem;
-    background: #e9e7df;
+    background: #eeece5;
     box-shadow: 0 22px 70px hsl(var(--foreground) / 0.08);
   }
 
@@ -464,7 +464,7 @@
     width: 112%;
     height: 34rem;
     margin-left: -6%;
-    animation: bento-board-pan 8s ease-in-out infinite alternate;
+    animation: bento-board-pan 5s ease-in-out infinite alternate;
   }
 
   .academic-bento-viewport:hover .academic-bento-grid {
@@ -586,7 +586,7 @@
       height: 31rem;
       margin-left: 0;
       gap: 0.55rem;
-      animation-duration: 11s;
+      animation-duration: 7s;
     }
   }
 
