@@ -2,16 +2,23 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Brain, Loader2, ThumbsDown, ThumbsUp, Trash2 } from "lucide-react";
+import {
+  Brain,
+  Check,
+  Loader2,
+  Pencil,
+  ThumbsDown,
+  ThumbsUp,
+  Trash2,
+} from "lucide-react";
 import { toast } from "sonner";
 
-import {
-  deletePreference,
-  updatePreferenceVerdict,
-} from "@/app/actions/questions";
+import { deletePreference, updatePreference } from "@/app/actions/questions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { PreferenceVerdict, QuestionPreference } from "@/lib/types";
 import { cn, formatDateTime } from "@/lib/utils";
@@ -70,29 +77,40 @@ export function StyleMemoryPanel({
     [rows, tab],
   );
 
-  /** Begeni <-> red. Kayit silinmez; yalnizca karar degisir. */
-  async function flip(row: QuestionPreference) {
-    const next: PreferenceVerdict =
-      row.verdict === "begendi" ? "begenmedi" : "begendi";
-
+  /** Duzenleme panelinden gelen degisikligi kaydeder: karar + gerekce. */
+  async function save(
+    row: QuestionPreference,
+    patch: { verdict: PreferenceVerdict; note: string },
+  ) {
     setPendingId(row.id);
     const previous = rows;
     setRows((current) =>
-      current.map((item) => (item.id === row.id ? { ...item, verdict: next } : item)),
+      current.map((item) =>
+        item.id === row.id
+          ? { ...item, verdict: patch.verdict, note: patch.note.trim() || null }
+          : item,
+      ),
     );
 
     try {
-      const result = await updatePreferenceVerdict(row.id, next);
+      const result = await updatePreference(row.id, {
+        verdict: patch.verdict,
+        note: patch.note,
+      });
       if (!result.ok) throw new Error(result.error);
 
-      toast.success(
-        next === "begendi" ? "Beğeniye çevrildi" : "Redde çevrildi",
-        { description: "AI bir sonraki üretimde yeni kararı görecek." },
-      );
+      toast.success("Örnek güncellendi", {
+        description:
+          patch.verdict === row.verdict
+            ? "Gerekçe kaydedildi."
+            : patch.verdict === "begendi"
+              ? "Beğeniye çevrildi; AI yeni kararı görecek."
+              : "Redde çevrildi; AI yeni kararı görecek.",
+      });
       router.refresh();
     } catch (caught) {
       setRows(previous);
-      toast.error("Karar değiştirilemedi", {
+      toast.error("Kaydedilemedi", {
         description:
           caught instanceof Error ? caught.message : "Lütfen tekrar deneyin.",
       });
@@ -153,7 +171,7 @@ export function StyleMemoryPanel({
         {rows.length === 0 ? null : (
           <>
             <Tabs value={tab} onValueChange={(value) => setTab(value as VerdictTab)}>
-              <TabsList className="w-full justify-start overflow-x-auto">
+              <TabsList className="w-full justify-start">
                 {TABS.map((item) => (
                   <TabsTrigger key={item.value} value={item.value} className="gap-1.5">
                     {item.label}
@@ -175,13 +193,13 @@ export function StyleMemoryPanel({
                 Bu kümede örnek yok.
               </p>
             ) : (
-              <ul className="max-h-[420px] space-y-2 overflow-y-auto pr-1">
+              <ul className="grid max-h-[560px] gap-2.5 overflow-y-auto pr-1 lg:grid-cols-2">
                 {visible.map((row) => (
                   <PreferenceRow
                     key={row.id}
                     row={row}
                     pending={pendingId === row.id}
-                    onFlip={() => void flip(row)}
+                    onSave={(patch) => save(row, patch)}
                     onRemove={() => void remove(row)}
                   />
                 ))}
@@ -196,27 +214,53 @@ export function StyleMemoryPanel({
 
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Tek ornek satiri.
+ *
+ * Karar degistirme dogrudan bir dugme DEGIL, "Duzenle"nin altinda. Once
+ * satirda "Redde cevir" duruyordu ve tek tikla karari ters ceviriyordu:
+ * geri alinmasi kolay ama YANLISLIKLA basilmasi da kolaydi, ustelik
+ * gerekceyi duzeltmenin hicbir yolu yoktu. Gerekce onemli, cunku o metin
+ * modele "bu taslak neden kotu" diye gidiyor.
+ */
 function PreferenceRow({
   row,
   pending,
-  onFlip,
+  onSave,
   onRemove,
 }: {
   row: QuestionPreference;
   pending: boolean;
-  onFlip: () => void;
+  onSave: (patch: { verdict: PreferenceVerdict; note: string }) => Promise<void>;
   onRemove: () => void;
 }) {
   const liked = row.verdict === "begendi";
+  const [editing, setEditing] = React.useState(false);
+  const [draftVerdict, setDraftVerdict] = React.useState<PreferenceVerdict>(
+    row.verdict,
+  );
+  const [draftNote, setDraftNote] = React.useState(row.note ?? "");
+
+  /** Duzenlemeyi acarken taslak her zaman KAYITLI degerden baslar. */
+  function openEditor() {
+    setDraftVerdict(row.verdict);
+    setDraftNote(row.note ?? "");
+    setEditing(true);
+  }
+
+  async function save() {
+    await onSave({ verdict: draftVerdict, note: draftNote });
+    setEditing(false);
+  }
 
   return (
     <li
       className={cn(
-        "rounded-lg border p-2.5 transition-colors",
+        "rounded-lg border p-3.5 transition-colors",
         liked ? "border-success/35 bg-success/[0.04]" : "border-destructive/30",
       )}
     >
-      <div className="flex items-start gap-2">
+      <div className="flex items-start gap-2.5">
         <span
           className={cn(
             "mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md",
@@ -233,10 +277,11 @@ function PreferenceRow({
           )}
         </span>
 
-        <div className="min-w-0 flex-1 space-y-1.5">
-          {/* Uzun taslaklari uc satirda kesiyoruz: bu bir okuma ekrani degil,
-              "hangi karari vermistim" hatirlatmasi. */}
-          <p className="line-clamp-3 text-xs leading-relaxed">{row.question_text}</p>
+        <div className="min-w-0 flex-1 space-y-2">
+          {/* Metin kesilmiyor: karari degistirmek icin soruyu TAM okumak
+              gerekiyor - kirpik metin "bunu neden begenmistim" sorusunu
+              yanitlamiyordu. */}
+          <p className="text-xs leading-relaxed">{row.question_text}</p>
 
           <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
             <Badge variant="outline" className="font-normal">
@@ -252,44 +297,122 @@ function PreferenceRow({
             <span>{formatDateTime(row.created_at)}</span>
           </div>
 
-          {/* Uzmanin yazdigi gerekce de modele gidiyor; burada gorunsun. */}
-          {row.note ? (
+          {/* Gerekce de modele gidiyor; duzenleme kapaliyken de gorunsun. */}
+          {!editing && row.note ? (
             <p className="rounded bg-muted/60 px-2 py-1 text-[11px] italic text-muted-foreground">
               &ldquo;{row.note}&rdquo;
             </p>
           ) : null}
 
-          <div className="flex flex-wrap gap-1.5 pt-0.5">
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="h-7 gap-1.5 text-xs"
-              disabled={pending}
-              onClick={onFlip}
-            >
-              {pending ? (
-                <Loader2 className="h-3 w-3 animate-spin" />
-              ) : liked ? (
-                <ThumbsDown className="h-3 w-3" />
-              ) : (
-                <ThumbsUp className="h-3 w-3" />
-              )}
-              {liked ? "Redde çevir" : "Beğeniye çevir"}
-            </Button>
+          {editing ? (
+            <div className="space-y-2.5 rounded-lg border bg-muted/40 p-3">
+              <div className="space-y-1.5">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                  Karar
+                </p>
+                <div className="flex gap-1.5">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={draftVerdict === "begendi" ? "default" : "outline"}
+                    className="h-7 gap-1.5 text-xs"
+                    disabled={pending}
+                    onClick={() => setDraftVerdict("begendi")}
+                  >
+                    <ThumbsUp className="h-3 w-3" />
+                    Beğendim
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={
+                      draftVerdict === "begenmedi" ? "destructive" : "outline"
+                    }
+                    className="h-7 gap-1.5 text-xs"
+                    disabled={pending}
+                    onClick={() => setDraftVerdict("begenmedi")}
+                  >
+                    <ThumbsDown className="h-3 w-3" />
+                    Beğenmedim
+                  </Button>
+                </div>
+              </div>
 
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              className="h-7 gap-1.5 text-xs text-muted-foreground hover:text-destructive"
-              disabled={pending}
-              onClick={onRemove}
-            >
-              <Trash2 className="h-3 w-3" />
-              Sil
-            </Button>
-          </div>
+              <div className="space-y-1.5">
+                <Label
+                  htmlFor={`not-${row.id}`}
+                  className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground"
+                >
+                  Gerekçe
+                </Label>
+                <Input
+                  id={`not-${row.id}`}
+                  value={draftNote}
+                  disabled={pending}
+                  onChange={(event) => setDraftNote(event.target.value)}
+                  placeholder="Nesi eksik? (örnek: çeldiriciler zayıf, çok kolay)"
+                  className="h-8 text-xs"
+                />
+                <p className="text-[11px] leading-relaxed text-muted-foreground">
+                  Bu metin modele gidiyor; ne kadar somut olursa o kadar işe
+                  yarar. Boş bırakırsanız gerekçe silinir.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap gap-1.5">
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-7 gap-1.5 text-xs"
+                  disabled={pending}
+                  onClick={() => void save()}
+                >
+                  {pending ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <Check className="h-3 w-3" />
+                  )}
+                  Kaydet
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 text-xs text-muted-foreground"
+                  disabled={pending}
+                  onClick={() => setEditing(false)}
+                >
+                  Vazgeç
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-1.5 pt-0.5">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-7 gap-1.5 text-xs"
+                disabled={pending}
+                onClick={openEditor}
+              >
+                <Pencil className="h-3 w-3" />
+                Düzenle
+              </Button>
+
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="h-7 gap-1.5 text-xs text-muted-foreground hover:text-destructive"
+                disabled={pending}
+                onClick={onRemove}
+              >
+                <Trash2 className="h-3 w-3" />
+                Sil
+              </Button>
+            </div>
+          )}
         </div>
       </div>
     </li>

@@ -188,3 +188,70 @@ export function findSimilarOutcome<T extends OutcomeLike>(
 
   return enIyi?.outcome ?? null;
 }
+
+/* -------------------------------------------------------------------------- */
+/*  Canli arama                                                               */
+/* -------------------------------------------------------------------------- */
+
+export interface OutcomeSearchable extends OutcomeLike {
+  topic?: string;
+  subject?: string | null;
+}
+
+/** Aramada bir kaydin listeye girmesi icin gereken en dusuk benzerlik. */
+const ARAMA_ESIGI = 0.3;
+
+/**
+ * Yazilan metne uyan kazanimlari SIRALI dondurur.
+ *
+ * `findSimilarOutcome` tek bir "bu zaten var" adayi verir ve esigi yuksektir
+ * (BENZERLIK_ESIGI); amaci tekrari engellemek. Bu fonksiyonun isi baska:
+ * kullanici yazarken ALTINDA liste acmak, yani ad ararken cikan oneriler
+ * gibi davranmak. O yuzden esik dusuk ve sonuc coklu.
+ *
+ * Iki sinyal birlestiriliyor:
+ *   1. ALT DIZI eslesmesi - "fotos" yazinca "Fotosentez" gelmeli. Kelime
+ *      cekirdegi benzerligi bunu yakalayamaz; yarim yazilmis bir kelime
+ *      hicbir koke tam oturmaz.
+ *   2. CEKIRDEK benzerligi - "bitkilerin besin uretimi" yazan biri
+ *      "Fotosentezin evreleri"ni gormeli. Alt dizi bunu yakalayamaz.
+ *
+ * Alt dizi eslesmesi daha guclu bir niyet gostergesi oldugu icin daha
+ * yuksek puan alir; konu ve ders eslesmesi ondan biraz daha zayif.
+ */
+export function searchOutcomes<T extends OutcomeSearchable>(
+  query: string,
+  list: readonly T[],
+  limit = 6,
+): T[] {
+  const aranan = asciiye(query).trim();
+  if (aranan.length < 2) return [];
+
+  const puanli: { outcome: T; score: number }[] = [];
+
+  for (const outcome of list) {
+    const metin = asciiye(outcome.outcome_text);
+    const konu = asciiye(outcome.topic ?? "");
+    const ders = asciiye(outcome.subject ?? "");
+
+    let score = 0;
+
+    if (metin.includes(aranan)) {
+      // Bastan eslesme daha anlamli: "foto" -> "Fotosentez..." aranan seydir,
+      // cumlenin ortasinda gecen "foto" daha zayif bir sinyal.
+      score = metin.startsWith(aranan) ? 1 : 0.85;
+    } else if (konu.includes(aranan) || ders.includes(aranan)) {
+      score = 0.7;
+    }
+
+    const benzerlik = outcomeSimilarity(query, outcome.outcome_text);
+    if (benzerlik > score) score = benzerlik;
+
+    if (score >= ARAMA_ESIGI) puanli.push({ outcome, score });
+  }
+
+  return puanli
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+    .map((item) => item.outcome);
+}

@@ -9,6 +9,7 @@ import { subjectKey } from "@/lib/subjects";
 import { createServerSupabaseClient, getCurrentUser } from "@/lib/supabase-server";
 import type {
   GeneratedQuestion,
+  LearningOutcome,
   PreferenceVerdict,
   QuestionStatus,
 } from "@/lib/types";
@@ -81,24 +82,36 @@ export async function deletePreference(id: string): Promise<ActionResult> {
 }
 
 /**
- * Verilmis bir karari degistirir: begeni <-> red.
+ * Bir tercih kaydini duzenler: karar ve/veya gerekce.
  *
- * Kayit SILINIP yeniden yazilmaz cunku `note` ve `outcome_id` gibi alanlar
- * kaybolurdu; yalnizca `verdict` guncellenir. Uzman bir taslagi begenip
- * sonradan fikrini degistirdiginde model de o an itibariyle yeni karari
- * gorur - eski karar ornek kumesinde asili kalmaz.
+ * Kayit SILINIP yeniden yazilmaz cunku `outcome_id`, `question_text` ve
+ * uretim zamani gibi alanlar kaybolurdu; yalnizca verilen alanlar guncellenir.
+ *
+ * Gerekce de duzenlenebilir olmali: o metin modele "bu taslak neden kotu"
+ * diye gidiyor. Aceleyle yazilmis bir not ("kotu") modele hicbir sey
+ * ogretmiyordu ve tek care kaydi silmekti.
  */
-export async function updatePreferenceVerdict(
+export async function updatePreference(
   id: string,
-  verdict: PreferenceVerdict,
+  patch: { verdict?: PreferenceVerdict; note?: string | null },
 ): Promise<ActionResult> {
   if (!isSupabaseConfigured) return demoGuard();
   if (!id) return { ok: false, error: "Kayıt seçilmedi." };
 
+  const alanlar: { verdict?: PreferenceVerdict; note?: string | null } = {};
+  if (patch.verdict) alanlar.verdict = patch.verdict;
+  // `note` bilerek `undefined` ile ayirt ediliyor: bos metin "notu sil"
+  // demektir ve gecerli bir istektir.
+  if (patch.note !== undefined) alanlar.note = patch.note?.trim() || null;
+
+  if (Object.keys(alanlar).length === 0) {
+    return { ok: false, error: "Değişiklik yok." };
+  }
+
   const supabase = await createServerSupabaseClient();
   const { error } = await supabase
     .from("question_preferences")
-    .update({ verdict })
+    .update(alanlar)
     .eq("id", id);
 
   if (error) return { ok: false, error: error.message };
@@ -254,7 +267,7 @@ export interface DuplicateOutcome {
  * `ActionResult` hata dalinda ek alan tasiyamadigi icin ayri tanimlandi.
  */
 export type CreateOutcomeResult =
-  | { ok: true; data: { id: string } }
+  | { ok: true; data: { id: string; outcome: LearningOutcome } }
   | { ok: false; error: string; duplicate?: DuplicateOutcome };
 
 /**
@@ -331,11 +344,11 @@ export async function createOutcome(
       source_text: input.sourceText?.trim() ?? "",
       created_by: current.user.id,
     })
-    .select("id")
+    .select("*")
     .single();
 
   if (error) return { ok: false, error: error.message };
 
   revalidatePath("/dashboard/icerik-uzmani");
-  return { ok: true, data: { id: data.id } };
+  return { ok: true, data: { id: data.id, outcome: data } };
 }

@@ -5,6 +5,7 @@ import {
   findSimilarOutcome,
   outcomeCore,
   outcomeSimilarity,
+  searchOutcomes,
 } from "../lib/outcome-core.ts";
 
 /**
@@ -94,4 +95,67 @@ test("cekirdegi tumuyle dolgu olan metinler ham karsilastirilir", () => {
   // ayni gosterirdi.
   assert.equal(outcomeSimilarity("her şey", "bilgisi"), 0);
   assert.equal(outcomeSimilarity("her şey", "Her şey"), 1);
+});
+
+/* -------------------------------------------------------------------------- */
+/*  Canli arama                                                               */
+/* -------------------------------------------------------------------------- */
+
+const KAZANIMLAR = [
+  {
+    id: "1",
+    outcome_text: "Öğrenci fotosentezin evrelerini açıklar.",
+    topic: "Fotosentez",
+    subject: "Biyoloji",
+  },
+  {
+    id: "2",
+    outcome_text: "Öğrenci birim çember üzerinde trigonometrik oranları hesaplar.",
+    topic: "Trigonometri",
+    subject: "Matematik",
+  },
+  {
+    id: "3",
+    outcome_text: "Öğrenci LDR sensörünün çalışma ilkesini açıklar.",
+    topic: "LDR ve Işık Sensörleri",
+    subject: "Robotik ve Kodlama",
+  },
+];
+
+test("yarim yazilmis kelime eslesir - ad ararken cikan oneriler gibi", () => {
+  // Cekirdek benzerligi bunu yakalayamaz: "fotos" hicbir koke tam oturmaz.
+  const sonuc = searchOutcomes("fotos", KAZANIMLAR);
+  assert.equal(sonuc.length, 1);
+  assert.equal(sonuc[0]?.id, "1");
+});
+
+test("konu ve ders adindan da bulunur", () => {
+  assert.equal(searchOutcomes("trigono", KAZANIMLAR)[0]?.id, "2");
+  assert.equal(searchOutcomes("robotik", KAZANIMLAR)[0]?.id, "3");
+});
+
+test("ayni seyi baska kelimelerle yazan da bulur", () => {
+  // Alt dizi eslesmesi yok; cekirdek benzerligi devreye giriyor.
+  const sonuc = searchOutcomes("fotosentezin evreleri", KAZANIMLAR);
+  assert.equal(sonuc[0]?.id, "1");
+});
+
+test("iki karakterden kisa arama sonuc dondurmez", () => {
+  // Her tusa basista tum listeyi acmak oneri degil gurultu olurdu.
+  assert.deepEqual(searchOutcomes("f", KAZANIMLAR), []);
+  assert.deepEqual(searchOutcomes("", KAZANIMLAR), []);
+});
+
+test("alakasiz arama bos doner", () => {
+  assert.deepEqual(searchOutcomes("osmanli padisahlari", KAZANIMLAR), []);
+});
+
+test("sonuc sayisi sinirlanir", () => {
+  const cok = Array.from({ length: 20 }, (_, i) => ({
+    id: String(i),
+    outcome_text: "Öğrenci fotosentezin evrelerini açıklar.",
+    topic: "Fotosentez",
+  }));
+  assert.equal(searchOutcomes("fotosentez", cok).length, 6);
+  assert.equal(searchOutcomes("fotosentez", cok, 3).length, 3);
 });

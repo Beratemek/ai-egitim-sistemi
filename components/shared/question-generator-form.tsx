@@ -1,10 +1,10 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import {
   Loader2,
   Sparkles,
-  Target,
   TriangleAlert,
   UploadCloud,
   Wand2,
@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { saveGeneratedQuestions } from "@/app/actions/questions";
 import { subjectKey } from "@/lib/subjects";
 import { GeneratedQuestionCard } from "@/components/shared/generated-question-card";
+import { OutcomeSearchField } from "@/components/shared/outcome-search-field";
 import { SourceTextField } from "@/components/shared/source-text-field";
 import { StyleMemoryPanel } from "@/components/shared/style-memory-panel";
 import { Badge } from "@/components/ui/badge";
@@ -54,7 +55,6 @@ type TypeChoice = QuestionType | "karisik";
  * Select bileseni bos dizeyi deger olarak kabul etmedigi icin ayri bir
  * anahtar kullaniliyor.
  */
-const SERBEST_KAZANIM = "__serbest__";
 
 /** "Daha fazla goster" ile her tiklamada kac taslak daha acilir (2 satir). */
 const BATCH_SIZE = 4;
@@ -122,6 +122,7 @@ export function QuestionGeneratorForm({
   canPersist,
   initialOutcomeId,
 }: QuestionGeneratorFormProps) {
+  const router = useRouter();
   /**
    * Adres satirindan gelen kazanim. Gecersiz kimlik sessizce yok sayilir -
    * eski bir baglanti ya da silinmis bir kazanim formu kilitlememeli.
@@ -254,14 +255,13 @@ export function QuestionGeneratorForm({
    * olusabilir. Secim geri alinirsa alanlar dokunulmadan kalir - kullanıcı
    * yazdigini kaybetmesin.
    */
-  function handleOutcomeChange(value: string) {
-    if (value === SERBEST_KAZANIM) {
+  function handleOutcomeSelect(outcome: LearningOutcome | null) {
+    if (!outcome) {
+      // Secim kaldirildi: alanlar DOKUNULMADAN kalir, kullanici yazdigini
+      // kaybetmesin. Metin artik serbest kazanim olarak gider.
       setOutcomeId("");
       return;
     }
-
-    const outcome = outcomes.find((item) => item.id === value);
-    if (!outcome) return;
 
     setOutcomeId(outcome.id);
     setKazanim(outcome.outcome_text);
@@ -482,7 +482,8 @@ export function QuestionGeneratorForm({
   }
 
   return (
-    <div className="grid gap-6 xl:grid-cols-5">
+    <div className="space-y-6">
+      <div className="grid gap-6 xl:grid-cols-5">
       {/* ---------- Sol: form ---------- */}
       <div className="space-y-4 xl:col-span-2">
         <Card>
@@ -529,62 +530,23 @@ export function QuestionGeneratorForm({
               </div>
 
               {/* ---------- Kazanım ---------- */}
-              <div className="space-y-2">
-                <Label htmlFor="outcome">Kazanım</Label>
-
-                {visibleOutcomes.length > 0 ? (
-                  <Select
-                    value={outcomeId || SERBEST_KAZANIM}
-                    onValueChange={handleOutcomeChange}
-                  >
-                    <SelectTrigger id="outcome">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={SERBEST_KAZANIM}>
-                        Serbest metin yaz
-                      </SelectItem>
-                      {visibleOutcomes.map((outcome) => (
-                        <SelectItem key={outcome.id} value={outcome.id}>
-                          {outcome.subject ? `${outcome.subject} · ` : ""}
-                          {outcome.topic} — {outcome.outcome_text}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : null}
-
-                {/*
-                  Serbest metin alanı kayitli kazanim SECILMEDIGINDE gorunur.
-                  Tumuyle kaldirilmadi: henuz kazanim tanimlamamis bir uzman
-                  da soru uretebilmeli, aksi halde ilk kullanim kilitlenir.
-                */}
-                {outcomeId ? (
-                  <p className="flex items-start gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2.5 text-xs leading-relaxed">
-                    <Target className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
-                    <span>
-                      <span className="font-medium">{kazanim}</span>
-                      <br />
-                      Üretilen sorular bu kazanıma bağlanacak; ders ve konu
-                      kazanımdan alındı.
-                    </span>
-                  </p>
-                ) : (
-                  <>
-                    <Input
-                      id="kazanim"
-                      value={kazanim}
-                      onChange={(event) => setKazanim(event.target.value)}
-                      placeholder="Öğrenci fotosentezin evrelerini açıklar."
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Serbest metin kazanıma <strong>bağlanmaz</strong> - gelişim
-                      raporunda kazanım kırılımı çıkmaz. Kalıcı ölçüm için
-                      aşağıdan kazanım tanımlayın.
-                    </p>
-                  </>
-                )}
-              </div>
+              {/*
+                Acilir liste KALDIRILDI. 60+ kazanimda kullanilmaz hale
+                geliyordu: aradigini bulmak icin listeyi gozle taramak
+                gerekiyordu. Yerine yazarken arayan bir alan geldi - ad
+                ararken cikan oneriler gibi (bkz. OutcomeSearchField).
+              */}
+              <OutcomeSearchField
+                value={kazanim}
+                onValueChange={setKazanim}
+                selectedId={outcomeId}
+                onSelect={handleOutcomeSelect}
+                outcomes={visibleOutcomes}
+                subject={subject}
+                topic={topic}
+                onCreated={() => router.refresh()}
+                disabled={pending}
+              />
 
               <SourceTextField
                 value={context}
@@ -673,9 +635,6 @@ export function QuestionGeneratorForm({
             </form>
           </CardContent>
         </Card>
-
-        {/* ---------- Ogrenme durumu ---------- */}
-        <StyleMemoryPanel preferences={preferences} canPersist={canPersist} />
       </div>
 
       {/* ---------- Sag: sonuçlar ---------- */}
@@ -887,6 +846,17 @@ export function QuestionGeneratorForm({
         ) : null}
       </div>
     </div>
+
+      {/*
+        AI tarz hafizasi TAM GENISLIKTE ve EN ALTTA.
+
+        Once sol sutundaydi (xl:col-span-2): dar oldugu icin ornek metinleri
+        uc satira sikisiyordu ve uretim yapilmadan once sagdaki taslak sutunu
+        bombos duruyordu. Asagi alininca iki sorun birden cozuluyor - panel
+        sayfanin tam genisligini kullaniyor, uretilen taslaklar da formun
+        hemen yaninda kaliyor.
+      */}
+      <StyleMemoryPanel preferences={preferences} canPersist={canPersist} />
+    </div>
   );
 }
-
