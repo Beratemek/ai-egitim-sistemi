@@ -77,8 +77,46 @@ const ADIMLAR = [
   ["sinav-suresi", () => fonksiyon("exam_attempt_deadline", { target_exam: BOS_ID, target_student: BOS_ID })],
   ["varsayilan-sure-ve-puan", () => sutun("exams", "points_auto")],
   ["bos-birakilan-sorular", bosSoruKontrolu],
+  // Kazanim derse baglandi + tarz hafizasi ders/konu kapsamina alindi.
+  // Iki sutun ayni dosyada eklendigi icin tek iz yeterli degil: kazanim
+  // tarafi uygulanip hafiza tarafi atlanmis olamaz, ama yine de ikisi de
+  // kontrol ediliyor - dosya elle bolunerek calistirilirsa yakalanir.
+  [
+    "kazanim-ve-ders-bazli-hafiza",
+    async () =>
+      (await sutun("learning_outcomes", "subject")) &&
+      (await sutun("question_preferences", "subject")),
+  ],
+  // Gorselli/grafikli sorular. IKI iz birlikte kontrol ediliyor: sutun
+  // eklenip RPC guncellenmezse gorseller egitmende gorunur ama SINAVDA
+  // kaybolur - sessiz ve bulunmasi zor bir hata.
+  ["gorsel-ve-grafik", gorselKontrolu],
   ["varsayilan-rol", varsayilanRolKontrolu],
 ];
+
+/**
+ * Gorsel migration'i tam mi?
+ *
+ * Iki sey gerekiyor: `questions.visual_json` sutunu ve ogrenci sorularini
+ * getiren RPC'nin o sutunu DONDURMESI. Fonksiyon var olmasi yetmez, eski
+ * surumu de var; bu yuzden donen alan adlarina bakiliyor.
+ */
+async function gorselKontrolu() {
+  if (!(await sutun("questions", "visual_json"))) return false;
+
+  const r = await fetch(`${BASE}/rest/v1/rpc/get_student_exam_questions`, {
+    method: "POST",
+    headers: H,
+    body: JSON.stringify({ target_exam: BOS_ID }),
+  });
+  if (!r.ok) return false;
+
+  // Bos dizi donerse alan adlari gorunmez; o durumda sutunun varligi tek
+  // olcut olarak kabul ediliyor (yanlis negatif vermemek icin).
+  const rows = await r.json();
+  if (!Array.isArray(rows) || rows.length === 0) return true;
+  return Object.prototype.hasOwnProperty.call(rows[0], "visual_json");
+}
 
 /**
  * Rol atama sirasi korunuyor mu? (BEKLEYEN-1-varsayilan-rol.sql)

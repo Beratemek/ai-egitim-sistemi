@@ -51,7 +51,7 @@ kontrol eder ve eksik olanı söyler. Dosyanın `uygulandi/` klasörüne taşın
 olup olmaması yalnızca bir defter kaydıdır; SQL'i çalıştırdığında dosya
 kendiliğinden taşınmaz. Tek doğru ölçüt şemanın kendisi.
 
-Şu an: **1 bekleyen** — `BEKLEYEN-1-varsayilan-rol.sql` (15/16 uygulanmış).
+Şu an: **1 bekleyen** — `BEKLEYEN-1-varsayilan-rol.sql` (17/18 uygulanmış).
 
 > Bu dosya yeni bir sütun/fonksiyon eklemez, iki fonksiyonun **gövdesini**
 > değiştirir (`set_user_roles`, `review_role_request`). Durum betiği bu yüzden

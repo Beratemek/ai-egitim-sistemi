@@ -27,10 +27,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  DENEYAP_CATEGORY_OPTIONS,
-  type DeneyapCategory,
-} from "@/lib/deneyap";
-import {
   countByType,
   formatTypeCounts,
   groupBySubject,
@@ -62,7 +58,6 @@ import { cn, formatDateTime } from "@/lib/utils";
  */
 
 type TypeFilter = QuestionType | "hepsi";
-type CategoryFilter = DeneyapCategory | "hepsi";
 
 const TYPE_LABELS: Record<QuestionType, string> = {
   test: "Çoktan seçmeli",
@@ -107,7 +102,6 @@ export function QuestionApprovalBoard({
   const [rows, setRows] = React.useState<readonly Question[]>(questions);
   const [search, setSearch] = React.useState("");
   const [typeFilter, setTypeFilter] = React.useState<TypeFilter>("hepsi");
-  const [categoryFilter, setCategoryFilter] = React.useState<CategoryFilter>("hepsi");
   const [pendingId, setPendingId] = React.useState<string | null>(null);
 
   /**
@@ -131,9 +125,6 @@ export function QuestionApprovalBoard({
   const visible = React.useMemo(() => {
     return rows.filter((question) => {
       if (typeFilter !== "hepsi" && question.type !== typeFilter) return false;
-      if (categoryFilter !== "hepsi" && question.category !== categoryFilter) {
-        return false;
-      }
       if (!needle) return true;
 
       return (
@@ -142,7 +133,7 @@ export function QuestionApprovalBoard({
         (question.subject ?? "").toLocaleLowerCase("tr").includes(needle)
       );
     });
-  }, [rows, needle, typeFilter, categoryFilter]);
+  }, [rows, needle, typeFilter]);
 
   /** Durum -> ders -> konu agaci. Bos durum kumeleri de listelenir. */
   const sections = React.useMemo(
@@ -245,30 +236,12 @@ export function QuestionApprovalBoard({
           </SelectContent>
         </Select>
 
-        <Select
-          value={categoryFilter}
-          onValueChange={(value) => setCategoryFilter(value as CategoryFilter)}
-        >
-          <SelectTrigger className="sm:w-56" aria-label="Atölye dalına göre filtrele">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="hepsi">Tüm atölye dalları</SelectItem>
-            {DENEYAP_CATEGORY_OPTIONS.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-muted-foreground">
           {visible.length} / {rows.length} soru
-          {searching || typeFilter !== "hepsi" || categoryFilter !== "hepsi"
-            ? " (filtreli)"
-            : ""}
+          {searching || typeFilter !== "hepsi" ? " (filtreli)" : ""}
         </p>
 
         <div className="flex gap-1">
@@ -345,18 +318,6 @@ export function QuestionApprovalBoard({
                           {subject.questionCount} soru · {subject.topics.length} konu
                         </span>
 
-                        {/* Atolye dali gezilen bir kademe degil, etiket. */}
-                        <span className="ml-auto hidden flex-wrap gap-1 lg:flex">
-                          {subject.categoryLabels.map((label) => (
-                            <Badge
-                              key={label}
-                              variant="outline"
-                              className="font-normal text-muted-foreground"
-                            >
-                              {label}
-                            </Badge>
-                          ))}
-                        </span>
                       </DisclosureRow>
 
                       {subOpen ? (

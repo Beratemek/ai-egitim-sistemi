@@ -52,11 +52,11 @@ import { cn } from "@/lib/utils";
  * Havuz uc kademe halinde, her kademede kutucuklarla gezilir:
  *   Ders  ->  Konu  ->  Soru listesi (isaretlenebilir)
  *
- * UST KADEME DERSTIR. Atolye dali gezilen bir kademe degil, ders kartinda
- * gosterilen bir etikettir: egitmen sinav hazirlarken "hangi ders" diye
- * dusunuyor, "hangi atolye dali" diye degil. Dal ust kademe oldugunda dali
- * girilmemis sorular ayri bir "Kategori yok" kutusuna dusuyor ve ayni ders
- * ikiye bolunuyordu.
+ * UST KADEME DERSTIR. Once "atolye dali" diye DENEYAP'a ozel bir ust kademe
+ * vardi; dali girilmemis sorular ayri bir "Kategori yok" kutusuna dusuyor ve
+ * ayni ders ikiye bolunuyordu. Urun tek bir kuruma bagli olmadigi icin o
+ * kademe tumuyle kaldirildi: egitmen sinav hazirlarken "hangi ders" diye
+ * dusunuyor.
  *
  * Kutucuklar sorulardan turetilir; altinda sorusu olmayan ders veya konu
  * kutucugu hic olusmaz. İçerik uzmanı yeni bir derse soru onayladigi anda o
@@ -318,12 +318,6 @@ function SubjectCard({
       meta={formatTypeCounts(countTopicsByType(group.topics))}
       action="Konuları ac"
     >
-      {/* Atolye dali gezilen bir kademe degil; dersin hangi dala ait
-          oldugunu burada etiket olarak gosteriyoruz. */}
-      <p className="text-xs text-muted-foreground">
-        {group.categoryLabels.join(" · ")}
-      </p>
-
       <ChipRow
         items={preview.map((topic) => topic.topic)}
         rest={rest}
@@ -898,8 +892,8 @@ function EmptyPool() {
         <Library className="h-8 w-8 text-muted-foreground/50" />
         <p className="font-medium">Havuzda onaylanmis soru yok</p>
         <p className="max-w-sm text-sm text-muted-foreground">
-          İçerik uzmanı üretilen taslakları onayladikca sorular burada atölye
-          dalı, ders ve konu basliklari altinda birikir.
+          İçerik uzmanı üretilen taslakları onayladikca sorular burada ders ve
+          konu basliklari altinda birikir.
         </p>
       </CardContent>
     </Card>
@@ -940,8 +934,7 @@ function countSelected(ids: readonly string[], selected: ReadonlySet<string>): n
  * Arama ve tip filtresini ders -> konu -> soru agacina uygular.
  *
  * Ust kademenin adi aramayla eslesiyorsa altindakiler kirpilmaz; boylece
- * "Siber Guvenlik" yazinca dersin tamami gorulebilir. Dal adi da aranabilir:
- * gezinilen bir kademe olmasa da ders kartinda etiket olarak duruyor.
+ * "Siber Guvenlik" yazinca dersin tamami gorulebilir.
  */
 function filterSubjects(
   subjects: readonly SubjectGroup[],
@@ -953,11 +946,7 @@ function filterSubjects(
   return subjects
     .map((subject) => {
       const subjectMatches =
-        !needle ||
-        subject.subject.toLocaleLowerCase("tr").includes(needle) ||
-        subject.categoryLabels.some((label) =>
-          label.toLocaleLowerCase("tr").includes(needle),
-        );
+        !needle || subject.subject.toLocaleLowerCase("tr").includes(needle);
 
       const topics = subject.topics
         .map((topic) => {
@@ -979,7 +968,6 @@ function filterSubjects(
         subject: subject.subject,
         topics,
         questionCount: topics.reduce((total, topic) => total + topic.questions.length, 0),
-        categoryLabels: subject.categoryLabels,
       };
     })
     .filter((subject) => subject.topics.length > 0);

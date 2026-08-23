@@ -8,6 +8,7 @@ import {
 } from "@/components/shared/analytics-charts";
 import { PageHeader } from "@/components/shared/page-header";
 import { RoleBadge } from "@/components/shared/status-badge";
+import { OutcomeAnalysis } from "@/components/shared/outcome-analysis";
 import { StatCard } from "@/components/shared/stat-card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -27,6 +28,7 @@ import {
 } from "@/components/ui/table";
 import {
   getExamStatistics,
+  getOutcomeAnalysis,
   getQuestions,
   getScoreTrend,
   getUsers,
@@ -36,12 +38,13 @@ import { formatScore } from "@/lib/utils";
 export const metadata: Metadata = { title: "Eğitim Yöneticisi" };
 
 export default async function YoneticiPage() {
-  const [statistics, questions, users, scoreTrend] =
+  const [statistics, questions, users, scoreTrend, outcomeAnalysis] =
     await Promise.all([
       getExamStatistics(),
       getQuestions(),
       getUsers(),
       getScoreTrend(),
+      getOutcomeAnalysis(),
     ]);
 
   const totalStudents = statistics.reduce(
@@ -99,6 +102,15 @@ export default async function YoneticiPage() {
           accent="warning"
         />
       </div>
+
+      {/*
+        Sartnamenin 4. rolu: "ogrenme ciktilarini, tamamlanma durumlarini ve
+        degerlendirme istatistiklerini takip eder". Sinav bazli istatistik
+        vardi, OGRENME CIKTISI kirilimi yoktu.
+
+        Uretim baglantisi yok: egitim yoneticisi raporu okur, soru uretmez.
+      */}
+      <OutcomeAnalysis rows={outcomeAnalysis} />
 
       <ScoreTrendChart data={scoreTrend} />
 

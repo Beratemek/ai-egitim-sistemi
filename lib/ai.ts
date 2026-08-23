@@ -21,7 +21,10 @@ import type { LanguageModelV1 } from "ai";
 import { z } from "zod";
 
 import { serverEnv } from "@/lib/env";
+import { parseVisual, type QuestionVisual } from "@/lib/visual";
+import { searchWikimediaImages } from "@/lib/visual-search";
 import type {
+  DifficultyChoice,
   GeneratedQuestion,
   GradingResult,
   QuestionType,
@@ -113,6 +116,87 @@ export function describeAiError(caught: unknown): string {
 /*  Semalar                                                                   */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Gorsel semasi.
+ *
+ * Ayrik birlesim (discriminated union) yerine TEK BIR nesne kullaniliyor ve
+ * alanlar kosullu doldurulmasi istenerek tarif ediliyor. Sebep: Gemini'nin
+ * yapilandirilmis cikti kipi `anyOf` semalarini guvenilir sekilde
+ * karsilamiyor; birlesim verildiginde cagri sema hatasiyla dusuyor. Tek
+ * nesne + `nullable` alanlar ayni bilgiyi tasiyor ve `parseVisual()` zaten
+ * bicimi dogruluyor.
+ *
+ * DORT TUR VE ARALARINDAKI KRITIK AYRIM - SORUNUN CEVABINI BELIRLEYIP
+ * BELIRLEMEDIGI:
+ *
+ *   - "chart" / "svg": gorseldeki SAYI ya da OLCU dogru cevabi belirliyor
+ *     (bir grafikteki yuzdeler, bir ucgenin kenar uzunluklari). Bu ikisini
+ *     MODEL URETIR - resim cizmez, yalnizca veri (chart) ya da vektor komut
+ *     (svg) yazar; cizimi kod yapar. Boylece "3-4-5 ucgeni" deyip 3-4-6
+ *     cizme hatasi imkansiz.
+ *
+ *   - "referans": gorsel sadece GERCEK BIR VARLIGI/ESERI gosterir ve
+ *     cevaba etki ETMEZ (or. "Mona Lisa tablosu", bir tarihi figurun
+ *     fotografi, bir bitki turu). Bu turde model resim URETMEZ; yalnizca
+ *     Wikimedia'da aranacak terimi yazar (`referenceQuery`), sunucu o
+ *     terimle GERCEK bir fotograf bulup lisansiyla ekler. AKSI YONE
+ *     KARISTIRMAK ONEMLI: cevabi belirleyen bir gorsel icin "referans"
+ *     kullanilirsa Wikimedia'dan gelen fotografin sayilari/olculeri
+ *     sorunun beklentisiyle hicbir zaman GARANTI uyusmaz.
+ *
+ *   - "yok": gorsel gerekmiyor.
+ */
+const questionVisualSchema = z.object({
+  kind: z
+    .enum(["chart", "svg", "referans", "yok"])
+    .describe(
+      'Gorsel gerekmiyorsa "yok". Cevabi SAYI/OLCU belirliyorsa "chart" ya da ' +
+        '"svg" kullan (herhangi ders - jeoloji, spor bilimi, muzik de dahil, ' +
+        'ornek listesine tam uymasa bile). Gorsel GERCEK DUNYADA VAR OLAN ' +
+        'somut bir seyi (eser, harita, mineral, tur, alet - SINIRLI DEGIL) ' +
+        'TANITIYORSA ve cevaba etki ETMIYORSA "referans" kullan - bu durumda ' +
+        "sayi/olcu UYDURMA, gercek bir fotograf aranacak.",
+    ),
+  title: z.string().nullable().describe("Gorselin kisa basligi; yoksa null."),
+  chartType: z
+    .enum(["bar", "line", "pie"])
+    .nullable()
+    .describe('kind="chart" ise grafik tipi; degilse null.'),
+  xKey: z
+    .string()
+    .nullable()
+    .describe('kind="chart" ise yatay eksendeki alan adi (or. "yil"); degilse null.'),
+  series: z
+    .array(
+      z.object({
+        key: z.string().describe("data satirlarindaki alan adi."),
+        label: z.string().describe("Efsanede gorunecek ad."),
+      }),
+    )
+    .nullable()
+    .describe('kind="chart" ise cizilecek seriler; degilse null.'),
+  dataJson: z
+    .string()
+    .nullable()
+    .describe(
+      'kind="chart" ise veri satirlari JSON dizisi olarak (or. \'[{"yil":"2020","uretim":12}]\'); degilse null.',
+    ),
+  svg: z
+    .string()
+    .nullable()
+    .describe(
+      'kind="svg" ise gecerli bir <svg viewBox="..."> icerigi. Script, olay ozelligi ve dis kaynak KULLANMA; yalnizca sekil, cizgi ve metin. Degilse null.',
+    ),
+  referenceQuery: z
+    .string()
+    .nullable()
+    .describe(
+      'kind="referans" ise Wikimedia Commons\'ta aranacak terim - varligin ' +
+        'ozgun/Ingilizce adi tercih edilir (or. "Mona Lisa painting Louvre", ' +
+        '"DNA double helix structure"). Degilse null.',
+    ),
+});
+
 const questionOptionSchema = z.object({
   key: z.string().describe('Sik anahtari: "A", "B", "C" veya "D".'),
   text: z.string().describe("Sikkin metni."),
@@ -139,6 +223,9 @@ const generatedQuestionSchema = z.object({
       'type="acik_uclu" ise puanlama rubrigi (madde madde, toplam 100 puan); degilse null.',
     ),
   difficulty: z.enum(["kolay", "orta", "zor"]).describe("Tahmini zorluk seviyesi."),
+  visual: questionVisualSchema
+    .nullable()
+    .describe("Soruya eklenecek gorsel. Gerekmiyorsa null ya da kind=\"yok\"."),
 });
 
 const generateQuestionsSchema = z.object({
@@ -167,8 +254,6 @@ const gradingResultSchema = z.object({
 /* -------------------------------------------------------------------------- */
 
 export interface GenerateQuestionsOptions {
-  /** DENEYAP atolye dali adi; modele alan baglami olarak verilir. */
-  categoryLabel?: string;
   /** Uretilecek soru adedi. Varsayilan: 5 */
   count?: number;
   /** Istenen soru tipi. "karisik" ise model her ikisini de uretir. */
@@ -176,11 +261,96 @@ export interface GenerateQuestionsOptions {
   /** Konu basligi. Verilmezse model kazanimdan cikarir. */
   topic?: string;
   /**
+   * Talep edilen zorluk seviyesi.
+   *
+   * Brief'in 2. maddesi seviyeyi EGITMENIN tanimlamasini istiyor. Onceden
+   * yalnizca modelin kendi tahmini (`difficulty` alani) vardi; istenen bir
+   * seviye yoktu, dolayisiyla "zor soru uret" denemiyordu.
+   */
+  difficulty?: DifficultyChoice;
+  /**
    * Icerik uzmaninin gecmis begeni/red kayitlari. Modele few-shot ornek olarak
    * verilir: begenilenler taklit edilecek tarz, reddedilenler kacinilacak tarz.
    */
   styleGuide?: StyleGuide;
 }
+
+/** Istenen zorluk seviyesinin modele verilecek talimati. */
+const DIFFICULTY_INSTRUCTIONS: Record<DifficultyChoice, string> = {
+  kolay:
+    "ZORLUK: Tum sorular KOLAY olsun - dogrudan hatirlama ve tanima olcsun, " +
+    "celdiriciler acikca ayrilabilsin.",
+  orta:
+    "ZORLUK: Tum sorular ORTA olsun - kavrama ve tek adimli uygulama olcsun, " +
+    "celdiriciler makul ama ayirt edilebilir olsun.",
+  zor:
+    "ZORLUK: Tum sorular ZOR olsun - analiz, cok adimli uygulama ya da " +
+    "karsilastirma olcsun, celdiriciler yaygin kavram yanilgilarindan uretilsin.",
+  karisik:
+    "ZORLUK: Kolay, orta ve zor sorulari dengeli dagit; her sorunun " +
+    "`difficulty` alanini gercek seviyesine gore doldur.",
+};
+
+/**
+ * Gorsel talimati.
+ *
+ * TEK BIR talimat var, secim YOK: model her soruda gorsele ihtiyac olup
+ * olmadigina VE turune KENDISI karar verir.
+ *
+ * ILK SURUM (tek ornekli: "yuzde grafigi") HER SEFERINDE AYNI bar grafigine
+ * dusuyordu. IKINCI SURUM (subject-by-subject ornek listesi: sanat, enerji,
+ * matematik, cografya...) BIRAZ DAHA IYI oldu ama ayni hatanin baska bir
+ * bicimiydi: model, karsilastigi konu (or. jeoloji/mineraloji) LISTEDEKI
+ * ORNEKLERIN HICBIRINE tam benzemeyince gorseli tumden atlayip "yok" diyordu.
+ * Sorun ornek sayisi degil, YAPI: sonlu bir ornek listesi HERHANGI bir
+ * derste (jeoloji, spor bilimi, ekonomi, muzik...) er ya da gec tukenir.
+ *
+ * BU SURUM once ILKEYI (cevaba etki eden sey SAYI mi, SEKIL mi, yoksa
+ * GERCEK DUNYADAKI somut bir sey mi) ders adindan BAGIMSIZ tarif ediyor;
+ * ornekler yalnizca ILKEYI SOMUTLASTIRMAK icin var ve acikca "bunlarla
+ * SINIRLI DEGIL" diye isaretleniyor. Amac: model yeni bir derste "bu tam
+ * ornek listesindeki gibi degil" diye TEREDDUT ETMESIN, ayni MANTIGI kendi
+ * basina uygulasin.
+ */
+const VISUAL_INSTRUCTION =
+  "GORSEL: Sen bir soru bankasi editorusun. Hangi ders olursa olsun AYNI " +
+  "ILKEYI uygula: gorsel SORUNUN CEVABINA hizmet ediyorsa ekle, suslemek " +
+  'icin EKLEME. Gerekmiyorsa visual.kind = "yok" bırak. Asagidaki uc arac ' +
+  "ORNEKLERLE anlatiliyor ama ORNEKLER SINIRLAYICI DEGIL - karsina hic " +
+  "gormedigin bir ders/konu gelse bile (jeoloji, spor bilimi, muzik, " +
+  "ekonomi, ne olursa olsun) AYNI MANTIGI SEN UYGULA, ornek listesine tam " +
+  "uymadigi icin gorseli ATLAMA:\n" +
+  "\n" +
+  '1) "chart" - CEVABI SAYISAL BIR VERI belirliyor: yuzde/istatistik, ' +
+  "nufus artisi, reaksiyon hizi, mesafe-zaman, sicaklik-yukseklik - HANGI " +
+  "DERSTE olursa olsun herhangi bir (x,y) iliskisi buraya girer. MATEMATIK " +
+  "FONKSIYONU DA BURAYA GIRER: y=f(x) turunden bir fonksiyonu birkac x " +
+  "degeri icin SEN HESAPLA (or. y=x^2 icin x=-3,-2,-1,0,1,2,3), sonuc " +
+  '(x,y) ciftlerini "line" grafigine ver - parabol, dogrusal fonksiyon, ' +
+  "trigonometrik egri boyle gorsellestirilir.\n" +
+  "\n" +
+  '2) "svg" - CEVABI BIR SEKIL, YAPI ya da DUZEN belirliyor: geometri ' +
+  "(ucgen/aci/cember, olculer ETIKETLI), devre semasi, sayi dogrusu, " +
+  "koordinat duzleminde isaretli nokta/sekil, basit kesit ya da diyagram " +
+  "(hucre, kayac dongusu, besin zinciri oku), zaman cizelgesi (yatay cizgi " +
+  "uzerinde tarihli isaretler), akis semasi, Venn semasi - BUNLARLA SINIRLI " +
+  "DEGIL, herhangi bir uzamsal/yapisal iliskiyi SEN CIZ. SADE ciz: viewBox " +
+  'tanimla, renk yerine stroke="currentColor" kullan ki tema degisince ' +
+  "okunur kalsin.\n" +
+  "\n" +
+  '3) "referans" - GERCEK DUNYADA VAR OLAN somut bir sey GORULMESI/' +
+  "TANINMASI gerekiyor ve gorsel CEVABA ETKI ETMIYOR: bir sanat eseri, " +
+  "tarihi figur/olay fotografi, GERCEK BIR HARITA (cografyada fiziki/" +
+  'siyasi/iklim haritasi - or. "Turkey physical map"), GERCEK BIR MINERAL/' +
+  "KAYAC FOTOGRAFI, gercek bir hayvan/bitki turu, gercek bir alet/nesne, " +
+  "mikroskop goruntusu - BUNLARLA SINIRLI DEGIL, somut ve GERCEKTEN VAR " +
+  "OLAN her sey buraya girer. `referenceQuery` alanina Wikimedia'da " +
+  "aranacak ozgun/Ingilizce adi yaz. GERCEK BIR NESNEYI/HARITAYI ASLA SVG " +
+  "ILE CIZMEYE CALISMA: elle cizip yanlis yapma riski cok yuksektir; " +
+  "gercek gorsel GERCEK arama ile bulunur, uydurulmaz.\n" +
+  "\n" +
+  "Ayni ders/konu ust uste gelse bile HEP AYNI TURU secme - soru farkli " +
+  "bir seyi olcuyorsa gorsel de farkli olmali.";
 
 /**
  * Tercih kayitlarini modele verilecek metne cevirir.
@@ -221,9 +391,25 @@ function buildStyleGuidePrompt(styleGuide: StyleGuide | undefined): string {
 
   if (sections.length === 0) return "";
 
+  /*
+    Kapsam modele acikca yaziliyor. Ayni konudan gelen ornek, uzmanin TAM O
+    konudaki tercihini gosterir; "genel" ornek yalnizca genel bir dil tonu
+    isaretidir. Kapsami soylemek modelin ornege ne kadar yaklasacagini
+    ayarlamasini sagliyor - aksi halde uzak bir dersin ornegini de birebir
+    tarz emri sanabiliyor.
+  */
+  const scopeNote: Record<StyleGuide["scope"], string> = {
+    konu: "Bu ornekler AYNI KONUDAN alindi - tarzi yakindan takip et.",
+    ders: "Bu ornekler AYNI DERSTEN alindi - genel kurguyu takip et.",
+    genel:
+      "Bu ornekler BASKA derslerden alindi - yalnizca dil tonu ve bicim icin " +
+      "referans al, konu kurgusunu bu derse uydur.",
+  };
+
   return [
     "",
     "== TARZ REHBERI ==",
+    scopeNote[styleGuide.scope],
     ...sections,
     "Bu ornekleri KOPYALAMA; yalnizca soru kurgusu, zorluk dengesi, celdirici",
     "mantigi ve dil tonu bakimindan ornek al. Yeni sorular ozgun olmali.",
@@ -298,7 +484,13 @@ export async function generateQuestions(
   kazanim: string,
   options: GenerateQuestionsOptions = {},
 ): Promise<GeneratedQuestion[]> {
-  const { count = 5, type = "karisik", topic, styleGuide } = options;
+  const {
+    count = 5,
+    type = "karisik",
+    topic,
+    styleGuide,
+    difficulty = "karisik",
+  } = options;
 
   if (!context.trim() || !kazanim.trim()) {
     throw new Error("[ai] generateQuestions: context ve kazanim bos olamaz.");
@@ -346,14 +538,17 @@ export async function generateQuestions(
       topic ? `KONU:\n${topic}` : "",
       `BILGI KAYNAGI (yalnizca dogrulama icin, soruda ona atif YAPMA):\n${context}`,
       `GOREV: Yukaridaki kazanimi olcen ${count} adet soru uret. ${typeInstruction}`,
+      DIFFICULTY_INSTRUCTIONS[difficulty],
+      VISUAL_INSTRUCTION,
       "HATIRLATMA: Her soru, kaynak metni hic gormemis bir ogrenci tarafindan okunup cevaplanabilmeli.",
+      'HATIRLATMA: Gorseli olan soruda metin gorsele atifta bulunabilir ("grafige gore", "sekildeki"), cunku gorsel soruyla birlikte gosterilir. Gorseli OLMAYAN soruda hicbir seye atif yapma.',
       buildStyleGuidePrompt(styleGuide),
     ]
       .filter(Boolean)
       .join("\n\n"),
   });
 
-  const first = collectUsable(object.questions, topic ?? kazanim);
+  const first = await collectUsable(object.questions, topic ?? kazanim);
 
   // Eleme sonucu adet tutuyorsa is bitti.
   if (first.length >= count) return first.slice(0, count);
@@ -392,6 +587,8 @@ export async function generateQuestions(
       topic ? `KONU:\n${topic}` : "",
       `BILGI KAYNAGI (yalnizca dogrulama icin, soruda ona atif YAPMA):\n${context}`,
       `GOREV: Kazanimi olcen ${missing} adet soru uret. ${typeInstruction}`,
+      DIFFICULTY_INSTRUCTIONS[difficulty],
+      VISUAL_INSTRUCTION,
       "YASAK KALIPLAR: 'kaynak metne gore', 'kitabin mufredatina gore', 'kacinci haftada', 'kac hafta surer', 'ucretsiz mi'.",
     ]
       .filter(Boolean)
@@ -404,7 +601,7 @@ export async function generateQuestions(
     console.warn("[ai] Tamamlama cagrisi basarisiz:", describeAiError(caught));
   }
 
-  const combined = [...first, ...collectUsable(retry.questions, topic ?? kazanim)];
+  const combined = [...first, ...(await collectUsable(retry.questions, topic ?? kazanim))];
 
   if (combined.length === 0) {
     throw new Error(
@@ -417,25 +614,86 @@ export async function generateQuestions(
   return combined.slice(0, count);
 }
 
-/** Model ciktisini normalize eder ve kaynaga atif yapanlari eler. */
-function collectUsable(
-  questions: z.infer<typeof generateQuestionsSchema>["questions"],
-  fallbackTopic: string,
-): GeneratedQuestion[] {
-  const usable: GeneratedQuestion[] = [];
+/**
+ * Duz sema ciktisini gercek gorsel nesnesine cevirir.
+ *
+ * Model sema geregi TEK bir nesne dolduruyor (bkz. questionVisualSchema);
+ * burada tipine gore ayristiriliyor ve `parseVisual()` ile dogrulaniyor.
+ * Gecersiz gorsel SORUYU DUSURMEZ - yalnizca gorsel atilir. Sebep: soru
+ * metni cogu zaman kendi basina gecerlidir ve iyi bir taslagi bozuk bir
+ * grafik yuzunden atmak kullanicinin emegini bosa harcar.
+ *
+ * ASENKRON: "referans" turu Wikimedia'ya bir ag istegi gerektiriyor (bkz.
+ * lib/visual-search.ts). Arama sonuc bulamazsa ya da servis yanit vermezse
+ * `searchWikimediaImages` bos dizi doner - bu fonksiyon da gorseli null
+ * yapar, soruyu ETKILEMEZ.
+ */
+async function toQuestionVisual(
+  raw: z.infer<typeof questionVisualSchema> | null | undefined,
+): Promise<QuestionVisual | null> {
+  if (!raw || raw.kind === "yok") return null;
 
-  for (const question of questions) {
-    if (looksLikeMetaQuestion(question.text)) continue;
-
-    try {
-      usable.push(normalizeGeneratedQuestion(question, fallbackTopic));
-    } catch {
-      // Eksik uretilmis soru (secenek veya rubrik yok) sessizce atlanir;
-      // cagiran katman eksik adedi tekrar isteyerek telafi eder.
-    }
+  if (raw.kind === "referans") {
+    if (!raw.referenceQuery) return null;
+    const results = await searchWikimediaImages(raw.referenceQuery, 1);
+    return results[0] ?? null;
   }
 
-  return usable;
+  if (raw.kind === "svg") {
+    return parseVisual({
+      kind: "svg",
+      ...(raw.title ? { title: raw.title } : {}),
+      svg: raw.svg,
+    });
+  }
+
+  // Grafik verisi metin olarak isteniyor: ic ice serbest sekilli nesne
+  // dizisini sema ile tarif etmek Gemini'de guvenilir degil. Cozulemeyen
+  // JSON gorseli dusurur, soruyu dusurmez.
+  let data: unknown;
+  try {
+    data = JSON.parse(raw.dataJson ?? "");
+  } catch {
+    return null;
+  }
+
+  return parseVisual({
+    kind: "chart",
+    chartType: raw.chartType,
+    ...(raw.title ? { title: raw.title } : {}),
+    xKey: raw.xKey,
+    series: raw.series,
+    data,
+  });
+}
+
+/**
+ * Model ciktisini normalize eder ve kaynaga atif yapanlari eler.
+ *
+ * Sorular PARALEL isleniyor (Promise.all): "referans" gorseli olan her soru
+ * bir Wikimedia cagrisi gerektiriyor, sirali isleseydi N soru N kat gecikme
+ * demek olurdu. Her sorunun normalizasyonu KENDI try/catch'inde - biri
+ * basarisiz olursa digerlerini dusurmez.
+ */
+async function collectUsable(
+  questions: z.infer<typeof generateQuestionsSchema>["questions"],
+  fallbackTopic: string,
+): Promise<GeneratedQuestion[]> {
+  const normalized = await Promise.all(
+    questions
+      .filter((question) => !looksLikeMetaQuestion(question.text))
+      .map(async (question) => {
+        try {
+          return await normalizeGeneratedQuestion(question, fallbackTopic);
+        } catch {
+          // Eksik uretilmis soru (secenek veya rubrik yok) sessizce atlanir;
+          // cagiran katman eksik adedi tekrar isteyerek telafi eder.
+          return null;
+        }
+      }),
+  );
+
+  return normalized.filter((item): item is GeneratedQuestion => item !== null);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -471,8 +729,6 @@ export function isRevisionPreset(value: unknown): value is RevisionPreset {
 }
 
 export interface ReviseQuestionOptions {
-  /** DENEYAP atolye dali adi - modele alan baglami verir. */
-  categoryLabel?: string;
   /** Sorunun olctugu kazanim; revizyonun hedefi degismesin diye gonderilir. */
   kazanim?: string;
   /** Kaynak metin. Verilirse model bilgi uydurmadan revize eder. */
@@ -503,7 +759,7 @@ export async function reviseQuestion(
     return mockReviseQuestion(question, trimmed);
   }
 
-  const { categoryLabel, kazanim, context } = options;
+  const { kazanim, context } = options;
 
   const shapeRule =
     question.type === "test"
@@ -525,7 +781,6 @@ export async function reviseQuestion(
       "Bilgi uydurma; verilen konunun disina cikma.",
     ].join(" "),
     prompt: [
-      categoryLabel ? `ATOLYE DALI:\n${categoryLabel}` : "",
       kazanim ? `OLCULEN KAZANIM:\n${kazanim}` : "",
       context ? `BILGI KAYNAGI (atif YAPMA):\n${context}` : "",
       `MEVCUT SORU:\n${JSON.stringify(
@@ -554,7 +809,7 @@ export async function reviseQuestion(
     );
   }
 
-  return normalizeGeneratedQuestion(object, question.topic);
+  return await normalizeGeneratedQuestion(object, question.topic);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -630,11 +885,12 @@ export async function gradeAnswer(
  * Model ciktisini veritabani kisitlariyla uyumlu hale getirir:
  * test sorusunda secenek/dogru cevap, acik ucluda rubrik garanti edilir.
  */
-function normalizeGeneratedQuestion(
+async function normalizeGeneratedQuestion(
   question: z.infer<typeof generatedQuestionSchema>,
   fallbackTopic: string,
-): GeneratedQuestion {
+): Promise<GeneratedQuestion> {
   const topic = question.topic.trim() || fallbackTopic;
+  const visual = await toQuestionVisual(question.visual);
 
   if (question.type === "test") {
     const options =
@@ -656,6 +912,7 @@ function normalizeGeneratedQuestion(
       correct_answer: question.correct_answer,
       rubric: null,
       difficulty: question.difficulty,
+      visual,
     };
   }
 
@@ -673,6 +930,7 @@ function normalizeGeneratedQuestion(
     correct_answer: null,
     rubric: question.rubric,
     difficulty: question.difficulty,
+    visual,
   };
 }
 
@@ -738,6 +996,9 @@ function mockGenerateQuestions(
         correct_answer: "B",
         rubric: null,
         difficulty,
+        // Mock modda gorsel uretilmiyor: sahte grafik gercek bir veri
+        // gostermedigi icin yaniltici olur.
+        visual: null,
       };
     }
 
@@ -753,6 +1014,7 @@ function mockGenerateQuestions(
         "3. Ornek vererek destekler (20 puan)",
       ].join("\n"),
       difficulty,
+      visual: null,
     };
   });
 }

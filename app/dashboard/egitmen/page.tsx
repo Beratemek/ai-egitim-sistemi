@@ -10,6 +10,7 @@ import {
 
 import { AiMockNotice } from "@/components/shared/ai-mock-notice";
 import { PageHeader } from "@/components/shared/page-header";
+import { OutcomeAnalysis } from "@/components/shared/outcome-analysis";
 import { PendingByClassroom } from "@/components/shared/pending-by-classroom";
 import { StatCard } from "@/components/shared/stat-card";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +26,7 @@ import { serverEnv } from "@/lib/env";
 import {
   getClassroomExamReviews,
   getExams,
+  getOutcomeAnalysis,
   getQuestions,
   getSubmissions,
 } from "@/lib/queries";
@@ -33,12 +35,14 @@ import { cn, formatDateTime } from "@/lib/utils";
 export const metadata: Metadata = { title: "Eğitmen" };
 
 export default async function EgitmenPage() {
-  const [questions, exams, submissions, classroomReviews] = await Promise.all([
-    getQuestions(),
-    getExams(),
-    getSubmissions(),
-    getClassroomExamReviews(),
-  ]);
+  const [questions, exams, submissions, classroomReviews, outcomeAnalysis] =
+    await Promise.all([
+      getQuestions(),
+      getExams(),
+      getSubmissions(),
+      getClassroomExamReviews(),
+      getOutcomeAnalysis(),
+    ]);
 
   // Eğitmen yalnızca havuza dusmus (onaylı) sorularla ilgilenir; taslak
   // inceleme ve onay/red içerik uzmaninin ekranindadir.
@@ -101,6 +105,18 @@ export default async function EgitmenPage() {
       {serverEnv.aiMockMode ? <AiMockNotice capability="puanlama" /> : null}
 
       <PendingByClassroom reviews={classroomReviews} />
+
+      {/*
+        SINIFIN OGRENME DURUMU.
+        Sartnamenin 2. slaydi "egitmen sinifin ogrenme durumunu tek ekrandan
+        gorur" diyor. Sinav ortalamasi bunu vermiyordu: "%61" hangi parcanin
+        zayif oldugunu soylemiyor.
+
+        En zayif 5 kazanim gosteriliyor - panel bir ozet ekrani, tam liste
+        yonetici raporunda. Her satirda "tekrar sorusu uret" baglantisi var:
+        analiz -> uretim -> olcme -> analiz dongusu boylece kapaniyor.
+      */}
+      <OutcomeAnalysis rows={outcomeAnalysis} canGenerate limit={5} />
 
       {/* ---------- Sınavlar ---------- */}
       <Card>

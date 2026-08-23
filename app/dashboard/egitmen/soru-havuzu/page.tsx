@@ -12,7 +12,7 @@ export const metadata: Metadata = { title: "Soru Havuzu" };
  * Eğitmenin soru havuzu.
  *
  * Yalnızca Onaylı sorular gösterilir - taslak inceleme ve onay/red içerik
- * uzmaninin ekranindadir. Eğitmen havuzu atölye dalı -> konu -> soru olarak
+ * uzmaninin ekranindadir. Eğitmen havuzu ders -> konu -> soru olarak
  * gezer, isaretledigi sorulardan yeni bir sınav kurar. Var olan bir sınava
  * soru eklemek o sınavın kendi düzenleme ekranında yapılır.
  */

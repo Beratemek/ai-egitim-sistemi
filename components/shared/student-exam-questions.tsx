@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 
 import { AnswerForm } from "@/components/shared/answer-form";
+import { QuestionVisual } from "@/components/shared/question-visual";
 import { QuestionTypeBadge } from "@/components/shared/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -103,7 +104,15 @@ export function StudentExamQuestions({
             </CardDescription>
           </CardHeader>
 
-          <CardContent>
+          <CardContent className="space-y-4">
+            {/*
+              Gorsel SIKLARDAN ONCE ve soru metninin altinda: ogrenci once
+              neye bakacagini, sonra ne sececegini gorur.
+            */}
+            {question.visual_json ? (
+              <QuestionVisual visual={question.visual_json} />
+            ) : null}
+
             <AnswerForm
               key={question.id}
               examId={examId}
