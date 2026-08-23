@@ -5,7 +5,6 @@ import Link from "next/link";
 import { LogOut, Menu, UserRound } from "lucide-react";
 
 import { NavLinks, RoleCard } from "@/components/shared/app-nav";
-import { SideBooks } from "@/components/shared/side-books";
 import { ActiveRoleSwitcher } from "@/components/shared/active-role-switcher";
 import { BrandMark } from "@/components/shared/brand-mark";
 import { ROLE_ICONS } from "@/components/shared/role-icons";
@@ -64,10 +63,19 @@ export function DashboardShell({
 
   return (
     <div className="bg-study min-h-screen bg-background">
-      {/* Genis ekranlarda icerik sutununun iki yanindaki bos seritleri
-          kitap yiginlariyla dolduruyoruz; bkz. SideBooks. */}
-      <SideBooks side="left" />
-      <SideBooks side="right" />
+      {/*
+        Kenar kitapliklari (SideBooks) KALDIRILDI.
+
+        Genis ekranlarda icerik sutununun iki yanindaki bos seritleri
+        dolduruyorlardi, ama calisma ekraninda dikkat dagitiyordu: sagdaki raf
+        icerigin hemen yaninda durdugu icin goz surekli oraya kayiyordu.
+        Soldaki zaten opak sol menunun (z-30) arkasinda kaliyor, hic
+        gorunmuyordu - yani tek etkisi bosuna render'di.
+
+        Bilesen duruyor (components/shared/side-books.tsx); geri istenirse
+        buraya iki satir eklemek yetiyor. Giris ve karsilama sayfalarindaki
+        BookshelfBackdrop'a dokunulmadi - orasi calisma ekrani degil.
+      */}
 
       {/* ---------- Masaustu sol menu ---------- */}
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-[264px] flex-col border-r bg-card lg:flex">

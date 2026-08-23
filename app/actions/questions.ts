@@ -69,6 +69,33 @@ export async function deletePreference(id: string): Promise<ActionResult> {
   return { ok: true, data: undefined };
 }
 
+/**
+ * Verilmis bir karari degistirir: begeni <-> red.
+ *
+ * Kayit SILINIP yeniden yazilmaz cunku `note` ve `outcome_id` gibi alanlar
+ * kaybolurdu; yalnizca `verdict` guncellenir. Uzman bir taslagi begenip
+ * sonradan fikrini degistirdiginde model de o an itibariyle yeni karari
+ * gorur - eski karar ornek kumesinde asili kalmaz.
+ */
+export async function updatePreferenceVerdict(
+  id: string,
+  verdict: PreferenceVerdict,
+): Promise<ActionResult> {
+  if (!isSupabaseConfigured) return demoGuard();
+  if (!id) return { ok: false, error: "Kayıt seçilmedi." };
+
+  const supabase = await createServerSupabaseClient();
+  const { error } = await supabase
+    .from("question_preferences")
+    .update({ verdict })
+    .eq("id", id);
+
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/dashboard/icerik-uzmani");
+  return { ok: true, data: undefined };
+}
+
 /* -------------------------------------------------------------------------- */
 /*  Havuza kaydetme                                                           */
 /* -------------------------------------------------------------------------- */

@@ -77,7 +77,29 @@ const ADIMLAR = [
   ["sinav-suresi", () => fonksiyon("exam_attempt_deadline", { target_exam: BOS_ID, target_student: BOS_ID })],
   ["varsayilan-sure-ve-puan", () => sutun("exams", "points_auto")],
   ["bos-birakilan-sorular", bosSoruKontrolu],
+  ["varsayilan-rol", varsayilanRolKontrolu],
 ];
+
+/**
+ * Rol atama sirasi korunuyor mu? (BEKLEYEN-1-varsayilan-rol.sql)
+ *
+ * Bu migration yeni bir sutun ya da fonksiyon EKLEMIYOR - `set_user_roles` ve
+ * `review_role_request` fonksiyonlarinin govdesini degistiriyor. Dolayisiyla
+ * varlik kontrolu ise yaramaz, `bos-birakilan-sorular` ile ayni durum.
+ *
+ * Iz olarak SUTUN ACIKLAMASI kullaniliyor: migration `users.roles` acikla-
+ * masini "ATAMA SIRASIYLA" ifadesini icerecek sekilde guncelliyor ve PostgREST
+ * sutun aciklamalarini OpenAPI tanimi icinde yayinliyor. Davranisi olcmek icin
+ * bir kullanicinin rollerini degistirmek gerekirdi; bu kontrol veri yazmaz.
+ */
+async function varsayilanRolKontrolu() {
+  const r = await fetch(`${BASE}/rest/v1/`, { headers: H });
+  if (!r.ok) return false;
+
+  const spec = await r.json();
+  const aciklama = spec?.definitions?.users?.properties?.roles?.description ?? "";
+  return aciklama.includes("ATAMA SIRASIYLA");
+}
 
 /**
  * Bos soru birakilabiliyor mu?

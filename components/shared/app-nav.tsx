@@ -11,9 +11,11 @@ import {
   GraduationCap,
   LayoutDashboard,
   Library,
-  ShieldCheck,
+  ListChecks,
   TrendingUp,
   Trophy,
+  UserCog,
+  Users,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -37,6 +39,12 @@ const BASE_NAV = {
       label: "İçerik & Kazanımlar",
       icon: BookOpen,
       description: "Metin yükle, AI ile soru üret",
+    },
+    {
+      href: "/dashboard/icerik-uzmani/soru-havuzu",
+      label: "Soru Havuzu Onayı",
+      icon: ListChecks,
+      description: "Ders ve konu bazlı oku, onayla",
     },
   ],
   egitmen: [
@@ -108,9 +116,15 @@ export const ROLE_NAV: Record<UserRole, readonly NavItem[]> = {
   admin: [
     {
       href: "/dashboard/sistem",
-      label: "Sistem Yönetimi",
-      icon: ShieldCheck,
-      description: "Roller, kullanıcılar ve sınıflar",
+      label: "Rol Onayları",
+      icon: UserCog,
+      description: "Bekleyen rol taleplerini karara bağla",
+    },
+    {
+      href: "/dashboard/sistem/kullanicilar",
+      label: "Kullanıcılar",
+      icon: Users,
+      description: "Rol, sınıf ve ders yetkisi düzenle",
     },
   ],
 };
@@ -230,7 +244,7 @@ export function RoleCard({ role }: { role: UserRole }) {
     Simdi renk yalnizca INCE bir aksan: ustte bir serit ve ikon kabi. Rol
     yine ilk bakista ayirt ediliyor ama kart kendi zeminine oturuyor.
   */
-  const book = ROLE_BOOK[role];
+  const book = definition.book;
 
   return (
     <div className="relative overflow-hidden rounded-lg border bg-card">
@@ -261,17 +275,3 @@ export function RoleCard({ role }: { role: UserRole }) {
     </div>
   );
 }
-
-/**
- * Rol -> cilt rengi.
- *
- * Menudeki kitap sirtlariyla ayni palete baglaniyor ki panel butun olarak
- * tek bir gorsel dil konussun.
- */
-const ROLE_BOOK: Record<UserRole, number> = {
-  icerik_uzmani: 3,
-  egitmen: 4,
-  ogrenci: 2,
-  egitim_yoneticisi: 8,
-  admin: 1,
-};

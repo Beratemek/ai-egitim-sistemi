@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import {
-  Brain,
   Loader2,
   Sparkles,
   TriangleAlert,
@@ -19,6 +18,7 @@ import {
 } from "@/lib/deneyap";
 import { GeneratedQuestionCard } from "@/components/shared/generated-question-card";
 import { SourceTextField } from "@/components/shared/source-text-field";
+import { StyleMemoryPanel } from "@/components/shared/style-memory-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -42,6 +42,8 @@ import type {
   ApiResponse,
   GenerateQuestionsRequest,
   GeneratedQuestion,
+  LearningOutcome,
+  QuestionPreference,
   QuestionType,
 } from "@/lib/types";
 
@@ -62,8 +64,17 @@ const BULK_PRESETS: readonly { key: string; label: string }[] = [
 export interface QuestionGeneratorFormProps {
   /** Havuzda halihazirda kullanılan ders adlari; öneri olarak sunulur. */
   subjects?: readonly string[];
-  /** AI'in bugune kadar ogrendigi örnek sayilari. */
-  preferenceStats: { liked: number; disliked: number };
+  /**
+   * Veritabanina kayitli kazanimlar.
+   *
+   * Bunlar bir arsiv degil, YENIDEN KULLANILACAK girdiler: uzman daha once
+   * yukledigi bir kazanimi secince form (dal, konu, kazanim, kaynak metin)
+   * tek hamlede doluyor. Onceden sayfanin dibinde yalnizca listeleniyorlardi
+   * ve tekrar soru uretmek icin metni elle kopyalamak gerekiyordu.
+   */
+  outcomes?: readonly LearningOutcome[];
+  /** Modele ornek olarak giden begeni/red kayitlari. */
+  preferences?: readonly QuestionPreference[];
   /** Supabase yoksa kaydetme kapali olur. */
   canPersist: boolean;
 }
@@ -78,7 +89,8 @@ export interface QuestionGeneratorFormProps {
  */
 export function QuestionGeneratorForm({
   subjects = [],
-  preferenceStats,
+  outcomes = [],
+  preferences = [],
   canPersist,
 }: QuestionGeneratorFormProps) {
   /** DENEYAP atölye dalı - üretilen sorular bu dala baglanir. */
@@ -104,7 +116,29 @@ export function QuestionGeneratorForm({
   const [bulkPreset, setBulkPreset] = React.useState<string | null>(null);
   const [bulkDone, setBulkDone] = React.useState(0);
 
-  const learnedTotal = preferenceStats.liked + preferenceStats.disliked;
+  const likedCount = preferences.filter((item) => item.verdict === "begendi").length;
+  const dislikedCount = preferences.length - likedCount;
+  const learnedTotal = preferences.length;
+
+  /**
+   * Kayitli bir kazanimi forma yazar.
+   *
+   * Kaynak metin de doldurulur - asil zahmet oydu; kazanim cumlesini elle
+   * yazmak kolay, uzun kaynak metni bulup kopyalamak degil.
+   */
+  function applyOutcome(outcomeId: string) {
+    const outcome = outcomes.find((item) => item.id === outcomeId);
+    if (!outcome) return;
+
+    setKazanim(outcome.outcome_text);
+    setContext(outcome.source_text);
+    setTopic(outcome.topic);
+    if (outcome.category) setCategory(outcome.category);
+
+    toast.success("Kazanım forma yüklendi", {
+      description: `${outcome.topic} — kaynak metin de dolduruldu.`,
+    });
+  }
 
   /** Alan boş veya gecersizse 5'e düşer; her zaman 1-20 araliginda. */
   const resolvedCount = Math.min(Math.max(Number.parseInt(count, 10) || 5, 1), 20);
@@ -148,7 +182,7 @@ export function QuestionGeneratorForm({
       toast.success(`${body.data.length} soru taslağı üretildi`, {
         description:
           learnedTotal > 0
-            ? `${preferenceStats.liked} beğeni ve ${preferenceStats.disliked} red örneği dikkate alındı.`
+            ? `${likedCount} beğeni ve ${dislikedCount} red örneği dikkate alındı.`
             : "Taslakları beğenerek AI'a tarzınızı öğretebilirsiniz.",
       });
     } catch (caught) {
@@ -267,6 +301,15 @@ export function QuestionGeneratorForm({
     });
   }
 
+  /** Hepsi seciliyse temizler, degilse hepsini secer. */
+  function toggleSelectAll() {
+    setSelected((current) =>
+      current.size === results.length
+        ? new Set()
+        : new Set(results.map((_, index) => index)),
+    );
+  }
+
   return (
     <div className="grid gap-6 xl:grid-cols-5">
       {/* ---------- Sol: form ---------- */}
@@ -350,6 +393,35 @@ export function QuestionGeneratorForm({
                 </div>
               </div>
 
+              {/*
+                Kayitli kazanimdan doldurma.
+
+                Kazanimlar sayfanin dibinde salt okunur listeleniyordu; ayni
+                kazanimdan yeniden soru uretmek icin metni elle kopyalamak
+                gerekiyordu. Secim formu tek hamlede dolduruyor - kaynak metin
+                dahil, cunku asil zahmet oydu.
+              */}
+              {outcomes.length > 0 ? (
+                <div className="space-y-2">
+                  <Label htmlFor="kayitli-kazanim">Kayıtlı kazanımdan doldur</Label>
+                  <Select value="" onValueChange={applyOutcome}>
+                    <SelectTrigger id="kayitli-kazanim">
+                      <SelectValue placeholder={`${outcomes.length} kayıtlı kazanım`} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {outcomes.map((outcome) => (
+                        <SelectItem key={outcome.id} value={outcome.id}>
+                          {outcome.topic} — {kisalt(outcome.outcome_text, 60)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Dal, konu, kazanım ve kaynak metni birlikte doldurur.
+                  </p>
+                </div>
+              ) : null}
+
               <div className="space-y-2">
                 <Label htmlFor="kazanim">Kazanım</Label>
                 <Input
@@ -409,65 +481,58 @@ export function QuestionGeneratorForm({
         </Card>
 
         {/* ---------- Ogrenme durumu ---------- */}
-        <Card className={learnedTotal > 0 ? "border-primary/30" : undefined}>
-          <CardContent className="p-4">
-            <div className="flex items-start gap-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <Brain className="h-4.5 w-4.5" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium">AI tarz hafizasi</p>
-                {learnedTotal === 0 ? (
-                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                    Henüz örnek yok. Üretilen taslakları begenip reddettikce AI
-                    sizin soru tarzınızı ogrenir ve sonraki uretimlerde ona yaklasir.
-                  </p>
-                ) : (
-                  <>
-                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                      Bir sonraki üretimde bu ornekler modele veriliyor.
-                    </p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      <Badge variant="success">{preferenceStats.liked} beğeni</Badge>
-                      <Badge variant="danger">{preferenceStats.disliked} red</Badge>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <StyleMemoryPanel preferences={preferences} canPersist={canPersist} />
       </div>
 
       {/* ---------- Sag: sonuçlar ---------- */}
       <div className="space-y-3 xl:col-span-3">
+        {/*
+          Bu cubuk bilerek YAPISKAN DEGIL: panelin kendi basligi zaten
+          `sticky top-0 z-20` ile duruyor, ikinci bir yapiskan seride onun
+          altina girer ve iki katmanli bir baslik olusurdu. Uzun listede
+          asagidan onaylama ihtiyacini alttaki eylem cubugu karsiliyor.
+        */}
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
             Üretilen taslaklar
           </h2>
 
+          {/*
+            Burada YALNIZCA secim ozeti var, onay dugmesi yok.
+
+            "Havuza gonder" bir sure ikisinde birden duruyordu; kisa listede
+            iki ayni dugme birkac santim arayla gorunuyordu. Onay tek yerde:
+            alttaki eylem cubugu, secim yapilir yapilmaz beliriyor.
+          */}
           {results.length > 0 ? (
-            <div className="flex items-center gap-2">
-              <Badge variant="soft">{selected.size} / {results.length} seçili</Badge>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="soft">
+                {selected.size} / {results.length} seçili
+              </Badge>
               <Button
                 size="sm"
-                className="gap-1.5"
-                disabled={saving || selected.size === 0 || !canPersist}
-                onClick={() => void handleSaveSelected()}
-                title={
-                  canPersist ? undefined : "Tanıtım modunda kayıt yapılmaz"
-                }
+                variant="ghost"
+                className="h-8 text-xs"
+                onClick={toggleSelectAll}
               >
-                {saving ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <UploadCloud className="h-3.5 w-3.5" />
-                )}
-                Havuza gönder
+                {selected.size === results.length
+                  ? "Seçimi temizle"
+                  : "Tümünü seç"}
               </Button>
             </div>
           ) : null}
         </div>
+
+        {/*
+          Kartlardan kaldirilan aciklama burada BIR KEZ duruyor; on soruluk
+          listede ayni cumleyi on kez okutmanin anlami yoktu.
+        */}
+        {results.length > 0 ? (
+          <p className="text-xs text-muted-foreground">
+            Beğeniniz AI&apos;ın bir sonraki üretimini şekillendirir. Havuza
+            yalnızca seçili taslaklar gönderilir.
+          </p>
+        ) : null}
 
         {pending ? (
           <div className="space-y-3">
@@ -482,8 +547,10 @@ export function QuestionGeneratorForm({
             ))}
           </div>
         ) : results.length === 0 ? (
+          // Kutu bilerek bir tik yuksek: form sutunu yaninda cok kisa
+          // kalinca sag taraf "bos birakilmis" gibi duruyordu.
           <Card className="border-dashed">
-            <CardContent className="flex flex-col items-center justify-center gap-2 py-16 text-center">
+            <CardContent className="flex min-h-[320px] flex-col items-center justify-center gap-2 py-16 text-center">
               <Sparkles className="h-8 w-8 text-muted-foreground/50" />
               <p className="font-medium">Henuz soru uretilmedi</p>
               <p className="max-w-xs text-sm text-muted-foreground">
@@ -515,7 +582,7 @@ export function QuestionGeneratorForm({
           yapisir. Kartlarin her birine dort dugme koymak yerine boyle
           yapildi - varsayilan gorunum temiz kaliyor, toplu is de mumkun.
         */}
-        {selected.size >= 2 ? (
+        {selected.size >= 1 ? (
           <div className="sticky bottom-4 z-10 flex flex-wrap items-center gap-2 rounded-xl border bg-card/95 p-3 shadow-lg backdrop-blur">
             <span className="text-sm font-medium">
               {selected.size} soru seçili
@@ -529,25 +596,57 @@ export function QuestionGeneratorForm({
             ) : null}
 
             <div className="ml-auto flex flex-wrap gap-2">
-              {BULK_PRESETS.map((preset) => (
-                <Button
-                  key={preset.key}
-                  size="sm"
-                  variant="outline"
-                  className="gap-1.5"
-                  disabled={bulkPreset !== null || saving}
-                  onClick={() => void bulkRevise(preset.key)}
-                >
-                  {bulkPreset === preset.key ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : null}
-                  {preset.label}
-                </Button>
-              ))}
+              {/*
+                Toplu revizyon tek soruda anlamsiz: "hepsini zorlastir" bir
+                taslak icin kartin kendi Duzenle dugmesinin isi. 2+ secimde
+                gorunur, tek secimde yalnizca "Havuza gonder" kalir.
+              */}
+              {selected.size >= 2
+                ? BULK_PRESETS.map((preset) => (
+                    <Button
+                      key={preset.key}
+                      size="sm"
+                      variant="outline"
+                      className="gap-1.5"
+                      disabled={bulkPreset !== null || saving}
+                      onClick={() => void bulkRevise(preset.key)}
+                    >
+                      {bulkPreset === preset.key ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : null}
+                      {preset.label}
+                    </Button>
+                  ))
+                : null}
+
+              {/*
+                Onay eylemi de bu cubukta: uzun bir listede asagida calisirken
+                onaylamak icin basliga kadar geri donmek gerekiyordu.
+              */}
+              <Button
+                size="sm"
+                className="gap-1.5"
+                disabled={saving || bulkPreset !== null || !canPersist}
+                onClick={() => void handleSaveSelected()}
+                title={canPersist ? undefined : "Tanıtım modunda kayıt yapılmaz"}
+              >
+                {saving ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <UploadCloud className="h-3.5 w-3.5" />
+                )}
+                Havuza gönder
+              </Button>
             </div>
           </div>
         ) : null}
       </div>
     </div>
   );
+}
+
+/** Uzun kazanim metnini secim listesinde tek satira sigdirir. */
+function kisalt(text: string, limit: number): string {
+  const temiz = text.trim();
+  return temiz.length <= limit ? temiz : `${temiz.slice(0, limit - 1)}…`;
 }

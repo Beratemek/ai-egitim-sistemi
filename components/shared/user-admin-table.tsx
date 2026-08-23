@@ -19,7 +19,7 @@ import {
   setUserClassroom,
   setUserRoles,
 } from "@/app/actions/admin";
-import { RoleBadge } from "@/components/shared/status-badge";
+import { RoleBadge, RoleCountBadge } from "@/components/shared/status-badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -34,7 +34,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ROLE_DEFINITIONS, ROLE_LIST } from "@/lib/roles";
+import { grantedRoles, ROLE_DEFINITIONS, ROLE_LIST } from "@/lib/roles";
 import { ALL_SUBJECTS, hasAllSubjects, subjectLabel } from "@/lib/subjects";
 import type { UserProfile, UserRole } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -49,8 +49,12 @@ import { cn } from "@/lib/utils";
  * kullaniciya degisiyordu. Coklu rol ve coklu ders geldikten sonra bu duzen
  * tasinamaz hale geldi.
  *
- * Ozette RENK yalnizca ETKIN role ayrildi; geri kalan roller notr bir sayacla
- * ("+3") gosteriliyor. Boylece tabloda goz bir yere odaklaniyor.
+ * Ozette RENK yalnizca VARSAYILAN role ayrildi; geri kalan roller notr bir
+ * sayacla ("+3") gosteriliyor. Boylece tabloda goz bir yere odaklaniyor.
+ *
+ * Varsayilan rol = `roles[0]`, yani kisiye ATANAN ILK rol. Aktif rol degil:
+ * aktif rol kullanicinin o an hangi panelde oldugunu soyler ve rol
+ * degistiriciyle degisir, yonetim tablosunda dalgali bir deger olurdu.
  *
  * Yetki kontrolu veritabanindaki SECURITY DEFINER fonksiyonlarindadir; bu
  * ekran yalnizca arayuz. Yonetici KENDI rolunu degistiremez - aksi halde
@@ -147,10 +151,18 @@ export function UserAdminTable({
 
       setRoleDraft((draft) => ({ ...draft, [user.id]: result.data.roles }));
 
+      // Varsayilani ayrica soyluyoruz: kullanici girişte o panelde acilacak,
+      // duz bir rol listesi bunu gostermiyordu.
+      const [ilk, ...digerleri] = result.data.roles;
       toast.success("Roller güncellendi", {
-        description: `${user.full_name || user.email}: ${result.data.roles
-          .map((item) => ROLE_DEFINITIONS[item].label)
-          .join(", ")}`,
+        description: [
+          user.full_name || user.email,
+          ": ",
+          ilk ? `${ROLE_DEFINITIONS[ilk].label} (varsayılan)` : "",
+          digerleri.length > 0
+            ? `, ${digerleri.map((item) => ROLE_DEFINITIONS[item].label).join(", ")}`
+            : "",
+        ].join(""),
       });
       router.refresh();
     } catch (caught) {
@@ -260,7 +272,18 @@ export function UserAdminTable({
             <TableRow className="hover:bg-transparent">
               <TableHead className="min-w-[220px]">Kullanıcı</TableHead>
               <TableHead className="w-[180px]">Rol</TableHead>
-              <TableHead className="min-w-[200px]">Atamalar</TableHead>
+              {/*
+                Sinif ve Alan AYRI kolonlar.
+
+                Ikisi tek bir "Atamalar" kolonunda birlikteyken satirdan satira
+                farkli anlamda rozetler yan yana geliyordu: ogrencide derslik,
+                egitmende ders. Goz kolonu asagi tarayinca "Derslik-3" ile "Tum
+                dersler" ayni sutunda alt alta dusuyor ve kolon hicbir sey
+                anlatmiyordu. Ayirinca her kolon tek bir soruyu yanitliyor;
+                ilgisiz hucre "—" ile bos birakiliyor.
+              */}
+              <TableHead className="w-[150px]">Sınıf</TableHead>
+              <TableHead className="min-w-[170px]">Alan</TableHead>
               <TableHead className="w-[130px] text-right">Düzenle</TableHead>
             </TableRow>
           </TableHeader>
@@ -275,6 +298,9 @@ export function UserAdminTable({
               const subjects = subjectsOf(user);
               const isStudent = roles.includes("ogrenci");
               const isInstructor = roles.includes("egitmen");
+              /* Varsayilan rol: kumenin ilk elemani. Taslak bir sekilde bos
+                 kalirsa (toggleRole buna izin vermez) aktif role duselim. */
+              const varsayilan = roles[0] ?? user.role;
 
               return (
                 <React.Fragment key={user.id}>
@@ -310,18 +336,25 @@ export function UserAdminTable({
                     </TableCell>
 
                     {/* ---------- Rol ozeti ---------- */}
+                    {/*
+                      Gosterilen rol VARSAYILAN rol (roles[0]), aktif rol degil.
+
+                      Aktif rol kullanicinin o an hangi panelde oldugunu soyler
+                      ve rol degistiriciyle degisir - yonetim tablosunda dalgali
+                      bir deger. Yoneticinin gormek istedigi, kisinin ATANMIS
+                      kimligi: girişte hangi panelde acilacagi.
+                    */}
                     <TableCell className="py-2.5">
-                      <div className="flex items-center gap-1.5">
-                        <RoleBadge role={user.role} />
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <RoleBadge role={varsayilan} />
                         {roles.length > 1 ? (
-                          <span
-                            className="text-xs font-medium text-muted-foreground"
-                            title={roles
+                          <RoleCountBadge
+                            count={roles.length - 1}
+                            title={`Diğer roller: ${roles
+                              .slice(1)
                               .map((role) => ROLE_DEFINITIONS[role].label)
-                              .join(", ")}
-                          >
-                            +{roles.length - 1}
-                          </span>
+                              .join(", ")}`}
+                          />
                         ) : null}
                         {user.role_status === "beklemede" ? (
                           <Badge variant="warning" className="font-normal">
@@ -331,12 +364,18 @@ export function UserAdminTable({
                       </div>
                     </TableCell>
 
-                    {/* ---------- Atama ozeti ---------- */}
+                    {/* ---------- Sinif (yalnizca ogrenci) ---------- */}
                     <TableCell className="py-2.5">
-                      <AssignmentSummary
+                      <ClassroomCell
                         classroom={user.classroom}
-                        subjects={subjects}
                         isStudent={isStudent}
+                      />
+                    </TableCell>
+
+                    {/* ---------- Alan (yalnizca egitmen) ---------- */}
+                    <TableCell className="py-2.5">
+                      <SubjectCell
+                        subjects={subjects}
                         isInstructor={isInstructor}
                       />
                     </TableCell>
@@ -368,7 +407,7 @@ export function UserAdminTable({
 
                   {/* ---------- Duzenleme paneli ---------- */}
                   <TableRow className="hover:bg-transparent">
-                    <TableCell colSpan={4} className="p-0">
+                    <TableCell colSpan={5} className="p-0">
                       {open ? (
                         <div className="grid gap-6 border-t bg-muted/30 p-4 md:grid-cols-3">
                           {/* Roller */}
@@ -384,12 +423,39 @@ export function UserAdminTable({
                                   hint={definition.description}
                                   checked={roles.includes(definition.role)}
                                   disabled={busy}
+                                  badge={
+                                    varsayilan === definition.role ? (
+                                      <Badge
+                                        variant="soft"
+                                        className="shrink-0 font-normal"
+                                      >
+                                        varsayılan
+                                      </Badge>
+                                    ) : null
+                                  }
                                   onToggle={() =>
                                     void toggleRole(user, definition.role)
                                   }
                                 />
                               ))}
                             </div>
+
+                            {/*
+                              Sira gorunmez bir kural olmasin: isaretleme
+                              sirasinin varsayilani belirledigini kullaniciya
+                              burada soyluyoruz, yoksa "neden hep bu rol
+                              yaziyor" sorusu geri geliyor.
+                            */}
+                            <p className="text-xs leading-relaxed text-muted-foreground">
+                              İlk işaretlediğiniz rol{" "}
+                              <strong className="font-medium text-foreground">
+                                varsayılan
+                              </strong>{" "}
+                              olur; kullanıcı girişte o panelde açılır.
+                              Varsayılanı değiştirmek için önce mevcut
+                              varsayılanın işaretini kaldırın, sonra istediğiniz
+                              rolü işaretleyin.
+                            </p>
 
                             {isSelf ? (
                               <p className="rounded-md border border-dashed px-3 py-2 text-xs leading-relaxed text-muted-foreground">
@@ -506,7 +572,7 @@ export function UserAdminTable({
             {visible.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={4}
+                  colSpan={5}
                   className="py-10 text-center text-sm text-muted-foreground"
                 >
                   Aramaya uyan kullanıcı bulunamadı.
@@ -553,6 +619,7 @@ function OptionRow({
   hint,
   checked,
   disabled,
+  badge,
   onToggle,
 }: {
   id: string;
@@ -560,6 +627,8 @@ function OptionRow({
   hint?: string;
   checked: boolean;
   disabled: boolean;
+  /** Etiketin sagina konan isaret (or. "varsayilan"). */
+  badge?: React.ReactNode;
   onToggle: () => void;
 }) {
   return (
@@ -578,7 +647,10 @@ function OptionRow({
         className="mt-0.5"
       />
       <Label htmlFor={id} className="min-w-0 cursor-pointer font-normal leading-tight">
-        <span className="block text-sm">{label}</span>
+        <span className="flex items-center gap-1.5">
+          <span className="text-sm">{label}</span>
+          {badge}
+        </span>
         {hint ? (
           <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
             {hint}
@@ -590,89 +662,94 @@ function OptionRow({
 }
 
 /**
- * Satirdaki atama ozeti.
+ * Bos hucre isareti.
  *
- * Iki farkli atama turu (sinif ve ders) tek sutunda toplandi; ayri sutunlar
- * cogu satirda bos kalip tabloyu genisletiyordu. Ilk iki ders gosterilir,
- * gerisi sayaca duser - satir yuksekligi sabit kalsin diye.
+ * Ogrencinin alani, egitmenin sinifi yok. Hucreyi tumuyle bos birakmak
+ * "veri girilmemis" gibi okunurdu; "—" bunun BEKLENEN bir bosluk oldugunu
+ * soyluyor.
  */
-function AssignmentSummary({
+function Bos() {
+  return <span className="text-sm text-muted-foreground">—</span>;
+}
+
+/**
+ * Sinif hucresi. Yalnizca OGRENCI icin doludur.
+ *
+ * Sinifsiz ogrenci sinava atanamaz, o yuzden uyari rengiyle isaretlenir -
+ * yoneticinin tabloyu tararken gormesi gereken tek eksik bu.
+ */
+function ClassroomCell({
   classroom,
-  subjects,
   isStudent,
-  isInstructor,
 }: {
   classroom: string | null;
-  subjects: readonly string[];
   isStudent: boolean;
+}) {
+  if (!isStudent) return <Bos />;
+
+  // Kolon basligi zaten "Sinif" diyor; hucrede kavrami tekrar etmiyoruz.
+  if (!classroom) {
+    return <span className="text-xs font-medium text-warning">atanmadı</span>;
+  }
+
+  return (
+    <Badge variant="soft" className="gap-1 font-normal">
+      <GraduationCap className="h-3 w-3" />
+      {classroom}
+    </Badge>
+  );
+}
+
+/**
+ * Alan (ders yetkisi) hucresi. Yalnizca EGITMEN icin doludur.
+ *
+ * Ilk iki alan gosterilir, gerisi sayaca duser - satir yuksekligi
+ * kullanicidan kullaniciya degismesin diye.
+ */
+function SubjectCell({
+  subjects,
+  isInstructor,
+}: {
+  subjects: readonly string[];
   isInstructor: boolean;
 }) {
-  const chips: React.ReactNode[] = [];
+  if (!isInstructor) return <Bos />;
 
-  if (isStudent) {
-    chips.push(
-      classroom ? (
-        <Badge key="sinif" variant="soft" className="gap-1 font-normal">
-          <GraduationCap className="h-3 w-3" />
-          {classroom}
-        </Badge>
-      ) : (
-        <span
-          key="sinif-yok"
-          className="text-xs text-amber-600 dark:text-amber-500"
-        >
-          sınıf atanmadı
-        </span>
-      ),
+  if (subjects.length === 0) {
+    return <span className="text-xs font-medium text-warning">atanmadı</span>;
+  }
+
+  // Joker tek rozet: yaninda ayrica ders adi listelemek yaniltir.
+  // Etiket `subjectLabel`'dan geliyor ki uygulamanin geri kalaniyla ayni
+  // kelimeyi kullansin - burada elle "Tum alanlar" yazmak iki ayri terim
+  // uretirdi (duzenleme panelinde hala "Tum dersler" yaziyor).
+  if (hasAllSubjects(subjects)) {
+    return (
+      <Badge variant="soft" className="gap-1 font-normal">
+        <BookMarked className="h-3 w-3" />
+        {subjectLabel(ALL_SUBJECTS)}
+      </Badge>
     );
   }
 
-  if (isInstructor) {
-    if (subjects.length === 0) {
-      chips.push(
-        <span
-          key="ders-yok"
-          className="text-xs text-amber-600 dark:text-amber-500"
-        >
-          ders atanmadı
-        </span>,
-      );
-    } else if (hasAllSubjects(subjects)) {
-      // Joker tek rozet: "Tum dersler" yaninda ders adi listelemek yaniltir.
-      chips.push(
-        <Badge key="tum-dersler" variant="soft" className="gap-1 font-normal">
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {subjects.slice(0, 2).map((subject) => (
+        <Badge key={subject} variant="soft" className="gap-1 font-normal">
           <BookMarked className="h-3 w-3" />
-          Tüm dersler
-        </Badge>,
-      );
-    } else {
-      for (const subject of subjects.slice(0, 2)) {
-        chips.push(
-          <Badge key={subject} variant="soft" className="gap-1 font-normal">
-            <BookMarked className="h-3 w-3" />
-            {subject}
-          </Badge>,
-        );
-      }
-      if (subjects.length > 2) {
-        chips.push(
-          <span
-            key="ders-fazla"
-            className="text-xs font-medium text-muted-foreground"
-            title={subjects.join(", ")}
-          >
-            +{subjects.length - 2}
-          </span>,
-        );
-      }
-    }
-  }
-
-  if (chips.length === 0) {
-    return <span className="text-sm text-muted-foreground">—</span>;
-  }
-
-  return <div className="flex flex-wrap items-center gap-1.5">{chips}</div>;
+          {subject}
+        </Badge>
+      ))}
+      {subjects.length > 2 ? (
+        <span
+          className="text-xs font-medium text-muted-foreground"
+          title={subjects.join(", ")}
+        >
+          +{subjects.length - 2}
+        </span>
+      ) : null}
+    </div>
+  );
 }
 
 /**
@@ -729,16 +806,6 @@ function ClassroomField({
       </p>
     </div>
   );
-}
-
-/**
- * Kullaniciya verilmis roller.
- *
- * `roles` kolonu eklenmeden once olusmus kayitlarda kume bos olabilir; o
- * durumda aktif rol tek eleman olarak kabul edilir ki tablo bos gorunmesin.
- */
-function grantedRoles(user: UserProfile): UserRole[] {
-  return user.roles && user.roles.length > 0 ? user.roles : [user.role];
 }
 
 function initials(name: string): string {

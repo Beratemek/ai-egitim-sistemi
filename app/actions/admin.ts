@@ -26,6 +26,7 @@ import { isRoleStatus, type RoleStatus, type UserRole } from "@/lib/types";
 /** Tum kullanici sayfalarini tazeler. */
 function revalidateUserPaths(): void {
   revalidatePath("/dashboard/sistem");
+  revalidatePath("/dashboard/sistem/kullanicilar");
   revalidatePath("/dashboard/yonetici");
   revalidatePath("/dashboard/egitmen");
 }

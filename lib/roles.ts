@@ -4,7 +4,7 @@
  * middleware, login ekrani ve navigasyon hep buradan okur.
  */
 
-import type { UserRole } from "@/lib/types";
+import type { UserProfile, UserRole } from "@/lib/types";
 
 export interface RoleDefinition {
   role: UserRole;
@@ -14,8 +14,16 @@ export interface RoleDefinition {
   description: string;
   /** Bu rolun ana panel yolu. */
   path: `/dashboard/${string}`;
-  /** Rozet renkleri (Tailwind sinifi). */
-  badgeClass: string;
+  /**
+   * Rolun cilt rengi: `--book-1..8` jetonlarindan biri.
+   *
+   * Once ham Tailwind renkleri (sky/violet/amber...) yaziliydi. O renkler
+   * tema jetonlarina bagli olmadigi icin acik/koyu temada panelin geri
+   * kalanina yabanci duruyordu - menudeki kitap sirtlari bir palet,
+   * rozetler baska bir palet konusuyordu. Artik ikisi de ayni jetonlardan
+   * besleniyor; rol nerede gorunurse gorunsun AYNI rengi tasiyor.
+   */
+  book: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 }
 
 export const ROLE_DEFINITIONS: Record<UserRole, RoleDefinition> = {
@@ -24,39 +32,35 @@ export const ROLE_DEFINITIONS: Record<UserRole, RoleDefinition> = {
     label: "İçerik Uzmanı",
     description: "Kaynak metin yükler, AI ile soru üretir, havuza onaylar.",
     path: "/dashboard/icerik-uzmani",
-    badgeClass: "bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-200",
+    book: 3, // petrol yesili
   },
   egitmen: {
     role: "egitmen",
     label: "Eğitmen",
     description: "Havuzdan sınav oluşturur ve öğrenci puanlarını onaylar.",
     path: "/dashboard/egitmen",
-    badgeClass:
-      "bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-200",
+    book: 4, // lacivert
   },
   ogrenci: {
     role: "ogrenci",
     label: "Öğrenci",
     description: "Sınava girer, açık uçlu soruları yanıtlar, geri bildirim alır.",
     path: "/dashboard/ogrenci",
-    badgeClass:
-      "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200",
+    book: 2, // hardal
   },
   egitim_yoneticisi: {
     role: "egitim_yoneticisi",
     label: "Eğitim Yöneticisi",
     description: "Sınav ve başarı istatistiklerini raporlar.",
     path: "/dashboard/yonetici",
-    badgeClass:
-      "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200",
+    book: 8, // altin sarisi
   },
   admin: {
     role: "admin",
     label: "Sistem Yöneticisi",
     description: "Rolleri, kullanıcıları ve sınıfları yönetir.",
     path: "/dashboard/sistem",
-    badgeClass:
-      "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-200",
+    book: 1, // kiremit
   },
 };
 
@@ -94,6 +98,38 @@ export function dashboardPathFor(role: UserRole): string {
 /** Rolun okunabilir adini dondurur. */
 export function roleLabel(role: UserRole): string {
   return ROLE_DEFINITIONS[role].label;
+}
+
+/** Rol kumesi ve aktif rol tasiyan her kayit. */
+type RoleBearer = Pick<UserProfile, "role" | "roles">;
+
+/**
+ * Kullaniciya VERILMIS roller, atama sirasiyla.
+ *
+ * `roles` kolonu eklenmeden once olusmus kayitlarda kume bos olabilir; o
+ * durumda aktif rol tek eleman olarak kabul edilir ki listeler bos gorunmesin.
+ */
+export function grantedRoles(user: RoleBearer): [UserRole, ...UserRole[]] {
+  // Donus tipi BOS OLMAYAN dizi: `defaultRole` ve cagiranlar `[0]` okurken
+  // `undefined` kontrolu yapmak zorunda kalmasin. Bos kume zaten aktif role
+  // duşurulduğu icin bu her zaman dogru.
+  const [first, ...rest] = user.roles ?? [];
+  return first ? [first, ...rest] : [user.role];
+}
+
+/**
+ * VARSAYILAN rol: kisiye atanan ILK rol.
+ *
+ * Aktif rolden (`user.role`) ayri bir kavramdir. Kullanici rol degistiricisiyle
+ * baska bir role gecebilir; varsayilan, sistem yoneticisinin atama sirasinda
+ * ilk sirada biraktiği roldur ve kume yeniden atanana kadar degismez.
+ *
+ * Siranin korunmasi veritabaninda `set_user_roles` fonksiyonuna bagli
+ * (bkz. migrations/BEKLEYEN-1-varsayilan-rol.sql). O fonksiyon dizideki
+ * sirayi bozarsa buradaki deger de anlamsizlasir.
+ */
+export function defaultRole(user: RoleBearer): UserRole {
+  return grantedRoles(user)[0];
 }
 
 /**

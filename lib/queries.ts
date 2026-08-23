@@ -33,6 +33,7 @@ import type {
   LearningOutcome,
   Question,
   QuestionOption,
+  QuestionPreference,
   QuestionStatus,
   QuestionType,
   StyleGuide,
@@ -915,6 +916,27 @@ export async function getStyleGuide(limit = 6): Promise<StyleGuide> {
   ]);
 
   return { liked: liked.data ?? [], disliked: disliked.data ?? [] };
+}
+
+/**
+ * Tercih kayitlarini (begeni + red) tek listede dondurur.
+ *
+ * `getStyleGuide` modele verilecek ORNEKLERI ayirir ve az sayida tutar;
+ * bu ise arayuzde gosterilip KARARI DEGISTIRILEBILSIN diye var, o yuzden
+ * ikisi tek listede ve daha genis bir limitle geliyor.
+ */
+export async function getPreferences(limit = 50): Promise<QuestionPreference[]> {
+  if (!isSupabaseConfigured) return [];
+
+  const supabase = await createServerSupabaseClient();
+
+  const { data } = await supabase
+    .from("question_preferences")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  return data ?? [];
 }
 
 /** Tercih istatistikleri - arayuzde "AI su kadar ornekten ogrendi" gostergesi. */
