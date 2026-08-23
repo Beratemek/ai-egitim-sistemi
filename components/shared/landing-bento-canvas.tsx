@@ -17,7 +17,7 @@ export function LandingBentoCanvas() {
       <div className="academic-bento-stage">
         <div className="academic-bento-viewport">
           <div className="academic-bento-grid">
-            <article className="bento-source bg-[#20382f] p-5 text-[#f7f3e9] sm:p-6">
+            <article className="bento-source bg-[#193f35] p-5 text-[#f7f5ef] sm:p-6">
               <div className="flex items-center justify-between text-[#b9d1c7]">
                 <span className="font-mono text-[8px] uppercase tracking-[0.18em]">Kaynak</span>
                 <FileText className="h-4 w-4" />
@@ -29,7 +29,7 @@ export function LandingBentoCanvas() {
               </div>
             </article>
 
-            <article className="bento-outcome bg-[#176f5e] p-5 text-[#fffaf0] sm:p-6">
+            <article className="bento-outcome bg-[#177765] p-5 text-[#fffdf8] sm:p-6">
               <div className="flex items-center justify-between text-[#dce9e3]">
                 <span className="font-mono text-[8px] uppercase tracking-[0.18em]">Kazanım</span>
                 <Target className="h-4 w-4" />
@@ -40,19 +40,19 @@ export function LandingBentoCanvas() {
               </div>
             </article>
 
-            <article className="bento-context bg-[#dfeae4] p-4 text-[#173a36] sm:p-5">
-              <div className="flex items-center justify-between text-[#52736d]">
+            <article className="bento-context bg-[#dce8e2] p-4 text-[#193f35] sm:p-5">
+              <div className="flex items-center justify-between text-[#5b6e72]">
                 <span className="font-mono text-[8px] uppercase tracking-[0.18em]">Hazırlık</span>
                 <ScanText className="h-4 w-4" />
               </div>
               <div className="mt-auto">
                 <p className="font-display text-xl leading-none sm:text-2xl">Bağlam çıkarılır.</p>
-                <p className="mt-2 text-[10px] text-[#52736d]">Soru üretimine hazırlanır</p>
+                <p className="mt-2 text-[10px] text-[#5b6e72]">Soru üretimine hazırlanır</p>
               </div>
             </article>
 
-            <article className="bento-question bg-[#fffdf8] p-5 text-[#10272f] sm:p-6">
-              <div className="flex items-center justify-between text-[#52736d]">
+            <article className="bento-question bg-[#fffdf8] p-5 text-[#102a30] sm:p-6">
+              <div className="flex items-center justify-between text-[#5b6e72]">
                 <span className="font-mono text-[8px] uppercase tracking-[0.18em]">Soru türü</span>
                 <FileQuestion className="h-4 w-4" />
               </div>
@@ -62,7 +62,7 @@ export function LandingBentoCanvas() {
               </div>
             </article>
 
-            <article className="bento-editorial bg-[#c7795c] p-4 text-[#fffaf0] sm:p-5">
+            <article className="bento-editorial bg-[#c9785b] p-4 text-[#fffdf8] sm:p-5">
               <ListChecks className="h-4 w-4" />
               <div className="mt-auto">
                 <p className="font-mono text-[8px] uppercase tracking-[0.18em] text-white/65">Soru üretimi</p>
@@ -81,7 +81,7 @@ export function LandingBentoCanvas() {
               </div>
             </article>
 
-            <article className="bento-answer bg-[#a9c4c4] p-5 text-[#173a36] sm:p-6">
+            <article className="bento-answer bg-[#aec9c2] p-5 text-[#193f35] sm:p-6">
               <div className="flex items-center justify-between">
                 <span className="font-mono text-[8px] uppercase tracking-[0.18em]">Öğrenci cevabı</span>
                 <Check className="bento-check h-4 w-4" />
@@ -92,10 +92,10 @@ export function LandingBentoCanvas() {
               </div>
             </article>
 
-            <article className="bento-assessment bg-[#fffdf8] p-5 text-[#10272f] sm:p-6">
+            <article className="bento-assessment bg-[#fffdf8] p-5 text-[#102a30] sm:p-6">
               <div className="flex items-center justify-between">
-                <span className="font-mono text-[8px] uppercase tracking-[0.18em] text-[#52736d]">Rubrik</span>
-                <ListChecks className="h-4 w-4 text-[#52736d]" />
+                <span className="font-mono text-[8px] uppercase tracking-[0.18em] text-[#5b6e72]">Rubrik</span>
+                <ListChecks className="h-4 w-4 text-[#5b6e72]" />
               </div>
               <p className="mt-5 font-display text-2xl leading-none sm:text-3xl">Ön değerlendirme</p>
               <div className="mt-auto space-y-2" aria-label="Rubrik kriterleri">
@@ -103,14 +103,14 @@ export function LandingBentoCanvas() {
                   <div key={criterion} className="grid grid-cols-[3.5rem_1fr] items-center gap-2 text-[8px] text-muted-foreground">
                     <span>{criterion}</span>
                     <span className="h-1 bg-[#dce2dc]">
-                      <span className="block h-full bg-[#176f5e]" style={{ width: `${72 + index * 9}%` }} />
+                      <span className="block h-full bg-[#177765]" style={{ width: `${72 + index * 9}%` }} />
                     </span>
                   </div>
                 ))}
               </div>
             </article>
 
-            <article className="bento-human bg-[#10272f] p-5 text-[#f7f3e9] sm:p-6">
+            <article className="bento-human bg-[#102a30] p-5 text-[#f7f5ef] sm:p-6">
               <div className="flex items-center justify-between text-[#b9d1c7]">
                 <span className="font-mono text-[8px] uppercase tracking-[0.18em]">Nihai sonuç</span>
                 <UserCheck className="h-4 w-4" />
@@ -121,7 +121,7 @@ export function LandingBentoCanvas() {
               </div>
             </article>
 
-            <article className="bento-analytics bg-[#e4c98c] p-5 text-[#2d372d] sm:p-6">
+            <article className="bento-analytics bg-[#e6ca82] p-5 text-[#2d372d] sm:p-6">
               <div className="flex items-center justify-between">
                 <span className="font-mono text-[8px] uppercase tracking-[0.18em]">Gelişim</span>
                 <BarChart3 className="h-4 w-4" />
