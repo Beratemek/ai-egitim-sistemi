@@ -5,6 +5,7 @@ import { ArrowLeft, CheckCircle2 } from "lucide-react";
 import { LoginForm } from "@/components/shared/login-form";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { BrandMark } from "@/components/shared/brand-mark";
+import { isUserRole, type UserRole } from "@/lib/types";
 
 export const metadata: Metadata = {
   title: "Giriş",
@@ -20,10 +21,18 @@ const HIGHLIGHTS: readonly string[] = [
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; next?: string }>;
+  searchParams: Promise<{
+    error?: string;
+    next?: string;
+    mode?: string;
+    role?: string;
+  }>;
 }) {
   const params = await searchParams;
   const callbackError = params.error ?? null;
+  const initialMode = params.mode === "kayit" ? "kayit" : "giris";
+  const initialRole: UserRole =
+    isUserRole(params.role) && params.role !== "admin" ? params.role : "ogrenci";
   return (
     <main className="grid min-h-screen lg:grid-cols-2">
       {/* ---------- Sol: marka paneli (yalnızca genis ekran) ---------- */}
@@ -110,7 +119,11 @@ export default async function LoginPage({
               </p>
             </div>
 
-            <LoginForm callbackError={callbackError} />
+            <LoginForm
+              callbackError={callbackError}
+              initialMode={initialMode}
+              initialRole={initialRole}
+            />
 
             <p className="text-center text-xs text-muted-foreground">
               Giriş yapamıyorsanız okulunuzun sistem yöneticisine başvurun.

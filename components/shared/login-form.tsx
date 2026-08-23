@@ -29,16 +29,22 @@ type Mode = "giris" | "kayit";
 export interface LoginFormProps {
   /** /auth/callback tarafından ?error= ile tasinan hata mesaji. */
   callbackError?: string | null;
+  initialMode?: Mode;
+  initialRole?: UserRole;
 }
 
-export function LoginForm({ callbackError = null }: LoginFormProps) {
+export function LoginForm({
+  callbackError = null,
+  initialMode = "giris",
+  initialRole = "ogrenci",
+}: LoginFormProps) {
   const router = useRouter();
 
-  const [mode, setMode] = React.useState<Mode>("giris");
+  const [mode, setMode] = React.useState<Mode>(initialMode);
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [fullName, setFullName] = React.useState("");
-  const [role, setRole] = React.useState<UserRole>("ogrenci");
+  const [role, setRole] = React.useState<UserRole>(initialRole);
   const [pending, setPending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(callbackError);
   const [info, setInfo] = React.useState<string | null>(null);
@@ -84,23 +90,25 @@ export function LoginForm({ callbackError = null }: LoginFormProps) {
         return;
       }
 
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+      const response = await fetch("/auth/login", {
+        method: "POST",
+        credentials: "same-origin",
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
       });
+      const result = (await response.json()) as {
+        redirectTo?: string;
+        error?: string;
+      };
 
-      if (signInError) throw signInError;
+      if (!response.ok || !result.redirectTo) {
+        throw new Error(result.error ?? "Giriş yapılamadı.");
+      }
 
-      const { data: profile } = await supabase
-        .from("users")
-        .select("role")
-        .eq("id", data.user.id)
-        .single();
-
-      const resolvedRole: UserRole = isUserRole(profile?.role) ? profile.role : "ogrenci";
-
-      router.replace(dashboardPathFor(resolvedRole));
-      router.refresh();
+      // Tam sayfa gecisi, Set-Cookie basliklarinin middleware tarafindan yeni
+      // istekte gorulmesini garanti eder.
+      window.location.assign(result.redirectTo);
     } catch (caught) {
       const message =
         caught instanceof Error
@@ -120,7 +128,12 @@ export function LoginForm({ callbackError = null }: LoginFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
+    <form
+      action={mode === "giris" ? "/auth/login" : undefined}
+      method={mode === "giris" ? "post" : undefined}
+      onSubmit={mode === "kayit" ? handleSubmit : undefined}
+      className="space-y-5"
+    >
       <Tabs
         value={mode}
         onValueChange={(value) => {

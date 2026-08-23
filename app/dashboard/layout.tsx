@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 
 import { DashboardShell } from "@/components/shared/dashboard-shell";
 import { isSupabaseConfigured } from "@/lib/env";
-import { roleForPath } from "@/lib/roles";
+import { dashboardPathFor, roleForPath } from "@/lib/roles";
 import { getCurrentUser } from "@/lib/supabase-server";
 import type { UserRole } from "@/lib/types";
 
@@ -49,6 +49,17 @@ export default async function DashboardLayout({
    */
   const requestHeaders = await headers();
   const pathRole = roleForPath(requestHeaders.get("x-pathname") ?? "/dashboard");
+
+  // Middleware ana korumadir; layout da ayni kurali uygular. Boylece istemci
+  // gecisi, onbellek veya middleware yapilandirma hatasi baska rolun sayfa
+  // icerigini mevcut kullanicinin adi altinda render edemez.
+  if (pathRole && !grantedRoles.includes(pathRole)) {
+    const safeRole = grantedRoles.includes(current.profile.role)
+      ? current.profile.role
+      : grantedRoles[0];
+    redirect(safeRole ? dashboardPathFor(safeRole) : "/login");
+  }
+
   const activeRole: UserRole =
     pathRole && grantedRoles.includes(pathRole) ? pathRole : current.profile.role;
 
