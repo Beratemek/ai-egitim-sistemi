@@ -1,0 +1,4 @@
+-- Yerel geliştirme ve test verileri burada tutulur.
+-- Şema değişikliklerini bu dosyaya eklemeyin; migration kullanın.
+-- Tekrarlanabilir ekip ortamı için güvenli demo kullanıcıları ve örnek veriler
+-- ayrı bir görevde buraya eklenecek.

@@ -1,5 +1,13 @@
 # Migration dosyaları
 
+## DİKKAT: `20260820074504_initial_schema.sql` bir BEKLEYEN İŞ DEĞİLDİR
+
+O dosya Supabase **CLI'ın yerel geliştirme** şemasıdır (`supabase start` onu
+okur) ve CLI onun tam olarak bu yolda durmasını ister. **SQL Editor'de
+ÇALIŞTIRMAYIN** — ortak veritabanına sıfırdan şema basmaya çalışır.
+
+Elle çalıştırılacak işler yalnızca `BEKLEYEN-*.sql` adlı dosyalardır.
+
 ## Nasıl çalışır
 
 Bu klasörde **doğrudan çalıştırılacak dosyalar durur.** Supabase SQL Editor'de
