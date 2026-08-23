@@ -59,9 +59,24 @@ export function LandingScrollStory() {
             {WORDS.map((word, index) => {
               const start = index * 0.055;
               const localProgress = clamp((progress - start) / 0.4);
-              const direction = index % 2 === 0 ? -1 : 1;
-              const distance = (1 - localProgress) * direction * 14;
-              const lift = (1 - localProgress) * (index % 3 === 0 ? 12 : -8);
+
+              /*
+                Hareket YALNIZCA DIKEY.
+
+                Onceki surum kelimeleri yatayda +/-14vw kaydiriyordu. Yatay
+                oteleme kardes elemanlari itmez - kelime kendi yerinde durur,
+                yalnizca boyanacagi yer kayar. Sonuc: "Kazanimi" ile "soruya,"
+                efektin ortasinda ust uste biniyor ve okunmaz oluyordu. 14vw
+                zaten bir kere 38vw'den dusurulmus, ama sorun mesafede degil
+                yonde: uzun Turkce kelimeler ne kadar kaydirilirsa kaydirilsin
+                cakisiyor.
+
+                Dikey oteleme boyle bir sorun uretmiyor - satir yuksekligi
+                sabit, kelimeler kendi sutununda yukari dogru geliyor. Ayni
+                kademeli aciliş hissi kaliyor, cakisma bitiyor.
+              */
+              const lift = (1 - localProgress) * (index % 2 === 0 ? 46 : 30);
+              const blur = (1 - localProgress) * 5;
 
               return (
                 <span
@@ -72,9 +87,10 @@ export function LandingScrollStory() {
                       : ""
                   }
                   style={{
-                    opacity: 0.2 + localProgress * 0.8,
-                    transform: `translate3d(${distance}vw, ${lift}px, 0)`,
-                    transition: "opacity 80ms linear",
+                    opacity: 0.12 + localProgress * 0.88,
+                    transform: `translate3d(0, ${lift}px, 0)`,
+                    filter: blur > 0.05 ? `blur(${blur}px)` : undefined,
+                    transition: "opacity 80ms linear, filter 80ms linear",
                   }}
                 >
                   {word}
