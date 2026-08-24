@@ -6,6 +6,17 @@ import { Check, X } from "lucide-react";
 import { QuestionVisual } from "@/components/shared/question-visual";
 import { QuestionTypeBadge } from "@/components/shared/status-badge";
 import { Badge } from "@/components/ui/badge";
+import { difficultyOf } from "@/lib/question-pool";
+import { DIFFICULTY_LABELS, type QuestionDifficulty } from "@/lib/types";
+
+/** Zorluk seviyesinin rozet tonu. */
+const ZORLUK_TONU: Readonly<
+  Record<QuestionDifficulty, "success" | "outline" | "warning">
+> = {
+  kolay: "success",
+  orta: "outline",
+  zor: "warning",
+};
 import type { Question } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -26,7 +37,13 @@ import { cn } from "@/lib/utils";
 /** Bilesenin ihtiyac duydugu alanlar; tam `Question` sart degil. */
 export type QuestionBodyData = Pick<
   Question,
-  "text" | "type" | "options_json" | "correct_answer" | "rubric" | "visual_json"
+  | "text"
+  | "type"
+  | "options_json"
+  | "correct_answer"
+  | "rubric"
+  | "visual_json"
+  | "difficulty"
 >;
 
 export interface QuestionBodyProps {
@@ -78,6 +95,19 @@ export function QuestionBody({
         ) : null}
         <QuestionTypeBadge type={question.type} />
         {topic ? <Badge variant="soft">{topic}</Badge> : null}
+        {/*
+          ZORLUK ROZETI.
+
+          Icerik uzmani soruyu bir zorluk ISTEYEREK uretiyor ve model her soru
+          icin kendi seviyesini dolduruyor. Bu bilgi bugune kadar yalnizca
+          suzgecte kullaniliyordu, EKRANDA hic gorunmuyordu; egitmen sinav
+          kurarken "bu soru zor mu" sorusunu metne bakip tahmin ediyordu.
+
+          Renk seviyeyi tasir: kolay yesil, orta notr, zor uyari tonunda.
+        */}
+        <Badge variant={ZORLUK_TONU[difficultyOf(question)]}>
+          {DIFFICULTY_LABELS[difficultyOf(question)]}
+        </Badge>
         {points !== null ? <Badge variant="outline">{points} puan</Badge> : null}
       </div>
 

@@ -49,6 +49,7 @@ import {
   type SubjectGroup,
   type TopicGroup,
 } from "@/lib/question-pool";
+import { DIFFICULTY_LABELS } from "@/lib/types";
 import type { Question, QuestionDifficulty, QuestionType } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -718,6 +719,17 @@ function PaperQuestion({
           <p className="text-[11.5pt] font-medium leading-[1.5]">
             <span className="mr-1.5 font-bold tabular-nums">{number}.</span>
             {question.text}
+          </p>
+
+          {/*
+            Zorluk, kagit gorunumunun sagina degil METNIN ALTINA konuyor:
+            kagit sinavin kendisini taklit ediyor ve gercek bir sinav
+            kagidinda sorunun yaninda "zor" yazmaz. Burasi havuz, yani
+            egitmenin SECIM yaptigi yer; bilgi gorunmeli ama kagidin
+            duzenini bozmamali - bu yuzden kucuk ve soluk.
+          */}
+          <p className="mt-1 text-[9pt] uppercase tracking-wide text-slate-500">
+            {DIFFICULTY_LABELS[difficultyOf(question)]}
           </p>
 
           {/*
