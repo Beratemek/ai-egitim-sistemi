@@ -201,3 +201,29 @@ export const VISUAL_LABELS: Record<QuestionVisual["kind"], string> = {
   svg: "Şema",
   image: "Görsel",
 };
+
+/* -------------------------------------------------------------------------- */
+/*  Lisans                                                                    */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Bu lisans atif (kaynak gosterme) zorunlulugu getiriyor mu?
+ *
+ * Kamu mali ve CC0 gorseller serbesttir - atif hukuken gerekmez. CC BY,
+ * CC BY-SA, GFDL gibi lisanslar ise eseri kullanirken kaynagi gostermeyi
+ * SART kosar.
+ *
+ * Emin olunamayan bir lisans metni geldiginde GUVENLI TARAFTA kalinir: atif
+ * gerekli sayilir. Yanlis tarafta hata yapmak telif ihlali olur, dogru
+ * tarafta hata yapmak yalnizca gereksiz bir satir yazi.
+ *
+ * IKI YERDE KULLANILIR ve ayni olmak ZORUNDA:
+ *   - lib/visual-search.ts  : atif isteyen gorselleri hic secmemek icin
+ *   - components/shared/question-visual.tsx : gene de gelmisse altyaziyi
+ *     cizmek icin (havuzda bu kural konmadan once kaydedilmis gorseller var)
+ */
+export function atifGerekli(license: string): boolean {
+  const l = license.toLocaleLowerCase("en");
+  const serbest = ["public domain", "cc0", "pd-", "kamu mal"];
+  return !serbest.some((kalip) => l.includes(kalip));
+}

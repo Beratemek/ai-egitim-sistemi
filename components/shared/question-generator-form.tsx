@@ -17,6 +17,7 @@ import { GeneratedQuestionCard } from "@/components/shared/generated-question-ca
 import { OutcomeSearchField } from "@/components/shared/outcome-search-field";
 import { SourceTextField } from "@/components/shared/source-text-field";
 import { StyleMemoryPanel } from "@/components/shared/style-memory-panel";
+import { SubjectCombobox } from "@/components/shared/subject-combobox";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -98,6 +99,13 @@ const BULK_PRESETS: readonly { key: string; label: string }[] = [
 export interface QuestionGeneratorFormProps {
   /** Havuzda halihazirda kullanılan ders adlari; öneri olarak sunulur. */
   subjects?: readonly string[];
+  /**
+   * Havuzda halihazirda kullanilan konular, DERSIYLE birlikte.
+   *
+   * Ders bilgisi tasiniyor cunku oneriler secili derse gore suzuluyor:
+   * Cografya yazan birine Trigonometri onerilmemeli.
+   */
+  topics?: readonly { subject: string; topic: string }[];
   /** Tanimli kazanimlar; uretimin olcme hedefi buradan secilir. */
   outcomes?: readonly LearningOutcome[];
   /** AI'in bugune kadar ogrendigi örnek sayilari (ders kirilimiyla). */
@@ -133,6 +141,7 @@ export interface QuestionGeneratorFormProps {
  */
 export function QuestionGeneratorForm({
   subjects = [],
+  topics = [],
   outcomes = [],
   preferenceStats,
   preferences = [],
@@ -187,6 +196,31 @@ export function QuestionGeneratorForm({
 
   /** Alan boş veya gecersizse 5'e düşer; her zaman 1-20 araliginda. */
   const resolvedCount = Math.min(Math.max(Number.parseInt(count, 10) || 5, 1), 20);
+
+  /**
+   * Konu onerileri, SECILI DERSE gore suzulur.
+   *
+   * Kazanim listesindeki mantigin aynisi ve ayni sebeple: havuzda yuzlerce
+   * konu birikiyor, hepsini tek listede gostermek oneriyi kullanilamaz
+   * kiliyor. "Cografya" yazan birine "Trigonometri" onerilmemeli.
+   *
+   * Ders BOSSA ya da o derste hic konu yoksa suzme yapilmaz - bos bir oneri
+   * listesi, oneri olmamasindan daha kotu. Ilk kez bir ders adi yazan
+   * kullanici yine de gecmis konularini gorebilsin.
+   *
+   * Karsilastirma `subjectKey` ile: "cografya" yazan biri "Coğrafya"
+   * altindaki konulari gormeli - buyuk/kucuk harf ve Turkce karakter farki
+   * yuzunden liste bos kalmasin.
+   */
+  const konuOnerileri = React.useMemo(() => {
+    const key = subject.trim() ? subjectKey(subject) : null;
+    const derstekiler = key
+      ? topics.filter((item) => item.subject && subjectKey(item.subject) === key)
+      : [];
+
+    const kaynak = derstekiler.length > 0 ? derstekiler : topics;
+    return [...new Set(kaynak.map((item) => item.topic))];
+  }, [topics, subject]);
 
   /**
    * Kazanim listesi yazilan DERSE gore suzulur.
@@ -266,6 +300,30 @@ export function QuestionGeneratorForm({
         "Kazanım zorunlu. Listeden bir kazanım seçin ya da serbest metin olarak yazın.";
       setError(message);
       toast.error("Kazanım eksik", { description: message });
+      return;
+    }
+
+    /*
+      Ders ve konu dogrulamasi BURADA.
+
+      Eskiden `<input required>` ile tarayiciya birakilmisti; alanlar
+      SubjectCombobox'a gecince o oznitelik dustu. Kontrolu js'e almak
+      zorunluydu: dersi bos birakan bir uretim havuza KAYDEDILEMIYOR
+      (saveGeneratedQuestions "Ders alani zorunlu" der) ve konusuz sorular
+      havuzda "Konusuz" kovasinda birikiyor. Yani uretim bosa gidiyordu.
+    */
+    if (subject.trim().length === 0) {
+      const message = "Ders zorunlu. Soruların hangi derse yazılacağını belirtin.";
+      setError(message);
+      toast.error("Ders eksik", { description: message });
+      return;
+    }
+
+    if (topic.trim().length === 0) {
+      const message =
+        "Konu zorunlu. Havuz ders ve konu başlıkları altında kırılıyor.";
+      setError(message);
+      toast.error("Konu eksik", { description: message });
       return;
     }
 
@@ -472,30 +530,34 @@ export function QuestionGeneratorForm({
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
+                {/*
+                  Ikisi de SubjectCombobox: daha once girilmis degerler
+                  yazdikca altta beliriyor - kazanim alanindaki davranisin
+                  aynisi. Native <datalist> KALDIRILDI; eslesmeyi tarayici
+                  yapiyordu ve kurali Turkce degildi ("kayaclar" yazana
+                  "Kayaçlar" cikmiyordu). Ustelik tarayicinin KENDI otomatik
+                  doldurmasi (daha once form gonderirken yazdiklariniz) ayni
+                  anda aciliyor ve iki liste birbirine kariyordu.
+                */}
                 <div className="space-y-2">
                   <Label htmlFor="subject">Ders</Label>
-                  <Input
+                  <SubjectCombobox
                     id="subject"
-                    required
-                    list="ders-onerileri"
                     value={subject}
-                    onChange={(event) => setSubject(event.target.value)}
+                    onChange={setSubject}
+                    options={subjects}
                     placeholder="Matematik"
                   />
-                  <datalist id="ders-onerileri">
-                    {subjects.map((item) => (
-                      <option key={item} value={item} />
-                    ))}
-                  </datalist>
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="topic">Konu</Label>
-                  <Input
+                  <SubjectCombobox
                     id="topic"
-                    required
                     value={topic}
-                    onChange={(event) => setTopic(event.target.value)}
+                    onChange={setTopic}
+                    options={konuOnerileri}
+                    listLabel="Eşleşen konular"
                     placeholder="Trigonometri"
                   />
                 </div>
