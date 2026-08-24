@@ -67,10 +67,12 @@ export function AnswerForm({
   const [result, setResult] = React.useState<SubmitAnswerResult | null>(null);
 
   const wordCount = answer.trim() ? answer.trim().split(/\s+/).length : 0;
+  const characterCount = answer.trim().length;
   /** Coktan secmeli mi? Otomatik kaydetmenin gecikmesi buna gore degisir. */
   const isTest = type === "test";
   const hasChanged = answer.trim() !== savedAnswer.trim();
   const meetsMinimum = type !== "acik_uclu" || answer.trim().length >= 10;
+  const isTooShort = type === "acik_uclu" && characterCount > 0 && !meetsMinimum;
   const draftKey = `student-exam-draft:${studentId}:${examId}:${questionId}`;
 
   React.useEffect(() => {
@@ -183,6 +185,24 @@ export function AnswerForm({
     );
   }
 
+  // Sonuc aciklandiginda cevaplanmamis soruda genel kilit mesajini tekrarlamak
+  // "asagida gorebilirsiniz" beklentisi olusturuyordu. Bu soruda gosterilecek
+  // cevap veya geri bildirim olmadigini dogrudan soyle.
+  if (revealResults && !existing) {
+    return (
+      <div className="flex items-start gap-2 rounded-xl border border-dashed bg-muted/30 p-4 text-sm text-muted-foreground">
+        <Lock className="mt-0.5 h-4 w-4 shrink-0" />
+        <div>
+          <p className="font-medium text-foreground">Bu soruyu yanıtlamadınız.</p>
+          <p className="mt-1">
+            Kaydedilmiş bir cevap olmadığı için bu soruya ait puan veya geri
+            bildirim bulunmuyor.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (disabledReason) {
     const chosen = options?.find((option) => option.key === existing?.answer_text);
     return (
@@ -260,7 +280,9 @@ export function AnswerForm({
           <div className="space-y-2">
             <div className="flex items-baseline justify-between">
               <Label htmlFor={`answer-${questionId}`}>Cevabınız</Label>
-              <span className="text-xs text-muted-foreground">{wordCount} kelime</span>
+              <span className="text-xs tabular text-muted-foreground">
+                {wordCount} kelime · {characterCount} karakter
+              </span>
             </div>
             <Textarea
               id={`answer-${questionId}`}
@@ -269,10 +291,33 @@ export function AnswerForm({
               value={answer}
               onChange={(event) => setAnswer(event.target.value)}
               placeholder="Cevabınızı buraya yazın..."
-              className="resize-y"
+              aria-invalid={isTooShort}
+              aria-describedby={`answer-help-${questionId}`}
+              className={cn(
+                "resize-y",
+                isTooShort &&
+                  "border-warning focus-visible:border-warning focus-visible:ring-warning/40",
+              )}
             />
-            <p className="text-xs text-muted-foreground">
-              En az 10 karakter yazın.
+            <p
+              id={`answer-help-${questionId}`}
+              aria-live="polite"
+              className={cn(
+                "text-xs",
+                isTooShort
+                  ? "font-medium text-warning"
+                  : answer.trim() && !hasChanged
+                    ? "text-success"
+                    : "text-muted-foreground",
+              )}
+            >
+              {isTooShort
+                ? `Henüz kaydedilmedi — en az 10 karakter gerekli. (${characterCount}/10)`
+                : !answer.trim()
+                  ? "En az 10 karakter yazın."
+                  : pending || hasChanged
+                    ? "Cevap otomatik olarak kaydediliyor..."
+                    : "Cevap kaydedildi."}
             </p>
           </div>
         )}
@@ -298,7 +343,7 @@ export function AnswerForm({
           yazmiyoruz - yesil sik zaten yeterli geri bildirim. Yavas bir
           baglantida ekranin donmus gibi gorunmemesi icin bu kadari kaliyor.
         */}
-        {pending ? (
+        {pending && isTest ? (
           <p
             className="flex items-center gap-1.5 text-xs text-muted-foreground"
             aria-live="polite"

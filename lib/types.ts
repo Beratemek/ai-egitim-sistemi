@@ -266,6 +266,31 @@ export type Submission = {
   updated_at: string;
 };
 
+export const STUDY_PLAN_STATUSES = [
+  "baslanmadi",
+  "calisiliyor",
+  "tamamlandi",
+] as const;
+
+export type StudyPlanStatus = (typeof STUDY_PLAN_STATUSES)[number];
+
+/** Ogrencinin hesabina kaydedilen tek bir calisma plani maddesi. */
+export type StudentStudyPlanRow = {
+  id: string;
+  student_id: string;
+  /** Oneri yeniden uretildiginde ayni maddeyi bulmak icin kararli anahtar. */
+  recommendation_key: string;
+  title: string;
+  context: string | null;
+  action: string | null;
+  evidence: string | null;
+  outcome_id: string | null;
+  latest_exam_id: string | null;
+  status: StudyPlanStatus;
+  saved_at: string;
+  updated_at: string;
+};
+
 export type ExamStatistics = {
   exam_id: string;
   exam_title: string;
@@ -547,6 +572,13 @@ export interface Database {
           | "instructor_note"
           | "status"
           | "reviewed_by"
+        >
+      >;
+      student_study_plan_items: TableDefinition<
+        StudentStudyPlanRow,
+        Insertable<
+          StudentStudyPlanRow,
+          "id" | "status" | "saved_at" | "updated_at"
         >
       >;
       question_preferences: TableDefinition<

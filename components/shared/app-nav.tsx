@@ -12,6 +12,7 @@ import {
   LayoutDashboard,
   Library,
   ListChecks,
+  ListTodo,
   TrendingUp,
   Trophy,
   UserCog,
@@ -91,6 +92,12 @@ const BASE_NAV = {
       label: "Gelişimim",
       icon: TrendingUp,
       description: "Kazanım bazlı ilerlemeni izle",
+    },
+    {
+      href: "/dashboard/ogrenci/calisma-plani",
+      label: "Çalışma Planım",
+      icon: ListTodo,
+      description: "Kazanımlarını planla ve tamamla",
     },
   ],
   egitim_yoneticisi: [

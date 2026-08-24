@@ -6,6 +6,11 @@ import {
   canAnswerStudentExam,
   getStudentExamStatus,
 } from "../lib/student-exam-status.ts";
+import {
+  asPercentageScore,
+  calculatePointWeightedAverage,
+  scoreDifference,
+} from "../lib/student-growth.ts";
 import { buildStudyRecommendations } from "../lib/student-recommendations.ts";
 
 const now = new Date("2026-08-21T12:00:00.000Z");
@@ -90,6 +95,23 @@ test("calisma onerileri en zayif kazanimdan baslar ve puana gore eylem uretir", 
   assert.equal(recommendations[0]?.id, "outcome-weak");
   assert.equal(recommendations[0]?.priority, "yuksek");
   assert.equal(recommendations[1]?.priority, "pekistir");
+});
+
+test("gelisim ortalamasi sinavlarin kazanilan ve toplam puanina gore hesaplanir", () => {
+  assert.equal(
+    calculatePointWeightedAverage([
+      { earned_points: 0.2, total_points: 30, final_score: 0.67 },
+      { earned_points: 36, total_points: 100, final_score: 36 },
+    ]),
+    27.8,
+  );
+});
+
+test("puan olcegi 0-100 araliginda tutulur ve gercek dusuk puan oran sanilmaz", () => {
+  assert.equal(asPercentageScore(0.67), 0.67);
+  assert.equal(asPercentageScore(140), 100);
+  assert.equal(asPercentageScore(-4), 0);
+  assert.equal(scoreDifference(36, 0.67), 35.3);
 });
 
 /* -------------------------------------------------------------------------- */

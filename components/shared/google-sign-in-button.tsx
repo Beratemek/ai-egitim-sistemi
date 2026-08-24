@@ -5,6 +5,7 @@ import { Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { publicEnv } from "@/lib/env";
+import { createClient } from "@/lib/supabase";
 
 /** Google'in marka kilavuzuna uygun çok renkli "G" logosu (inline SVG). */
 function GoogleLogo({ className }: { className?: string }) {
@@ -48,17 +49,6 @@ export function GoogleSignInButton({ disabled = false }: { disabled?: boolean })
     setError(null);
 
     try {
-      /*
-        Supabase istemcisi TALEP UZERINE yukleniyor.
-
-        Statik import edildiginde `@supabase/ssr` + `@supabase/supabase-js`
-        giris sayfasinin ILK YUKLEMESINE giriyordu (~79 kB rota boyutu).
-        Oysa istemciye yalnizca kullanici formu gonderdiginde ihtiyac var;
-        sayfayi acip bakan herkes bedelini odemek zorunda degil. Giris
-        sayfasi uygulamanin en cok acilan sayfasi oldugu icin bu fark
-        dogrudan ilk acilis suresine yansiyor.
-      */
-      const { createClient } = await import("@/lib/supabase");
       const supabase = createClient();
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: "google",
