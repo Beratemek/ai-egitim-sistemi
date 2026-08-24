@@ -24,39 +24,39 @@
 @layer base {
   :root {
     /* --- Yüzeyler: kâğıt --- */
-    --background: 45 33% 95%;
+    --background: 44 46% 92%;
     --foreground: 191 50% 13%;
-    --card: 43 100% 99%;
+    --card: 45 68% 97%;
     --card-foreground: 191 50% 13%;
-    --popover: 43 100% 99%;
+    --popover: 45 68% 97%;
     --popover-foreground: 191 50% 13%;
 
     /* --- Marka: zümrüt mürekkep --- */
     --primary: 169 68% 28%;
-    --primary-foreground: 43 100% 99%;
+    --primary-foreground: 45 68% 97%;
 
     /* --- Vurgu: kehribar --- */
-    --accent: 43 67% 88%;
+    --accent: 43 72% 86%;
     --accent-foreground: 16 43% 24%;
     --highlight: 16 51% 57%;
     --highlight-foreground: 191 50% 13%;
 
     --secondary: 150 21% 89%;
     --secondary-foreground: 164 43% 17%;
-    --muted: 44 16% 92%;
-    --muted-foreground: 190 11% 40%;
+    --muted: 44 34% 89%;
+    --muted-foreground: 190 14% 36%;
 
     /* --- Durum --- */
     --destructive: 358 62% 44%;
     --destructive-foreground: 45 60% 98%;
     --success: 169 68% 28%;
-    --success-foreground: 43 100% 99%;
-    --warning: 16 51% 48%;
-    --warning-foreground: 43 100% 99%;
+    --success-foreground: 45 68% 97%;
+    --warning: 16 57% 42%;
+    --warning-foreground: 45 68% 97%;
 
     /* --- Çizgiler --- */
-    --border: 44 16% 82%;
-    --input: 44 14% 76%;
+    --border: 42 28% 80%;
+    --input: 42 24% 74%;
     --ring: 169 68% 28%;
 
     /* Kitap sırtı motifinin rengi; temaya göre değişir. */

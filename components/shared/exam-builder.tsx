@@ -10,8 +10,8 @@ import {
   removeExamQuestion,
   setExamQuestionPoints,
 } from "@/app/actions/exams";
+import { QuestionBody } from "@/components/shared/question-body";
 import { QuestionPoolBrowser } from "@/components/shared/question-pool-browser";
-import { QuestionTypeBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -130,23 +130,33 @@ export function ExamBuilder({
             </p>
           ) : (
             examQuestions.map((question, index) => (
-              <div
-                key={question.id}
-                className="flex items-start gap-3 rounded-xl border p-4"
-              >
-                <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-primary/10 text-xs font-semibold text-primary">
-                  {index + 1}
-                </span>
+              <div key={question.id} className="rounded-xl border p-4">
+                {/*
+                  SORU TAM GOVDESIYLE CIZILIR (QuestionBody).
 
-                <div className="min-w-0 flex-1 space-y-2">
-                  <p className="text-sm font-medium leading-relaxed">{question.text}</p>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <QuestionTypeBadge type={question.type} />
-                    <span className="text-xs text-muted-foreground">
-                      {question.topic}
-                    </span>
+                  Onceden yalnizca soru METNI tek satirda duruyordu. 100
+                  soruluk bir sinavda liste birbirine benzeyen tek satirlik
+                  cumlelere donusuyor, egitmen hangi soruyu cikaracagini
+                  metinden ayirt edemiyordu; siklari gormeden "bu soru
+                  duzgun mu" karari verilemiyordu.
+
+                  Ayni bilesen sinav kontrolu ekraninda da kullaniliyor;
+                  boylece soru NEREDE gorunurse gorunsun ayni bicimde
+                  okunur. revealAnswer: burasi egitmen ekrani, dogru sik
+                  isaretli gelmeli. showRubric: acik uclu sorunun puanlama
+                  olcutu de burada gorunur.
+                */}
+                <div className="flex items-start gap-3">
+                  <div className="min-w-0 flex-1">
+                    <QuestionBody
+                      question={question}
+                      number={index + 1}
+                      topic={question.topic}
+                      points={question.points}
+                      revealAnswer
+                      showRubric
+                    />
                   </div>
-                </div>
 
                 <PuanAlani
                   examId={exam.id}
@@ -170,6 +180,7 @@ export function ExamBuilder({
                   )}
                   Çıkar
                 </Button>
+                </div>
               </div>
             ))
           )}

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { LogOut, Menu, UserRound } from "lucide-react";
 
 import { NavLinks, RoleCard } from "@/components/shared/app-nav";
+import { FloatingBooks } from "@/components/shared/floating-books";
 import { ActiveRoleSwitcher } from "@/components/shared/active-role-switcher";
 import { BrandMark } from "@/components/shared/brand-mark";
 import { ROLE_ICONS } from "@/components/shared/role-icons";
@@ -79,24 +80,28 @@ export function DashboardShell({
 
       {/* ---------- Masaustu sol menu ---------- */}
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-[264px] flex-col border-r bg-card lg:flex print:hidden">
-        {/* Menunun dibinde ince bir kitap rafi: bos kalan alani urunun
-            kimligiyle dolduruyor, hicbir bilgi tasimiyor. */}
-        <div
-          className="bg-shelf pointer-events-none absolute inset-x-0 bottom-0 h-28 opacity-[0.5]"
-          aria-hidden
-        />
-        <div className="flex h-16 items-center border-b px-5">
+        {/*
+          Dekoratif zemin: havada suzulen silik kitaplar.
+
+          Once burada `.bg-shelf` vardi - dibe yapisik, sert dikey cizgili
+          bir raf. Krem acik temada o cizgiler zeminden ayrisip rol kartinin
+          arkasinda kir gibi duruyordu. Yeni motif TUM kenar cubuguna
+          dagilir ama ust %34 tamamen seffaftir; menu baglantilarinin
+          arkasi her zaman temiz kalir (bkz. floating-books.tsx).
+        */}
+        <FloatingBooks className="pointer-events-none absolute inset-0" />
+        <div className="relative z-10 flex h-16 items-center border-b px-5">
           <BrandMark />
         </div>
 
-        <div className="flex-1 overflow-y-auto px-3 py-4">
+        <div className="relative z-10 flex-1 overflow-y-auto px-3 py-4">
           <p className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
             Menü
           </p>
           <NavLinks role={role} />
         </div>
 
-        <div className="border-t p-3">
+        <div className="relative z-10 border-t p-3">
           <RoleCard role={role} />
         </div>
       </aside>

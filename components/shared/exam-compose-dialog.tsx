@@ -36,10 +36,12 @@ import {
 import {
   countByType,
   countTopicsByType,
+  difficultyOf,
   pickBalancedByType,
   UNASSIGNED_SUBJECT,
   type SubjectGroup,
 } from "@/lib/question-pool";
+import { DIFFICULTY_LABELS, type QuestionDifficulty } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 /**
@@ -62,10 +64,8 @@ import { cn } from "@/lib/utils";
 export interface ExamComposeDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Havuzun tamami: ders -> konu -> soru. */
+  /** Havuzdaki dersler ve konulari; secim kutulari bundan cizilir. */
   subjects: readonly SubjectGroup[];
-  /** Egitmenin listeden isaretledigi sorular; varsa ayri bir secenek olur. */
-  selectedIds?: readonly string[];
   /** Pencere acilirken on secili gelecek ders. */
   defaultSubject?: string | null;
   /** Tanitim modunda kayit yapilmaz; dugme kapatilir. */
@@ -73,13 +73,10 @@ export interface ExamComposeDialogProps {
   onCreated?: () => void;
 }
 
-type Kaynak = "otomatik" | "secili";
-
 export function ExamComposeDialog({
   open,
   onOpenChange,
   subjects,
-  selectedIds = [],
   defaultSubject = null,
   canPersist = true,
   onCreated,
@@ -92,7 +89,21 @@ export function ExamComposeDialog({
   const [testSayisi, setTestSayisi] = React.useState("10");
   const [klasikSayisi, setKlasikSayisi] = React.useState("5");
   const [sure, setSure] = React.useState("60");
-  const [kaynak, setKaynak] = React.useState<Kaynak>("otomatik");
+  /*
+    "İşaretlediklerimden" KAYNAGI KALDIRILDI (2026-08-24).
+
+    Bu pencere iki kaynak sunuyordu: dersten dengeli secim, ya da havuzda
+    isaretlenmis sorular. Ikincisi kafa karistiriciydi - ayni isi zaten
+    havuz ekranindaki "Yeni sinav" akisi yapiyor. Burasi artik TEK ISE
+    odakli: ders + konu + soru sayisi ver, sistem dengeli sinav kursun.
+  */
+  /*
+    Sinavin zorlugu. VARSAYILAN "orta": egitmen hicbir sey secmeden
+    devam ederse dengeli bir sinav cikar. "hepsi" zorluk gozetmez.
+  */
+  const [zorluk, setZorluk] = React.useState<"hepsi" | QuestionDifficulty>(
+    "orta",
+  );
   const [pending, setPending] = React.useState(false);
 
   // Pencere her acilista temiz baslasin; onceki denemenin artiklari kalmasin.
@@ -100,7 +111,7 @@ export function ExamComposeDialog({
     if (!open) return;
     setBaslik("");
     setKonular(new Set());
-    setKaynak("otomatik");
+    setZorluk("orta");
     setDers(defaultSubject ?? subjects[0]?.subject ?? "");
   }, [open, defaultSubject, subjects]);
 
@@ -109,12 +120,31 @@ export function ExamComposeDialog({
     [subjects, ders],
   );
 
-  /** Kapsam: konu secilmediyse dersin TUM konulari. */
+  /**
+   * Kapsam: konu secilmediyse dersin TUM konulari, ustune zorluk suzgeci.
+   *
+   * Zorluk KAPSAMI daraltir, modele ayri bir istek olarak GITMEZ: bu pencere
+   * havuzdaki HAZIR sorulardan sinav kuruyor, yeni soru uretmiyor. Yani
+   * "zor sinav" = "havuzdaki zor sorulardan kur".
+   */
   const kapsam = React.useMemo(() => {
     if (!acikDers) return [];
-    if (konular.size === 0) return acikDers.topics;
-    return acikDers.topics.filter((topic) => konular.has(topic.topic));
-  }, [acikDers, konular]);
+    const konuyaGore =
+      konular.size === 0
+        ? acikDers.topics
+        : acikDers.topics.filter((topic) => konular.has(topic.topic));
+
+    if (zorluk === "hepsi") return konuyaGore;
+
+    return konuyaGore
+      .map((topic) => ({
+        ...topic,
+        questions: topic.questions.filter(
+          (question) => difficultyOf(question) === zorluk,
+        ),
+      }))
+      .filter((topic) => topic.questions.length > 0);
+  }, [acikDers, konular, zorluk]);
 
   const mevcut = React.useMemo(() => {
     let test = 0;
@@ -136,7 +166,8 @@ export function ExamComposeDialog({
 
   const gecerli =
     baslik.trim().length > 0 &&
-    (kaynak === "secili" ? selectedIds.length > 0 : Boolean(acikDers) && toplamIstenen > 0);
+    Boolean(acikDers) &&
+    toplamIstenen > 0;
 
   function konuDegistir(konu: string) {
     setKonular((mevcut) => {
@@ -152,9 +183,7 @@ export function ExamComposeDialog({
 
     let ids: string[];
 
-    if (kaynak === "secili") {
-      ids = [...selectedIds];
-    } else {
+    {
       const sonuc = pickBalancedByType(kapsam, {
         test: Number.isFinite(istenenTest) ? Math.max(0, istenenTest) : 0,
         acikUclu: Number.isFinite(istenenKlasik) ? Math.max(0, istenenKlasik) : 0,
@@ -199,13 +228,10 @@ export function ExamComposeDialog({
     try {
       const result = await createExamWithQuestions({
         title: baslik,
-        description:
-          kaynak === "secili"
-            ? "Soru havuzundan seçilerek hazırlandı."
-            : gecerliDers
-              ? `${gecerliDers} dersinden hazırlandı.`
-              : "Soru havuzundan hazırlandı.",
-        ...(kaynak === "otomatik" && gecerliDers ? { subject: gecerliDers } : {}),
+        description: gecerliDers
+          ? `${gecerliDers} dersinden hazırlandı.`
+          : "Soru havuzundan hazırlandı.",
+        ...(gecerliDers ? { subject: gecerliDers } : {}),
         ...(Number.isFinite(dakika) ? { durationMinutes: dakika } : {}),
         questionIds: ids,
       });
@@ -262,24 +288,6 @@ export function ExamComposeDialog({
             />
           </div>
 
-          {/* ---------- Kaynak: yalnizca secim varsa secenek sunulur ---------- */}
-          {selectedIds.length > 0 ? (
-            <div className="grid gap-2 sm:grid-cols-2">
-              <KaynakSecenegi
-                secili={kaynak === "otomatik"}
-                baslik="Ders ve konudan"
-                aciklama="Sistem dengeli seçsin"
-                onSelect={() => setKaynak("otomatik")}
-              />
-              <KaynakSecenegi
-                secili={kaynak === "secili"}
-                baslik="İşaretlediklerimden"
-                aciklama={`${selectedIds.length} soru işaretli`}
-                onSelect={() => setKaynak("secili")}
-              />
-            </div>
-          ) : null}
-
           {/* ---------- Süre ---------- */}
           <div className="space-y-2">
             <Label htmlFor="compose-sure" className="flex items-center gap-1.5">
@@ -302,8 +310,6 @@ export function ExamComposeDialog({
           </div>
 
           <div className="space-y-5">
-          {kaynak === "otomatik" ? (
-            <>
               {/* ---------- Ders ---------- */}
               <div className="space-y-2">
                 <Label htmlFor="compose-ders">Ders</Label>
@@ -331,6 +337,32 @@ export function ExamComposeDialog({
                     })}
                   </SelectContent>
                 </Select>
+              </div>
+
+              {/* ---------- Zorluk ---------- */}
+              <div className="space-y-2">
+                <Label htmlFor="compose-zorluk">Zorluk</Label>
+                <Select
+                  value={zorluk}
+                  onValueChange={(value) =>
+                    setZorluk(value as "hepsi" | QuestionDifficulty)
+                  }
+                >
+                  <SelectTrigger id="compose-zorluk">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="kolay">Kolay</SelectItem>
+                    <SelectItem value="orta">Orta</SelectItem>
+                    <SelectItem value="zor">Zor</SelectItem>
+                    <SelectItem value="hepsi">Fark etmez (karışık)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  {zorluk === "hepsi"
+                    ? "Kapsamdaki tüm sorular kullanılabilir."
+                    : `Yalnızca ${DIFFICULTY_LABELS[zorluk].toLocaleLowerCase("tr")} sorulardan kurulur.`}
+                </p>
               </div>
 
               {/* ---------- Konular (istege bagli, coklu) ---------- */}
@@ -455,25 +487,25 @@ export function ExamComposeDialog({
                   </p>
                 </div>
               </div>
-            </>
-          ) : null}
 
           {/* ---------- Özet ---------- */}
           <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2.5 text-sm">
             <span className="text-muted-foreground">Sınav:</span>
             <Badge variant="soft">
-              {kaynak === "secili" ? selectedIds.length : toplamIstenen} soru
+              {toplamIstenen} soru
             </Badge>
             <Badge variant="soft">{sure || "60"} dk</Badge>
-            {kaynak === "otomatik" && ders ? (
+            {ders ? (
               <Badge variant="soft">{ders}</Badge>
             ) : null}
-            {kaynak === "otomatik" && konular.size > 0 ? (
+            {zorluk === "hepsi" ? null : (
+              <Badge variant="soft">{DIFFICULTY_LABELS[zorluk]}</Badge>
+            )}
+            {konular.size > 0 ? (
               <Badge variant="soft">{konular.size} konu</Badge>
             ) : null}
 
-            {kaynak === "otomatik" &&
-            (istenenTest > mevcut.test || istenenKlasik > mevcut.acik) ? (
+            {istenenTest > mevcut.test || istenenKlasik > mevcut.acik ? (
               <span className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-500">
                 <TriangleAlert className="h-3.5 w-3.5" />
                 Kapsam yetersiz
@@ -499,32 +531,3 @@ export function ExamComposeDialog({
 
 /* -------------------------------------------------------------------------- */
 
-function KaynakSecenegi({
-  secili,
-  baslik,
-  aciklama,
-  onSelect,
-}: {
-  secili: boolean;
-  baslik: string;
-  aciklama: string;
-  onSelect: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onSelect}
-      aria-pressed={secili}
-      className={cn(
-        "rounded-lg border p-3 text-left transition-colors",
-        "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-        secili ? "border-primary bg-primary/5" : "hover:bg-accent/40",
-      )}
-    >
-      <p className="text-sm font-medium">{baslik}</p>
-      <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-        {aciklama}
-      </p>
-    </button>
-  );
-}

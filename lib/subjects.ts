@@ -65,3 +65,34 @@ export function hasAllSubjects(subjects: readonly string[]): boolean {
 export function subjectLabel(subject: string): string {
   return subject === ALL_SUBJECTS ? "Tüm dersler" : subject;
 }
+
+/**
+ * ARAMA icin normalizasyon - KIMLIK KARSILASTIRMASI ICIN DEGIL.
+ *
+ * `subjectKey` bilerek duz `toLowerCase()` kullanir cunku yetkiyi nihai
+ * olarak Postgres'in `lower()`u belirler (bkz. dosyanin basi). Ama o kural
+ * ARAMA icin kotudur: kullanici "matematik" yazdiginda "MATEMATİK" secenegi
+ * eslesmemeli miydi? Eslesmiyordu, cunku "İ".toLowerCase() birlesik noktali
+ * bir karakter uretir.
+ *
+ * Bu fonksiyon YALNIZCA "yazdikca oneri suzme" icin kullanilir. Sonucu asla
+ * kaydedilmez, karsilastirilmaz, yetki kararina girmez: kullanici bir oneriye
+ * tikladiginda kaydedilen sey listedeki KANONIK yazimdir. Bu yuzden burada
+ * Turkce kurallari serbestce kullanilabilir.
+ *
+ * Turkce klavye olmadan da aranabilsin diye i/ı, s/ş, g/ğ, c/ç, o/ö, u/ü
+ * tek harfe indirgenir: "ogrenme" -> "ogrenme", "Öğrenme" -> "ogrenme".
+ */
+export function subjectSearchKey(value: string): string {
+  return value
+    .trim()
+    .toLocaleLowerCase("tr")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/ı/g, "i")
+    .replace(/ş/g, "s")
+    .replace(/ğ/g, "g")
+    .replace(/ç/g, "c")
+    .replace(/ö/g, "o")
+    .replace(/ü/g, "u");
+}

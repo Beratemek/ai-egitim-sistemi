@@ -8,7 +8,7 @@
 
 // Goreli yol: bu modul birim testinden dogrudan cagriliyor ve Node test
 // calistiricisi tsconfig yol takma adlarini ("@/lib/...") cozemiyor.
-import type { Question } from "./types.ts";
+import type { Question, QuestionDifficulty } from "./types.ts";
 
 /** Turkce siralama; "Cografya" < "Cebir" hatasina dusmemek icin. */
 const collator = new Intl.Collator("tr", { sensitivity: "base" });
@@ -216,4 +216,28 @@ export function pickBalancedByType(
       acikUclu: Math.max(0, quota.acikUclu - acikIds.length),
     },
   };
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Zorluk                                                                    */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Bir sorunun zorlugu; bilinmiyorsa "orta".
+ *
+ * NEDEN VARSAYILAN VAR: `difficulty` sutunu havuza sonradan eklendi
+ * (supabase/migrations/BEKLEYEN-2-soru-zorluk.sql). Migration uygulanmadan
+ * once Supabase bu alani hic dondurmez; suzgec o durumda TUM sorulari
+ * eleyip havuzu bos gosterirdi. Bilinmeyeni "orta" saymak, sutunun
+ * veritabanindaki varsayilaniyla da aynidir - iki taraf ayrilmaz.
+ *
+ * Beklenmeyen bir deger gelirse (elle girilmis "Orta", "medium"...) yine
+ * "orta"ya duser; kisit bunu engelliyor ama okuyan taraf saglam olmali.
+ */
+export function difficultyOf(question: {
+  difficulty?: string | null;
+}): QuestionDifficulty {
+  const value = question.difficulty;
+  if (value === "kolay" || value === "orta" || value === "zor") return value;
+  return "orta";
 }

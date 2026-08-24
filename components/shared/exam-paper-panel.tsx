@@ -143,8 +143,20 @@ export function ExamPaperPanel({
     (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
       setMeta((current) => ({ ...current, [key]: event.target.value }));
 
+  /*
+   * YAN PANEL GENISLETILDI: 300px -> 360px (xl'de 400px).
+   *
+   * 300px'te kartin kendi dolgusu (sm:p-6 = 24+24) dusulunce iceride
+   * ~252px kaliyordu; "Ders" ve "Sınıf" ikili izgarada bunu paylasinca
+   * alan basina ~120px dusuyordu. "Yazılım Teknolojileri" yazan bir ders
+   * adi "Yazılım Teknolc" diye kirpiliyordu; tarih alaninda da gun.ay.yil
+   * ve takvim simgesi ayni 120px'e sigmiyordu.
+   *
+   * Sol sutun minmax(0,1fr) oldugu icin kagit onizlemesi kalan yeri alir;
+   * genisleme onizlemeden calindi, sayfa tasmaz.
+   */
   return (
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px] print:block print:gap-0">
+    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px] xl:grid-cols-[minmax(0,1fr)_400px] print:block print:gap-0">
       {/* ---------- Kagit ---------- */}
       <div className="min-w-0 space-y-3 print:space-y-0">
         <p className="flex items-start gap-2 rounded-lg border bg-muted/40 px-3 py-2.5 text-xs leading-relaxed text-muted-foreground print:hidden">
@@ -166,7 +178,15 @@ export function ExamPaperPanel({
       </div>
 
       {/* ---------- Kagit ust bilgisi ---------- */}
-      <Card className="lg:sticky lg:top-20 lg:self-start print:hidden">
+      {/*
+        lg:top-48 (192px) - lg:top-20 (80px) DEGIL.
+
+        Bu sayfada IKI yapiskan katman var: panel ust cubugu 0-64px ve
+        sinav detay sekme seridi 64-177px (olculdu). Panel 80px'e
+        yapistiginda seridin TAM ALTINA giriyor ve kaydirinca kayboluyordu.
+        192px seridin bittigi yerin hemen altidir.
+      */}
+      <Card className="lg:sticky lg:top-48 lg:self-start print:hidden">
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Kağıt üst bilgisi</CardTitle>
           <CardDescription>
@@ -188,7 +208,9 @@ export function ExamPaperPanel({
             />
           </Field>
 
-          <div className="grid grid-cols-2 gap-3">
+          {/* 2:1 - ders adi uzun, sinif kisa ("10-A"). Esit bolmek ders
+              adini kirpiyordu. */}
+          <div className="grid grid-cols-[2fr_1fr] gap-3">
             <Field id="kagit-ders" label="Ders">
               <Input id="kagit-ders" value={meta.lesson} onChange={field("lesson")} />
             </Field>
@@ -203,7 +225,8 @@ export function ExamPaperPanel({
             </Field>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          {/* 2:1 - tarih alani gun.ay.yil + takvim simgesi tasiyor. */}
+          <div className="grid grid-cols-[2fr_1fr] gap-3">
             <Field id="kagit-tarih" label="Tarih">
               <Input
                 id="kagit-tarih"

@@ -44,10 +44,11 @@ import {
   formatTypeCounts,
   groupBySubject,
   UNASSIGNED_SUBJECT,
+  difficultyOf,
   type SubjectGroup,
   type TopicGroup,
 } from "@/lib/question-pool";
-import type { Question, QuestionType } from "@/lib/types";
+import type { Question, QuestionDifficulty, QuestionType } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 /**
@@ -72,6 +73,8 @@ import { cn } from "@/lib/utils";
  */
 
 type TypeFilter = QuestionType | "hepsi";
+/** Zorluk suzgeci; "hepsi" = suzme yok. */
+type DifficultyFilter = QuestionDifficulty | "hepsi";
 
 export interface QuestionPoolBrowserProps {
   /** Havuzdaki onaylı sorular. */
@@ -110,6 +113,13 @@ export function QuestionPoolBrowser({
   );
   const [search, setSearch] = React.useState("");
   const [typeFilter, setTypeFilter] = React.useState<TypeFilter>("hepsi");
+  /*
+    Zorluk suzgeci: "bu sinav orta seviye olsun" diyebilmek icin.
+    Havuzdaki zorluk bilgisi sonradan eklendi; sutun yoksa difficultyOf
+    her soruyu "orta" sayar, yani suzgec havuzu bosaltmaz.
+  */
+  const [difficultyFilter, setDifficultyFilter] =
+    React.useState<DifficultyFilter>("hepsi");
   /** Onizlemesi acik olan sorunun kimligi; kapaliyken null. */
   const [openQuestionId, setOpenQuestionId] = React.useState<string | null>(null);
   /** Otomatik sinav kurma penceresi (ders/konu/sayi). */
@@ -133,8 +143,8 @@ export function QuestionPoolBrowser({
 
   /** Arama / tip filtresinden geçmiş hali. */
   const visibleSubjects = React.useMemo(
-    () => filterSubjects(allSubjects, search, typeFilter),
-    [allSubjects, search, typeFilter],
+    () => filterSubjects(allSubjects, search, typeFilter, difficultyFilter),
+    [allSubjects, search, typeFilter, difficultyFilter],
   );
 
   const openSubject = React.useMemo(
@@ -213,6 +223,8 @@ export function QuestionPoolBrowser({
         onSearchChange={setSearch}
         typeFilter={typeFilter}
         onTypeFilterChange={setTypeFilter}
+        difficultyFilter={difficultyFilter}
+        onDifficultyFilterChange={setDifficultyFilter}
         onCreateExam={sinavaEkleKipi ? undefined : () => setComposeOpen(true)}
       />
 
@@ -343,7 +355,6 @@ export function QuestionPoolBrowser({
             open={composeOpen}
             onOpenChange={setComposeOpen}
             subjects={allSubjects}
-            selectedIds={[...selectedIds]}
             defaultSubject={realDefaultSubject}
             canPersist={canPersist}
             onCreated={() => setSelectedIds(new Set())}
@@ -847,12 +858,16 @@ function PoolToolbar({
   onSearchChange,
   typeFilter,
   onTypeFilterChange,
+  difficultyFilter,
+  onDifficultyFilterChange,
   onCreateExam,
 }: {
   search: string;
   onSearchChange: (value: string) => void;
   typeFilter: TypeFilter;
   onTypeFilterChange: (value: TypeFilter) => void;
+  difficultyFilter: DifficultyFilter;
+  onDifficultyFilterChange: (value: DifficultyFilter) => void;
   /** undefined ise dugme hic basilmaz - sinava ekleme kipinde boyle. */
   onCreateExam?: () => void;
 }) {
@@ -881,6 +896,21 @@ function PoolToolbar({
           <SelectItem value="hepsi">Tüm soru tipleri</SelectItem>
           <SelectItem value="test">Çoktan seçmeli</SelectItem>
           <SelectItem value="acik_uclu">Açık uçlu</SelectItem>
+        </SelectContent>
+      </Select>
+
+      <Select
+        value={difficultyFilter}
+        onValueChange={(value) => onDifficultyFilterChange(value as DifficultyFilter)}
+      >
+        <SelectTrigger className="sm:w-44" aria-label="Zorluğa göre filtrele">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="hepsi">Tüm zorluklar</SelectItem>
+          <SelectItem value="kolay">Kolay</SelectItem>
+          <SelectItem value="orta">Orta</SelectItem>
+          <SelectItem value="zor">Zor</SelectItem>
         </SelectContent>
       </Select>
 
@@ -1027,6 +1057,7 @@ function filterSubjects(
   subjects: readonly SubjectGroup[],
   search: string,
   typeFilter: TypeFilter,
+  difficultyFilter: DifficultyFilter,
 ): SubjectGroup[] {
   const needle = search.trim().toLocaleLowerCase("tr");
 
@@ -1044,6 +1075,12 @@ function filterSubjects(
             topic: topic.topic,
             questions: topic.questions.filter((question) => {
               if (typeFilter !== "hepsi" && question.type !== typeFilter) return false;
+              if (
+                difficultyFilter !== "hepsi" &&
+                difficultyOf(question) !== difficultyFilter
+              ) {
+                return false;
+              }
               if (topicMatches) return true;
               return question.text.toLocaleLowerCase("tr").includes(needle);
             }),

@@ -183,7 +183,44 @@ export async function saveGeneratedQuestions(
     ai_generated: true,
   }));
 
-  const { data, error } = await supabase.from("questions").insert(rows).select("id");
+  /*
+    Modelin zorluk tahmini ARTIK SAKLANIYOR. Eskiden yalnizca
+    question_preferences (begeni hafizasi) tarafina yaziliyordu; soru havuza
+    kaydedilirken dusuyor, havuzda hicbir sorunun zorlugu bilinmiyordu.
+
+    Zorluk AYRI bir adimda ekleniyor ki sutun henuz yokken (asagidaki geri
+    dusus) zorluksuz satirlar hazir olsun.
+  */
+  const zorluklu = rows.map((row, index) => ({
+    ...row,
+    difficulty: input.questions[index]?.difficulty ?? "orta",
+  }));
+
+  let { data, error } = await supabase
+    .from("questions")
+    .insert(zorluklu)
+    .select("id");
+
+  /*
+    GERI DUSUS: `difficulty` sutunu sonradan eklendi
+    (supabase/migrations/BEKLEYEN-2-soru-zorluk.sql). O SQL henuz elle
+    calistirilmadiysa Postgres "column does not exist" (42703) der ve
+    PostgREST bunu PGRST204 olarak yansitir.
+
+    Bu durumda kaydi tamamen basarisiz saymak yanlis olurdu: icerik uzmani
+    migration yuzunden hic soru kaydedemezdi. Sutunsuz tekrar denenir;
+    zorluk o partide kaybolur ama sorular durur ve okuyan taraf zaten
+    "orta" varsayar (bkz. lib/question-pool.ts -> difficultyOf).
+  */
+  const sutunYok =
+    error !== null &&
+    (error.code === "PGRST204" ||
+      error.code === "42703" ||
+      /difficulty/i.test(error.message));
+
+  if (sutunYok) {
+    ({ data, error } = await supabase.from("questions").insert(rows).select("id"));
+  }
 
   if (error) return { ok: false, error: error.message };
 

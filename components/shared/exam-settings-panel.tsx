@@ -20,7 +20,6 @@ import {
   setExamSubject,
   updateExamSettings,
 } from "@/app/actions/exams";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -32,6 +31,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SubjectCombobox } from "@/components/shared/subject-combobox";
 import { cn } from "@/lib/utils";
 
 /**
@@ -303,23 +303,23 @@ export function ExamSettingsPanel({
             </Label>
 
             <div className="flex gap-1.5">
-              <Input
+              {/*
+                Native <datalist> yerine SubjectCombobox: eslesme Turkce
+                kurallariyla yapiliyor ("matematik" -> "MATEMATİK"), liste
+                uygulamanin temasiyla ciziliyor ve klavyeyle gezilebiliyor.
+                Serbest metin hala serbest - listede olmayan ders yazilabilir.
+              */}
+              <SubjectCombobox
                 id="ayar-ders"
-                list="ayar-ders-secenekleri"
                 value={ders}
-                onChange={(event) => setDers(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" && dersDirty) void dersiKaydet();
-                }}
+                onChange={setDers}
+                options={subjectOptions}
                 placeholder="Biyoloji"
-                autoComplete="off"
                 disabled={pending !== null}
+                onEnter={() => {
+                  if (dersDirty) void dersiKaydet();
+                }}
               />
-              <datalist id="ayar-ders-secenekleri">
-                {subjectOptions.map((option) => (
-                  <option key={option} value={option} />
-                ))}
-              </datalist>
 
               <KaydetDugmesi
                 dirty={dersDirty}
@@ -500,16 +500,27 @@ export function ExamSettingsPanel({
               puan
             </span>
 
-            <div className="flex items-center gap-2">
-              <Badge variant={pointsAuto ? "soft" : "warning"}>
-                {pointsAuto ? "Otomatik dağıtım" : "Elle ayarlandı"}
-              </Badge>
+            {/*
+              "Otomatik dağıtım" ROZETI ve "Eşit dağıt" DUGMESI KALDIRILDI.
 
+              Dagitim zaten arka planda calisiyordu: `points_auto` acikken
+              soru eklendikce/cikarildikca puanlar 100 uzerinden yeniden
+              bolusturuluyor (lib/exam-paper.ts -> distributePoints, toplam
+              100). Egitmenin bunu "acmasi" gerekmiyordu; iki denetim
+              yalnizca calisan bir seyi gorunur kiliyor ve ekrani mesgul
+              ediyordu.
+
+              GERI DONUS YOLU KORUNDU: bir soruya elle puan verilince
+              otomatik dagitim kapanir ve bu TEK YONLU bir kapi olurdu.
+              Bu yuzden yalnizca elle ayarlanmis durumda kucuk bir baglanti
+              cikiyor. Normal (otomatik) durumda hicbir denetim gorunmez.
+            */}
+            {!pointsAuto && questionCount > 0 ? (
               <Button
                 size="sm"
-                variant="outline"
-                className="gap-1.5"
-                disabled={pending !== null || questionCount === 0}
+                variant="ghost"
+                className="h-auto gap-1.5 px-2 py-1 text-xs text-muted-foreground"
+                disabled={pending !== null}
                 onClick={() => void puanlariEsitle()}
               >
                 {pending === "puan" ? (
@@ -517,26 +528,21 @@ export function ExamSettingsPanel({
                 ) : (
                   <Scale className="h-3.5 w-3.5" />
                 )}
-                Eşit dağıt
+                Otomatik dağıtıma dön
               </Button>
-            </div>
+            ) : null}
           </div>
 
           <p className="text-xs leading-relaxed text-muted-foreground">
             {questionCount === 0 ? (
               "Sınava soru ekleyince puanlar 100 üzerinden kendiliğinden dağıtılır."
             ) : pointsAuto ? (
-              <>
-                Puanlar soru sayısına göre kendiliğinden dağıtılıyor; soru
-                ekleyip çıkardıkça güncellenir. Bir soruya elle puan verirseniz
-                otomatik dağıtım kapanır.
-              </>
+              "Puanlar soru sayısına göre kendiliğinden dağıtılıyor; soru ekleyip çıkardıkça güncellenir. Bir soruya elle puan verirseniz bu durur."
             ) : (
               <span className="flex items-start gap-1.5">
                 <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                Puanları elle ayarladınız; soru ekleyip çıkarmak puanları
-                değiştirmez. Otomatik dağıtıma dönmek için &quot;Eşit
-                dağıt&quot;a basın.
+                Puanları elle ayarladınız; soru ekleyip çıkarmak artık puanları
+                değiştirmiyor.
               </span>
             )}
           </p>

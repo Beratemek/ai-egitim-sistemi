@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Check, Loader2, Sparkles, TriangleAlert } from "lucide-react";
+import { Check, Loader2, Pencil, Sparkles, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 
 import { approveSubmission } from "@/app/actions/submissions";
@@ -128,10 +128,19 @@ export function SubmissionReviewDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
+      {/*
+        Etiket "Puanı incele" DEGIL "Düzenle".
+
+        Onaylamak icin bu pencereyi acmak ZORUNLU degil artik: cevap
+        satirinda dogrudan bir "Onayla" dugmesi var (bkz.
+        classroom-exam-review.tsx). Bu pencere yalnizca AI'in verdigi puani
+        DEGISTIRMEK isteyene lazim; adi da o isi anlatmali. "Puanı incele"
+        egitmene her cevap icin buraya girmesi gerektigini dusundurtuyordu.
+      */}
       <DialogTrigger asChild>
         <Button size="sm" variant="outline" className="gap-1.5">
-          Puanı incele
-          <ArrowRight className="h-3.5 w-3.5" />
+          <Pencil className="h-3.5 w-3.5" />
+          Düzenle
         </Button>
       </DialogTrigger>
 

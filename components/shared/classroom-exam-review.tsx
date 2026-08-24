@@ -3,10 +3,10 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import {
+  Check,
   CheckCheck,
   ChevronDown,
   CircleCheck,
-  Clock,
   Loader2,
   Sparkles,
 } from "lucide-react";
@@ -152,7 +152,7 @@ export function ClassroomExamReview({
             )}
             {allPendingIds.length === 0
               ? "Tüm cevaplar onaylı"
-              : `Sınıfın tümünü onayla (${allPendingIds.length})`}
+              : `Sınavı onayla · ${allPendingIds.length} cevap`}
           </Button>
         </CardContent>
       </Card>
@@ -202,6 +202,10 @@ export function ClassroomExamReview({
                   student.studentName,
                 )
               }
+              onApproveSubmission={(submissionId) =>
+                void runApproval(submissionId, [submissionId], student.studentName)
+              }
+              approvingId={busy}
             />
           ))}
         </div>
@@ -211,6 +215,26 @@ export function ClassroomExamReview({
 }
 
 /* -------------------------------------------------------------------------- */
+
+/**
+ * Yuzdeyi sorunun puanina cevirir: %85 x 20 puan -> "17 / 20 puan".
+ *
+ * Sorunun puani bilinmiyorsa (havuzdan silinmis soru) yuzde olarak birakir;
+ * uydurma bir payda yazmaktansa ham degeri gostermek dogru.
+ */
+function puanla(yuzde: number | null, soruPuani: number | undefined): string {
+  if (yuzde === null) return "—";
+  if (soruPuani === undefined) return "%" + Math.round(yuzde);
+
+  const kazanilan = (yuzde / 100) * soruPuani;
+  // Ondalik yalnizca gerekiyorsa: 17 kalsin, 16.5 gorunsun.
+  const gosterim =
+    Math.abs(kazanilan - Math.round(kazanilan)) < 0.05
+      ? String(Math.round(kazanilan))
+      : kazanilan.toFixed(1);
+
+  return gosterim + " / " + soruPuani + " puan";
+}
 
 function Summary({
   label,
@@ -242,11 +266,21 @@ interface StudentRowProps {
   expanded: boolean;
   busy: boolean;
   disabled: boolean;
-  questionById: Map<string, Question>;
+  /**
+   * Soru + BU SINAVDAKI puani.
+   *
+   * Sade Question yeterli degil: cevap satirinda AI yuzdesini puana
+   * cevirebilmek icin sorunun agirligi (or. 20) lazim.
+   */
+  questionById: Map<string, Question & { points: number }>;
   positionById: Map<string, number>;
   canPersist: boolean;
   onToggle: () => void;
   onApproveAll: () => void;
+  /** Tek bir cevabi onaylar - cevap satirindaki "Onayla" dugmesi kullanir. */
+  onApproveSubmission: (submissionId: string) => void;
+  /** Su an onaylanmakta olan cevabin kimligi; yoksa null. */
+  approvingId: string | null;
 }
 
 function StudentRow({
@@ -260,6 +294,8 @@ function StudentRow({
   canPersist,
   onToggle,
   onApproveAll,
+  onApproveSubmission,
+  approvingId,
 }: StudentRowProps) {
   const initials = student.studentName
     .split(" ")
@@ -328,9 +364,14 @@ function StudentRow({
               {busy ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : (
-                <Clock className="h-3.5 w-3.5" />
+                <CheckCheck className="h-3.5 w-3.5" />
               )}
-              {student.pendingCount} onayla
+              {/*
+                "5 onayla" NEYIN onaylanacagini soylemiyordu - saat simgesiyle
+                birlikte "5 dakika sonra onayla" gibi bile okunabiliyordu.
+                Simdi acik: bu ogrencinin bekleyen CEVAPLARI onaylanir.
+              */}
+              {student.pendingCount} cevabı onayla
             </Button>
           ) : (
             <Badge variant="success" className="gap-1">
@@ -364,6 +405,9 @@ function StudentRow({
                     : null
                 }
                 canPersist={canPersist}
+                onApprove={() => onApproveSubmission(submission.id)}
+                approving={approvingId === submission.id}
+                disabled={disabled}
               />
             ))
           )}
@@ -376,9 +420,13 @@ function StudentRow({
 interface AnswerCardProps {
   submission: Submission;
   studentName: string;
-  question: Question | null;
+  question: (Question & { points: number }) | null;
   position: number | null;
   canPersist: boolean;
+  /** AI on puanini oldugu gibi kesinlestirir - pencere acmadan. */
+  onApprove: () => void;
+  approving: boolean;
+  disabled: boolean;
 }
 
 function AnswerCard({
@@ -387,6 +435,9 @@ function AnswerCard({
   question,
   position,
   canPersist,
+  onApprove,
+  approving,
+  disabled,
 }: AnswerCardProps) {
   const approved = submission.instructor_approved_score;
   const isApproved = submission.status === "egitmen_onayli";
@@ -445,15 +496,27 @@ function AnswerCard({
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t pt-3">
         <div className="flex min-w-0 flex-1 items-center gap-3">
+          {/*
+            PUAN, SORUNUN AGIRLIGI UZERINDEN gosterilir.
+
+            ai_score 0-100 arasi bir YUZDEdir (bkz. lib/grading.ts); coktan
+            secmeli dogru cevap 100 verir. Ekranda ciplak "AI: 100" yazinca
+            20 puanlik bir sorudan 100 puan alinmis gibi okunuyordu.
+
+            Toplam ZATEN dogru hesaplaniyor - lib/queries.ts agirlikli
+            ortalama aliyor (score * points / toplamPuan). Yanlis olan
+            yalnizca bu etiketti. Artik "20 / 20 puan" yazar.
+          */}
           <span className="shrink-0 text-xs text-muted-foreground">
-            AI: <span className="font-semibold tabular-nums">
-              {submission.ai_score ?? "—"}
+            AI:{" "}
+            <span className="font-semibold tabular-nums">
+              {puanla(submission.ai_score, question?.points)}
             </span>
             {approved !== null ? (
               <>
                 {" · "}Onaylı:{" "}
                 <span className="font-semibold tabular-nums text-foreground">
-                  {approved}
+                  {puanla(approved, question?.points)}
                 </span>
               </>
             ) : null}
@@ -465,12 +528,49 @@ function AnswerCard({
           />
         </div>
 
-        <SubmissionReviewDialog
-          submission={submission}
-          studentName={studentName}
-          question={question}
-          canPersist={canPersist}
-        />
+        {/*
+          ONAYLAMAK ICIN PENCERE ACMAK GEREKMIYOR.
+
+          Eskiden satirdaki tek eylem "Puanı incele" idi: egitmen katildigi
+          bir puani kesinlestirmek icin bile pencereyi acmak, beklemek ve
+          kapatmak zorundaydi. Cogunlukla yapilan is AI'in puanini oldugu
+          gibi kabul etmek oldugu icin o is artik burada, tek tikla.
+
+          "Düzenle" yalnizca puani DEGISTIRMEK isteyene: pencere aciliyor,
+          puan ve not orada duzenleniyor.
+
+          Onaylanmis cevapta "Onayla" gosterilmez - yapilacak is kalmamistir;
+          fikir degistiren "Düzenle" ile puani gunceller.
+        */}
+        <div className="flex shrink-0 items-center gap-2">
+          {isApproved ? null : (
+            <Button
+              size="sm"
+              className="gap-1.5"
+              disabled={disabled || approving || submission.ai_score === null}
+              title={
+                submission.ai_score === null
+                  ? "AI ön puanı yok; puanı elle vermek için Düzenle'yi kullanın."
+                  : undefined
+              }
+              onClick={onApprove}
+            >
+              {approving ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Check className="h-3.5 w-3.5" />
+              )}
+              Onayla
+            </Button>
+          )}
+
+          <SubmissionReviewDialog
+            submission={submission}
+            studentName={studentName}
+            question={question}
+            canPersist={canPersist}
+          />
+        </div>
       </div>
 
       {submission.ai_feedback ? (

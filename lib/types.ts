@@ -160,6 +160,14 @@ export type Question = {
    * sorularda null.
    */
   visual_json: QuestionVisual | null;
+  /**
+   * Zorluk derecesi. AI uretirken tahmin eder; icerik uzmani duzeltebilir.
+   *
+   * OPSIYONEL cunku sutun sonradan eklendi (BEKLEYEN-2-soru-zorluk.sql).
+   * Migration uygulanmadan once Supabase bu alani hic dondurmez; okuyan
+   * taraf bu yuzden `difficultyOf()` ile varsayilana duser.
+   */
+  difficulty?: QuestionDifficulty;
   status: QuestionStatus;
   outcome_id: string | null;
   created_by: string | null;
@@ -423,6 +431,22 @@ export type ApiResponse<T> =
  * tahmini vardi ve talep edilemiyordu.
  */
 export type DifficultyChoice = "kolay" | "orta" | "zor" | "karisik";
+
+/**
+ * Havuzdaki bir sorunun zorlugu.
+ *
+ * DifficultyChoice ile ayni DEGIL: orada bir de "karisik" var ve o bir
+ * URETIM TALEBIdir ("bana karisik zorlukta 10 soru uret"). Tek bir sorunun
+ * zorlugu karisik olamaz.
+ */
+export type QuestionDifficulty = "kolay" | "orta" | "zor";
+
+/** Ekranda gosterilen etiketler. */
+export const DIFFICULTY_LABELS: Readonly<Record<QuestionDifficulty, string>> = {
+  kolay: "Kolay",
+  orta: "Orta",
+  zor: "Zor",
+};
 
 export interface GenerateQuestionsRequest {
   context: string;
