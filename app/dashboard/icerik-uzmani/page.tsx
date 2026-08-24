@@ -100,27 +100,28 @@ export default async function IcerikUzmaniPage({
               : "Ölçmenin hedefi"
           }
           icon={Target}
-          accent="primary"
+          accent="cat1"
         />
         <StatCard
           label="Üretilen soru"
           value={aiGenerated}
           hint="AI kaynaklı"
           icon={Sparkles}
-          accent="success"
+          accent="cat2"
         />
         <StatCard
           label="Onay bekleyen"
           value={pending}
           hint={`${approved} soru onaylandı`}
           icon={CircleDashed}
-          accent="warning"
+          accent="cat3"
         />
         <StatCard
           label="Tarz örneği"
           value={preferenceStats.liked + preferenceStats.disliked}
           hint={`${preferenceStats.liked} beğeni · ${preferenceStats.disliked} red`}
           icon={ThumbsUp}
+          accent="cat4"
         />
       </div>
 

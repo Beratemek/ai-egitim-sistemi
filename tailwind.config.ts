@@ -74,6 +74,18 @@ const config: Config = {
           DEFAULT: "hsl(var(--warning))",
           foreground: "hsl(var(--warning-foreground))",
         },
+        /*
+          Istatistik kartlarinin KATEGORIK paleti (bkz. app/globals.css).
+          Durum renkleri (success/warning) DEGIL: bir KPI satirinda renk
+          kimlik tasir. Slot sirasi sabittir - bir kart eklenip cikarilinca
+          kalan kartlarin rengi DEGISMEMELI.
+        */
+        stat: {
+          1: "hsl(var(--stat-1))",
+          2: "hsl(var(--stat-2))",
+          3: "hsl(var(--stat-3))",
+          4: "hsl(var(--stat-4))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
