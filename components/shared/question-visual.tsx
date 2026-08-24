@@ -79,9 +79,31 @@ export function QuestionVisual({ visual, compact, className }: QuestionVisualPro
           o zaman cizim tema renklerini (currentColor) alamaz ve karanlik
           temada okunmaz hale gelirdi.
         */}
+        {/*
+          YUKSEKLIK SINIRI SVG'NIN KENDISINE VERILIR - sarmalayiciya degil.
+
+          HATA: sinir yalnizca bu div'in `maxHeight`indeydi ve `overflow`
+          serbestti. Veritabanindaki cizimler
+              <svg viewBox="0 0 200 120" width="100%" height="100%">
+          bicimde; `[&_svg]:h-auto` yuksekligi serbest birakinca SVG genisligi
+          kartin tamamini (~1100px) aliyor ve en-boy orani geregi ~660px
+          yukseklige uzuyordu. Sarmalayicinin maxHeight'i onu KIRPMIYORDU
+          (overflow: visible); cizim asagi tasip siklarin uzerine biniyor,
+          sorunun okunmasini engelliyordu.
+
+          Simdi hem SVG'ye max-height veriliyor hem sarmalayiciya
+          overflow-hidden konuyor. SVG'nin varsayilan
+          preserveAspectRatio="xMidYMid meet" davranisi geregi cizim
+          KIRPILMAZ; kutuya sigacak sekilde kucultulup ortalanir.
+        */}
         <div
-          className="[&_svg]:mx-auto [&_svg]:h-auto [&_svg]:max-w-full"
-          style={{ maxHeight: yukseklik * 1.4 }}
+          className="overflow-hidden [&_svg]:mx-auto [&_svg]:block [&_svg]:h-auto [&_svg]:max-h-[var(--gorsel-en-fazla)] [&_svg]:w-full [&_svg]:max-w-full"
+          style={
+            {
+              maxHeight: yukseklik * 1.4,
+              "--gorsel-en-fazla": `${yukseklik * 1.4}px`,
+            } as React.CSSProperties
+          }
           dangerouslySetInnerHTML={{ __html: visual.svg }}
         />
       </figure>

@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { BrandMark } from "@/components/shared/brand-mark";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { buttonVariants } from "@/components/ui/button";
+import { smoothScrollToHash } from "@/lib/smooth-scroll";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
@@ -75,7 +76,31 @@ export function LandingPillNav() {
                     className="landing-pill-link"
                     data-active={active}
                     href={item.href}
-                    onClick={() => setActiveSection(item.id)}
+                    /*
+                      Tarayicinin ANINDA zipladigi davranis birakildi.
+
+                      Duz bir `<a href="#...">` hedefe hic kaydirmadan
+                      konumlaniyordu; "sayfa zipladi" hissi veriyor ve
+                      kullanici nereye geldigini takip edemiyordu. Artik
+                      olcülü, sonda yavaslayan bir kaydirma var.
+
+                      preventDefault yalnizca hedef BULUNURSA: bolum
+                      silinmisse tarayicinin kendi davranisi calissin.
+
+                      Adres cubugundaki karma pushState ile guncellenir -
+                      dogrudan yazmak tarayiciyi yeniden ziplatirdi.
+                    */
+                    onClick={(event) => {
+                      setActiveSection(item.id);
+
+                      const nav = event.currentTarget.closest("header, nav");
+                      const bosluk = (nav?.getBoundingClientRect().height ?? 64) + 24;
+
+                      if (smoothScrollToHash(item.href, { offset: bosluk })) {
+                        event.preventDefault();
+                        window.history.pushState(null, "", item.href);
+                      }
+                    }}
                     role="listitem"
                   >
                     <span>{item.label}</span>

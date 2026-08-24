@@ -12,7 +12,6 @@ import {
   Pie,
   PieChart,
   ResponsiveContainer,
-  Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
@@ -96,7 +95,6 @@ function chartBody(visual: ChartVisual): React.ReactElement {
     const seri = ilkSeri;
     return (
       <PieChart>
-        <Tooltip />
         <Pie data={data} dataKey={seri.key} nameKey={xKey} outerRadius="75%" label>
           {data.map((_, index) => (
             <Cell key={index} fill={renkAl(index)} />
@@ -112,7 +110,6 @@ function chartBody(visual: ChartVisual): React.ReactElement {
         <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
         <XAxis dataKey={xKey} tick={EKSEN_BICIMI} />
         <YAxis tick={EKSEN_BICIMI} />
-        <Tooltip />
         {series.length > 1 ? <Legend wrapperStyle={{ fontSize: 11 }} /> : null}
         {series.map((seri, index) => (
           <Line
@@ -134,7 +131,6 @@ function chartBody(visual: ChartVisual): React.ReactElement {
       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
       <XAxis dataKey={xKey} tick={EKSEN_BICIMI} />
       <YAxis tick={EKSEN_BICIMI} />
-      <Tooltip />
       {series.length > 1 ? <Legend wrapperStyle={{ fontSize: 11 }} /> : null}
       {series.map((seri, index) => (
         <Bar
@@ -167,8 +163,22 @@ export function QuestionChart({
   visual: ChartVisual;
   height: number;
 }) {
+  /*
+    SORU GRAFIGI ETKILESIMSIZDIR - bir RESIM gibi durur.
+
+    Recharts varsayilan olarak fare uzerine gelince deger balonu (Tooltip) ve
+    vurgu imleci gosterir. Burasi bir gosterge paneli DEGIL, sinav sorusunun
+    govdesi: ogrenciye/egitmene grafigin uzerinde gezinip sayi okutmak
+    sorunun kendisini degistirebilir (grafikten okunmasi istenen degeri
+    balon dogrudan soyler). Uc <Tooltip /> kaldirildi.
+
+    pointer-events-none: balon gitse de vurgu imleci ve imlec degisimi
+    kalirdi; grafigin tiklanabilir/incelenebilir bir sey oldugu izlenimini
+    tumuyle kaldiriyoruz. aria-hidden DEGIL - ekran okuyucu icin baslik ve
+    cevre metin duruyor.
+  */
   return (
-    <div style={{ height }}>
+    <div style={{ height }} className="pointer-events-none select-none">
       <ResponsiveContainer width="100%" height="100%">
         {chartBody(visual)}
       </ResponsiveContainer>

@@ -1,3 +1,4 @@
+import { LoadingBanner } from "@/components/shared/hourglass";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -21,6 +22,13 @@ export function PageSkeleton({ stats = 4, blocks = 2 }: PageSkeletonProps) {
         <Skeleton className="h-8 w-56" />
         <Skeleton className="h-4 w-96 max-w-full" />
       </div>
+
+      {/*
+        Iskelet "duzen bu olacak" der ama HAREKETSIZDIR; uzun bir beklemede
+        sayfa donmus gibi gorunur. Kum saati "hala calisiyorum" diyen tek
+        hareketli ogedir.
+      */}
+      <LoadingBanner />
 
       {stats > 0 ? (
         <div className="grid grid-cols-2 gap-2.5 sm:gap-4 xl:grid-cols-4">

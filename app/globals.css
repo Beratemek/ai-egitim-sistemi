@@ -1517,3 +1517,89 @@
     color-scheme: light;
   }
 }
+
+@layer utilities {
+  /*
+   * Kum saati bekleme gostergesi (components/shared/hourglass.tsx).
+   *
+   * Uc animasyon AYNI 2.4sn dongusune bagli: kum ust hazneden biter,
+   * alt hazne dolar ve tam o anda saat cevrilir. Sureler ayrisirsa
+   * "dolu saat ters donuyor" gibi yanlis bir hareket cikar.
+   */
+  @keyframes kum-saati-cevir {
+    0%,
+    88% {
+      transform: rotate(0deg);
+    }
+    100% {
+      transform: rotate(180deg);
+    }
+  }
+
+  /* Ust hazne: dolu -> bos (yukseklik kuculur, tepeden asagi cekilir). */
+  @keyframes kum-ust {
+    0% {
+      transform: translateY(0);
+    }
+    85%,
+    100% {
+      transform: translateY(-13px);
+    }
+  }
+
+  /* Alt hazne: bos -> dolu (asagidan yukari yukselir). */
+  @keyframes kum-alt {
+    0% {
+      transform: translateY(13px);
+    }
+    85%,
+    100% {
+      transform: translateY(0);
+    }
+  }
+
+  /* Akis cizgisi kum biterken kaybolur. */
+  @keyframes kum-akis {
+    0%,
+    80% {
+      opacity: 0.9;
+    }
+    88%,
+    100% {
+      opacity: 0;
+    }
+  }
+
+  .kum-saati svg {
+    animation: kum-saati-cevir 2.4s ease-in-out infinite;
+    transform-origin: 50% 50%;
+  }
+  .kum-saati .kum-ust {
+    animation: kum-ust 2.4s linear infinite;
+  }
+  .kum-saati .kum-alt {
+    animation: kum-alt 2.4s linear infinite;
+  }
+  .kum-saati .kum-akis {
+    animation: kum-akis 2.4s linear infinite;
+  }
+
+  /*
+   * Hareket duyarliligi: donup duran bir nesne birakmak dogru olmaz.
+   * Saat yari dolu, SABIT bir simge olarak kalir - anlami korunur.
+   */
+  @media (prefers-reduced-motion: reduce) {
+    .kum-saati svg,
+    .kum-saati .kum-ust,
+    .kum-saati .kum-alt,
+    .kum-saati .kum-akis {
+      animation: none;
+    }
+    .kum-saati .kum-ust {
+      transform: translateY(-6px);
+    }
+    .kum-saati .kum-alt {
+      transform: translateY(6px);
+    }
+  }
+}
