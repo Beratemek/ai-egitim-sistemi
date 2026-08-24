@@ -140,7 +140,7 @@ export function StudentStudyPlanBoard() {
   if (!ready) {
     return (
       <Card className="border-dashed">
-        <CardContent className="py-16 text-center text-sm text-muted-foreground">
+        <CardContent className="flex flex-col items-center justify-center py-16 text-center text-sm text-muted-foreground min-h-[240px]">
           Çalışma planın yükleniyor…
         </CardContent>
       </Card>
@@ -150,7 +150,7 @@ export function StudentStudyPlanBoard() {
   if (syncError) {
     return (
       <Card className="border-destructive/40 bg-destructive/5">
-        <CardContent className="py-12 text-center">
+        <CardContent className="flex flex-col items-center justify-center py-12 text-center min-h-[240px]">
           <p className="font-medium text-destructive">Çalışma planı yüklenemedi</p>
           <p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground">
             {syncError}
@@ -166,7 +166,7 @@ export function StudentStudyPlanBoard() {
   if (items.length === 0) {
     return (
       <Card className="border-dashed">
-        <CardContent className="flex flex-col items-center py-16 text-center">
+        <CardContent className="flex flex-col items-center py-16 text-center min-h-[240px]">
           <ListTodo className="h-10 w-10 text-muted-foreground/50" />
           <p className="mt-4 font-medium">Çalışma planın henüz boş</p>
           <p className="mt-1 max-w-md text-sm text-muted-foreground">
@@ -229,7 +229,7 @@ export function StudentStudyPlanBoard() {
 
       {visibleItems.length === 0 ? (
         <Card className="border-dashed">
-          <CardContent className="py-12 text-center text-sm text-muted-foreground">
+          <CardContent className="flex flex-col items-center justify-center py-12 text-center text-sm text-muted-foreground min-h-[240px]">
             Bu durumda bir çalışma bulunmuyor.
           </CardContent>
         </Card>

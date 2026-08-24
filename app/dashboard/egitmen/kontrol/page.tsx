@@ -52,7 +52,7 @@ export default async function KontrolPage() {
 
       {classrooms.length === 0 ? (
         <Card>
-          <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
+          <CardContent className="flex flex-col items-center gap-3 py-12 text-center min-h-[240px]">
             <span className="flex h-11 w-11 items-center justify-center rounded-full bg-muted">
               <ClipboardCheck className="h-5 w-5 text-muted-foreground" />
             </span>

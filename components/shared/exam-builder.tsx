@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Check, Loader2, Plus, Search, Trash2 } from "lucide-react";
+import { Check, Library, Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -10,6 +10,7 @@ import {
   removeExamQuestion,
   setExamQuestionPoints,
 } from "@/app/actions/exams";
+import { QuestionPoolBrowser } from "@/components/shared/question-pool-browser";
 import { QuestionTypeBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,8 +21,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Separator } from "@/components/ui/separator";
-import { cn } from "@/lib/utils";
 import type { Exam, Question } from "@/lib/types";
 
 export interface ExamBuilderProps {
@@ -60,8 +59,6 @@ export function ExamBuilder({
 }: ExamBuilderProps) {
   const router = useRouter();
 
-  const [selected, setSelected] = React.useState<Set<string>>(new Set());
-  const [search, setSearch] = React.useState("");
   const [pendingAction, setPendingAction] = React.useState<string | null>(null);
 
   const inExamIds = React.useMemo(
@@ -69,31 +66,23 @@ export function ExamBuilder({
     [examQuestions],
   );
 
-  const available = React.useMemo(() => {
-    const needle = search.trim().toLocaleLowerCase("tr");
+  /**
+   * Havuzdan, bu sinavda ZATEN ekli olanlar cikarilmis hali.
+   *
+   * Arama/filtre burada YAPILMAZ: onlar QuestionPoolBrowser'in kendi ust
+   * cubugunda, ders/konu gezintisiyle birlikte duruyor.
+   */
+  const available = React.useMemo(
+    () => pool.filter((question) => !inExamIds.has(question.id)),
+    [pool, inExamIds],
+  );
 
-    return pool.filter((question) => {
-      if (inExamIds.has(question.id)) return false;
-      if (!needle) return true;
-      return (
-        question.text.toLocaleLowerCase("tr").includes(needle) ||
-        question.topic.toLocaleLowerCase("tr").includes(needle)
-      );
-    });
-  }, [pool, inExamIds, search]);
+  /** Gezginde isaretlenen sorulari bu sinava ekler. */
+  async function handleAdd(questionIds: string[]) {
+    if (questionIds.length === 0) return;
 
-  function toggle(questionId: string) {
-    setSelected((current) => {
-      const next = new Set(current);
-      if (next.has(questionId)) next.delete(questionId);
-      else next.add(questionId);
-      return next;
-    });
-  }
-
-  async function handleAdd() {
     setPendingAction("add");
-    const result = await addExamQuestions(exam.id, [...selected]);
+    const result = await addExamQuestions(exam.id, questionIds);
     setPendingAction(null);
 
     if (!result.ok) {
@@ -102,7 +91,6 @@ export function ExamBuilder({
     }
 
     toast.success(`${result.data.added} soru sınava eklendi`);
-    setSelected(new Set());
     router.refresh();
   }
 
@@ -210,88 +198,45 @@ export function ExamBuilder({
           </CardDescription>
         </CardHeader>
 
-        <CardContent className="space-y-4">
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <div className="relative flex-1">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                type="search"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Soru veya konu ara..."
-                aria-label="Havuzda ara"
-                className="pl-9"
-              />
-            </div>
+        <CardContent>
+          {/*
+            HAVUZUN KENDISI BURAYA TASINDI (duz liste kaldirildi).
 
-            <Button
-              className="gap-2"
-              disabled={selected.size === 0 || pendingAction === "add"}
-              onClick={() => void handleAdd()}
-            >
-              {pendingAction === "add" ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Plus className="h-4 w-4" />
-              )}
-              {selected.size > 0 ? `${selected.size} soruyu ekle` : "Soru ekle"}
-            </Button>
-          </div>
+            Onceden burada yalnizca bir arama kutusu ve butun onayli
+            sorularin alt alta dizildigi duz bir liste vardi. Havuz
+            buyudukce (uzun metinli yuzlerce soru) bu liste kullanilamaz
+            hale geliyordu ve en onemlisi: soru havuzunda kurulan
+            DERS -> KONU kategori yapisi bu ekranda hic gorunmuyordu.
 
-          <Separator />
+            Artik soru havuzu sayfasindaki gezginin TA KENDISI kullaniliyor
+            (QuestionPoolBrowser): ayni ders/konu kutucuklari, ayni
+            breadcrumb, ayni tip filtresi ve toplu secim. Tek fark
+            `onAddToExam`: secim yeni sinav kurmak yerine ACIK OLAN sinava
+            eklenir.
 
+            Sinavda zaten bulunan sorular gezgine hic verilmez; boylece
+            "ekli olan" sorular listede tekrar gorunmez.
+          */}
           {available.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">
-              {pool.length === 0
-                ? "Havuzda onaylı soru yok. Önce soru havuzundan taslakları onaylayın."
-                : "Eklenebilecek başka soru kalmadı."}
-            </p>
+            <div className="flex min-h-[320px] flex-col items-center justify-center gap-2 text-center">
+              <Library className="h-8 w-8 text-muted-foreground/50" />
+              <p className="font-medium">
+                {pool.length === 0
+                  ? "Havuzda onaylı soru yok"
+                  : "Eklenebilecek başka soru kalmadı"}
+              </p>
+              <p className="max-w-sm text-sm text-muted-foreground">
+                {pool.length === 0
+                  ? "Önce soru havuzundan taslakları onaylayın; onaylanan sorular ders ve konu başlıkları altında burada birikir."
+                  : "Havuzdaki onaylı soruların tamamı bu sınavda ekli."}
+              </p>
+            </div>
           ) : (
-            <ul className="space-y-2">
-              {available.map((question) => {
-                const isSelected = selected.has(question.id);
-
-                return (
-                  <li key={question.id}>
-                    <button
-                      type="button"
-                      onClick={() => toggle(question.id)}
-                      aria-pressed={isSelected}
-                      className={cn(
-                        "flex w-full items-start gap-3 rounded-xl border p-4 text-left transition-colors",
-                        isSelected
-                          ? "border-primary bg-primary/5"
-                          : "hover:border-primary/40 hover:bg-accent/50",
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border",
-                          isSelected
-                            ? "border-primary bg-primary text-primary-foreground"
-                            : "border-input",
-                        )}
-                        aria-hidden
-                      >
-                        {isSelected ? <Check className="h-3.5 w-3.5" /> : null}
-                      </span>
-
-                      <span className="min-w-0 flex-1 space-y-2">
-                        <span className="block text-sm font-medium leading-relaxed">
-                          {question.text}
-                        </span>
-                        <span className="flex flex-wrap items-center gap-2">
-                          <QuestionTypeBadge type={question.type} />
-                          <span className="text-xs text-muted-foreground">
-                            {question.topic}
-                          </span>
-                        </span>
-                      </span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
+            <QuestionPoolBrowser
+              questions={available}
+              canPersist={canPersist}
+              onAddToExam={handleAdd}
+            />
           )}
         </CardContent>
       </Card>

@@ -515,7 +515,7 @@ function SourceBadge({ aiGenerated }: { aiGenerated: boolean }) {
 function EmptyState() {
   return (
     <Card>
-      <CardContent className="flex flex-col items-center justify-center gap-2 py-16 text-center">
+      <CardContent className="flex flex-col items-center justify-center gap-2 py-16 text-center min-h-[240px]">
         <Search className="h-8 w-8 text-muted-foreground/50" />
         <p className="font-medium">Filtrelere uyan soru bulunamadı</p>
         <p className="text-sm text-muted-foreground">

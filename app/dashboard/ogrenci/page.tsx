@@ -200,7 +200,7 @@ export default async function OgrenciPage() {
 
           {examHistory.length === 0 ? (
             <Card className="border-dashed">
-              <CardContent className="py-10 text-center text-sm text-muted-foreground">
+              <CardContent className="flex flex-col items-center justify-center py-10 text-center text-sm text-muted-foreground min-h-[240px]">
                 Henüz basladiginiz bir sınav yok.
               </CardContent>
             </Card>
@@ -313,7 +313,7 @@ function ExamSection({
       {items.length === 0 ? (
         emptyMessage ? (
           <Card className="border-dashed">
-            <CardContent className="py-12 text-center text-sm text-muted-foreground">
+            <CardContent className="flex flex-col items-center justify-center py-12 text-center text-sm text-muted-foreground min-h-[240px]">
               {emptyMessage}
             </CardContent>
           </Card>

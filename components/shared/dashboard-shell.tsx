@@ -215,7 +215,16 @@ export function DashboardShell({
           </div>
         </header>
 
-        <main className="animate-kitap-yukselir mx-auto w-full max-w-[1400px] space-y-4 px-3 py-4 sm:space-y-6 sm:px-6 sm:py-8 print:max-w-none print:space-y-0 print:p-0">
+        {/*
+          UST BOSLUK ayri tutuluyor (py-4 -> pt-7/pb-4, sm:py-8 -> sm:pt-14/sm:pb-8).
+
+          Yapiskan ust cubuk 64px ve icerikle ARASINDA yalnizca 32px vardi;
+          sayfa basligi ile cubuk tek bir blok gibi gorunuyor, baslik cubuga
+          "yapisik" duruyordu. Ust bosluk alt bosluktan bagimsiz buyutuldu:
+          asagida zaten kartlar arasi ritim (space-y) var, tekrar buyutmek
+          sayfayi gereksiz uzatirdi.
+        */}
+        <main className="animate-kitap-yukselir mx-auto w-full max-w-[1400px] space-y-4 px-3 pb-4 pt-7 sm:space-y-6 sm:px-6 sm:pb-8 sm:pt-14 print:max-w-none print:space-y-0 print:p-0">
           {children}
         </main>
       </div>

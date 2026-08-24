@@ -113,10 +113,20 @@ export function ExamPaperPanel({
     window.print();
   }
 
+  /*
+   * Bos durum kutusu EKRANIN KALANINI doldurur.
+   *
+   * Onceden sabit `py-16` ile kisa bir seritti: yapiskan sekme seridinin
+   * hemen altina yapisip altinda ekran boyunca bos alan birakiyordu.
+   * Yukseklik artik gorunur alandan hesaplaniyor:
+   *   100vh - ust cubuk (64px) - sekme seridi (~113px) - main dikey
+   *   bosluklari (~64px) = 100vh - 241px
+   * Alt sinir 320px: kisa pencerelerde kutu ezilmesin.
+   */
   if (questions.length === 0) {
     return (
       <Card className="border-dashed print:hidden">
-        <CardContent className="flex flex-col items-center justify-center gap-2 py-16 text-center">
+        <CardContent className="flex min-h-[max(320px,calc(100vh-241px))] flex-col items-center justify-center gap-2 py-16 text-center">
           <Printer className="h-8 w-8 text-muted-foreground/50" />
           <p className="font-medium">Basılacak soru yok</p>
           <p className="max-w-sm text-sm text-muted-foreground">

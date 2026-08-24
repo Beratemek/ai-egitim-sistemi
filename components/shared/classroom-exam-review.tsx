@@ -117,7 +117,13 @@ export function ClassroomExamReview({
     <div className="space-y-4">
       {/* ---------- Sinif ozeti + toplu onay ---------- */}
       <Card>
-        <CardContent className="flex flex-wrap items-center justify-between gap-4 py-4">
+        {/*
+          Bu kartin ustunde CardHeader YOK; ust boslugu buradaki py verir.
+          Eskiden calismiyordu (CardContent tabanindaki `sm:pt-0` eziyordu),
+          artik kaynagi duzeltildi - bkz. components/ui/card.tsx. 28px ust,
+          28px alt: sayilar ve toplu onay dugmesi dikeyde ortali durur.
+        */}
+        <CardContent className="flex flex-wrap items-center justify-between gap-4 py-7">
           <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
             <Summary label="Öğrenci" value={String(detail.students.length)} />
             <Summary label="Soru" value={String(detail.questions.length)} />
@@ -165,7 +171,7 @@ export function ClassroomExamReview({
       {/* ---------- Ogrenciler ---------- */}
       {detail.students.length === 0 ? (
         <Card>
-          <CardContent className="py-12 text-center text-sm text-muted-foreground">
+          <CardContent className="flex flex-col items-center justify-center py-12 text-center text-sm text-muted-foreground min-h-[240px]">
             Bu sınıfta sınavı alan öğrenci yok.
           </CardContent>
         </Card>
@@ -216,11 +222,11 @@ function Summary({
   highlight?: boolean;
 }) {
   return (
-    <span className="flex flex-col">
+    <span className="flex flex-col gap-0.5">
       <span className="text-xs text-muted-foreground">{label}</span>
       <span
         className={cn(
-          "text-lg font-semibold tabular-nums",
+          "text-2xl font-semibold leading-none tabular-nums",
           highlight && "text-amber-600 dark:text-amber-500",
         )}
       >

@@ -11,11 +11,14 @@ import {
   Layers,
   Library,
   ListChecks,
+  Loader2,
+  Plus,
   RotateCcw,
   Search,
   ClipboardList,
   Sparkles,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
 import { ExamComposeDialog } from "@/components/shared/exam-compose-dialog";
 import { ExamManualDialog } from "@/components/shared/exam-manual-dialog";
@@ -75,12 +78,30 @@ export interface QuestionPoolBrowserProps {
   questions: readonly Question[];
   /** Supabase yoksa ekleme adimi hata döndürür. */
   canPersist?: boolean;
+  /**
+   * VERILIRSE bilesen "var olan sinava ekle" kipine gecer.
+   *
+   * Havuz sayfasinda bu prop YOK: orada secim yeni sinav kurmaya baglanir.
+   * Sinav duzenleme ekraninda ise ayni ders -> konu -> soru gezintisi
+   * gerekiyordu; oradaki duz liste, havuz buyudukce (yuzlerce uzun metinli
+   * soru alt alta) kullanilamaz hale geliyordu ve kurulan kategori yapisi
+   * o ekranda hic gorunmuyordu.
+   *
+   * Kip acikken: ust cubuktaki "Sinav olustur" dugmesi ve sinav kurma
+   * pencereleri gizlenir, secim seridindeki eylem "sinava ekle" olur.
+   */
+  onAddToExam?: (questionIds: string[]) => Promise<void>;
 }
 
 export function QuestionPoolBrowser({
   questions,
   canPersist = false,
+  onAddToExam,
 }: QuestionPoolBrowserProps) {
+  /** "Var olan sinava ekle" kipi mi? (bkz. onAddToExam) */
+  const sinavaEkleKipi = typeof onAddToExam === "function";
+  /** Ekleme istegi surerken secim seridi bekleme gosterir. */
+  const [ekleniyor, setEkleniyor] = React.useState(false);
 
   const [activeSubject, setActiveSubject] = React.useState<string | null>(null);
   const [activeTopic, setActiveTopic] = React.useState<string | null>(null);
@@ -192,7 +213,7 @@ export function QuestionPoolBrowser({
         onSearchChange={setSearch}
         typeFilter={typeFilter}
         onTypeFilterChange={setTypeFilter}
-        onCreateExam={() => setComposeOpen(true)}
+        onCreateExam={sinavaEkleKipi ? undefined : () => setComposeOpen(true)}
       />
 
         {openSubject === null ? (
@@ -278,8 +299,23 @@ export function QuestionPoolBrowser({
       {/* ---------- Secim bari ---------- */}
       <SelectionBar
         selectedCount={selectedIds.size}
-        onCreate={() => setManualOpen(true)}
+        onCreate={
+          sinavaEkleKipi
+            ? async () => {
+                setEkleniyor(true);
+                try {
+                  await onAddToExam!([...selectedIds]);
+                  setSelectedIds(new Set());
+                } finally {
+                  setEkleniyor(false);
+                }
+              }
+            : () => setManualOpen(true)
+        }
         onClear={() => setSelectedIds(new Set())}
+        actionLabel={sinavaEkleKipi ? "Sınava ekle" : "Yeni sınav"}
+        actionIcon={sinavaEkleKipi ? Plus : ClipboardList}
+        busy={ekleniyor}
       />
 
       {/*
@@ -289,25 +325,31 @@ export function QuestionPoolBrowser({
         gibi kaydedilseydi sinavin gercek dersi olur ve ders yetki
         sisteminde var olmayan bir ders gibi davranirdi.
       */}
-      <ExamManualDialog
-        open={manualOpen}
-        onOpenChange={setManualOpen}
-        questions={selectedQuestions}
-        subjectOptions={realSubjectNames}
-        defaultSubject={realDefaultSubject}
-        canPersist={canPersist}
-        onCreated={() => setSelectedIds(new Set())}
-      />
+      {/* Sinav kurma pencereleri yalnizca HAVUZ sayfasinda anlamli; sinava
+          ekleme kipinde zaten acik bir sinav var. */}
+      {sinavaEkleKipi ? null : (
+        <>
+          <ExamManualDialog
+            open={manualOpen}
+            onOpenChange={setManualOpen}
+            questions={selectedQuestions}
+            subjectOptions={realSubjectNames}
+            defaultSubject={realDefaultSubject}
+            canPersist={canPersist}
+            onCreated={() => setSelectedIds(new Set())}
+          />
 
-      <ExamComposeDialog
-        open={composeOpen}
-        onOpenChange={setComposeOpen}
-        subjects={allSubjects}
-        selectedIds={[...selectedIds]}
-        defaultSubject={realDefaultSubject}
-        canPersist={canPersist}
-        onCreated={() => setSelectedIds(new Set())}
-      />
+          <ExamComposeDialog
+            open={composeOpen}
+            onOpenChange={setComposeOpen}
+            subjects={allSubjects}
+            selectedIds={[...selectedIds]}
+            defaultSubject={realDefaultSubject}
+            canPersist={canPersist}
+            onCreated={() => setSelectedIds(new Set())}
+          />
+        </>
+      )}
     </div>
   );
 }
@@ -811,7 +853,8 @@ function PoolToolbar({
   onSearchChange: (value: string) => void;
   typeFilter: TypeFilter;
   onTypeFilterChange: (value: TypeFilter) => void;
-  onCreateExam: () => void;
+  /** undefined ise dugme hic basilmaz - sinava ekleme kipinde boyle. */
+  onCreateExam?: () => void;
 }) {
   return (
     <div className="flex flex-col gap-2 sm:flex-row">
@@ -846,10 +889,12 @@ function PoolToolbar({
         isaretlendikten sonra beliriyordu; oysa egitmen cogu zaman tek tek
         secmek degil "su dersten 20 soruluk sinav" demek istiyor.
       */}
-      <Button className="gap-2 whitespace-nowrap" onClick={onCreateExam}>
-        <Sparkles className="h-4 w-4" />
-        Sınav oluştur
-      </Button>
+      {onCreateExam ? (
+        <Button className="gap-2 whitespace-nowrap" onClick={onCreateExam}>
+          <Sparkles className="h-4 w-4" />
+          Sınav oluştur
+        </Button>
+      ) : null}
     </div>
   );
 }
@@ -870,10 +915,17 @@ function SelectionBar({
   selectedCount,
   onCreate,
   onClear,
+  actionLabel,
+  actionIcon: ActionIcon,
+  busy = false,
 }: {
   selectedCount: number;
   onCreate: () => void;
   onClear: () => void;
+  /** Eylem dugmesinin metni: havuzda "Yeni sinav", sinavda "Sinava ekle". */
+  actionLabel: string;
+  actionIcon: LucideIcon;
+  busy?: boolean;
 }) {
   if (selectedCount === 0) return null;
 
@@ -888,6 +940,7 @@ function SelectionBar({
           size="sm"
           variant="ghost"
           className="gap-1.5 text-muted-foreground"
+          disabled={busy}
           onClick={onClear}
         >
           <RotateCcw className="h-3.5 w-3.5" />
@@ -897,13 +950,20 @@ function SelectionBar({
         <Separator orientation="vertical" className="mx-1 h-6" />
 
         {/*
-          Var olan bir sinava soru eklemek BU EKRANIN isi degil: o sinavin
-          kendi duzenleme ekraninda, sorularin sirasi ve puanlari gorunurken
-          yapiliyor. Havuz ekrani yeni sinav kurmaya odakli.
+          Eylem baglama gore degisir:
+            havuz sayfasi        -> "Yeni sinav"  (secilenlerle sinav kurar)
+            sinav duzenleme      -> "Sinava ekle" (acik olan sinava ekler)
+          Havuz sayfasi hala yeni sinav kurmaya odakli; sinava ekleme, o
+          sinavin kendi ekraninda sorularin sirasi ve puanlari gorunurken
+          yapiliyor - bkz. onAddToExam.
         */}
-        <Button size="sm" className="gap-1.5" onClick={onCreate}>
-          <ClipboardList className="h-3.5 w-3.5" />
-          Yeni sınav
+        <Button size="sm" className="gap-1.5" disabled={busy} onClick={onCreate}>
+          {busy ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <ActionIcon className="h-3.5 w-3.5" />
+          )}
+          {actionLabel}
         </Button>
       </div>
     </div>
@@ -915,7 +975,7 @@ function SelectionBar({
 function EmptyPool() {
   return (
     <Card>
-      <CardContent className="flex flex-col items-center justify-center gap-2 py-16 text-center">
+      <CardContent className="flex flex-col items-center justify-center gap-2 py-16 text-center min-h-[240px]">
         <Library className="h-8 w-8 text-muted-foreground/50" />
         <p className="font-medium">Havuzda onaylanmis soru yok</p>
         <p className="max-w-sm text-sm text-muted-foreground">
@@ -930,7 +990,7 @@ function EmptyPool() {
 function NoMatch() {
   return (
     <Card>
-      <CardContent className="flex flex-col items-center justify-center gap-2 py-14 text-center">
+      <CardContent className="flex flex-col items-center justify-center gap-2 py-14 text-center min-h-[240px]">
         <Search className="h-8 w-8 text-muted-foreground/50" />
         <p className="font-medium">Filtrelere uyan soru bulunamadi</p>
         <p className="text-sm text-muted-foreground">

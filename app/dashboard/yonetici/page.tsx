@@ -8,7 +8,7 @@ import {
 } from "@/components/shared/analytics-charts";
 import { PageHeader } from "@/components/shared/page-header";
 import { RoleBadge } from "@/components/shared/status-badge";
-import { OutcomeAnalysis } from "@/components/shared/outcome-analysis";
+
 import { StatCard } from "@/components/shared/stat-card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -28,7 +28,6 @@ import {
 } from "@/components/ui/table";
 import {
   getExamStatistics,
-  getOutcomeAnalysis,
   getQuestions,
   getScoreTrend,
   getUsers,
@@ -38,13 +37,12 @@ import { formatScore } from "@/lib/utils";
 export const metadata: Metadata = { title: "Eğitim Yöneticisi" };
 
 export default async function YoneticiPage() {
-  const [statistics, questions, users, scoreTrend, outcomeAnalysis] =
+  const [statistics, questions, users, scoreTrend] =
     await Promise.all([
       getExamStatistics(),
       getQuestions(),
       getUsers(),
       getScoreTrend(),
-      getOutcomeAnalysis(),
     ]);
 
   const totalStudents = statistics.reduce(
@@ -104,13 +102,16 @@ export default async function YoneticiPage() {
       </div>
 
       {/*
-        Sartnamenin 4. rolu: "ogrenme ciktilarini, tamamlanma durumlarini ve
-        degerlendirme istatistiklerini takip eder". Sinav bazli istatistik
-        vardi, OGRENME CIKTISI kirilimi yoktu.
+        KAZANIM BAZLI BASARI PANELI KALDIRILDI (2026-08-24).
 
-        Uretim baglantisi yok: egitim yoneticisi raporu okur, soru uretmez.
+        Once egitmen panelinden alinip yalnizca burada birakilmisti; sonra
+        buradan da cikarildi. Kazanim/cikti raporlamasini takim ayrica ele
+        alacak, o yuzden yarim bir surumun ekranda durmasi istenmiyor.
+
+        Bilesen SILINMEDI: components/shared/outcome-analysis.tsx ve
+        lib/queries.ts icindeki getOutcomeAnalysis oldugu gibi duruyor,
+        yeni tasarim hazir oldugunda tekrar baglanabilir.
       */}
-      <OutcomeAnalysis rows={outcomeAnalysis} />
 
       <ScoreTrendChart data={scoreTrend} />
 

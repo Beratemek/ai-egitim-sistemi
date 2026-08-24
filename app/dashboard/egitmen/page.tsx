@@ -10,36 +10,31 @@ import {
 } from "lucide-react";
 
 import { AiMockNotice } from "@/components/shared/ai-mock-notice";
-import { ExamStatusAlerts } from "@/components/shared/exam-status-alerts";
+
 import { PageHeader } from "@/components/shared/page-header";
-import { OutcomeAnalysis } from "@/components/shared/outcome-analysis";
 import { PendingByClassroom } from "@/components/shared/pending-by-classroom";
 import { QuickActions } from "@/components/shared/quick-actions";
 import { StatCard } from "@/components/shared/stat-card";
 import { buttonVariants } from "@/components/ui/button";
-import { buildExamAlerts } from "@/lib/exam-alerts";
-import { isSupabaseConfigured, serverEnv } from "@/lib/env";
+
+import { serverEnv } from "@/lib/env";
 import {
   getClassroomExamReviews,
   getExamSummaries,
-  getOutcomeAnalysis,
   getQuestions,
   getSubmissions,
 } from "@/lib/queries";
-import { grantedRoles } from "@/lib/roles";
-import { getCurrentUser } from "@/lib/supabase-server";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Eğitmen" };
 
 export default async function EgitmenPage() {
-  const [questions, exams, submissions, classroomReviews, outcomeAnalysis] =
+  const [questions, exams, submissions, classroomReviews] =
     await Promise.all([
       getQuestions(),
       getExamSummaries(),
       getSubmissions(),
       getClassroomExamReviews(),
-      getOutcomeAnalysis(),
     ]);
 
   // Eğitmen yalnızca havuza dusmus (onaylı) sorularla ilgilenir; taslak
@@ -50,57 +45,18 @@ export default async function EgitmenPage() {
     (submission) => submission.status === "ai_degerlendirildi",
   );
 
-  /*
-    Sinav basina atanmis ogrenci sayisi.
-
-    Ayri bir sorgu ACILMIYOR: `getClassroomExamReviews` zaten atamalardan
-    turetiliyor ve bu sayfa onu her halukarda okuyor. Atamasi olmayan sinav
-    hic satir uretmedigi icin haritada bulunmamasi "0 ogrenci" demektir -
-    uyari mantiginin aradigi bilgi tam olarak budur.
-  */
-  const assignedByExam = new Map<string, number>();
-  for (const review of classroomReviews) {
-    assignedByExam.set(
-      review.exam.id,
-      (assignedByExam.get(review.exam.id) ?? 0) + review.assignedCount,
-    );
-  }
-
-  /*
-    "Simdi" TEK BIR AN olarak sabitlenir. Satir satir `Date.now()` cagirmak
-    ayni listedeki sinavlari birbirinden milisaniyeler farkli anlara gore
-    degerlendirmek olurdu.
-  */
-  const alerts = buildExamAlerts(
-    exams.map((exam) => ({
-      id: exam.id,
-      title: exam.title,
-      is_published: exam.is_published,
-      ends_at: exam.ends_at,
-      questionCount: exam.questionCount,
-      assignedCount: assignedByExam.get(exam.id) ?? 0,
-    })),
-    Date.now(),
-  );
-
   const pendingReviewCount = classroomReviews.reduce(
     (sum, review) => sum + review.pendingCount,
     0,
   );
 
   /*
-    KAZANIM PANELINDEKI "soru uret" BAGLANTISI.
-
-    Baglanti icerik uzmaninin ekranina gidiyor ve o ekran ROLE BAGLI:
-    middleware, `icerik_uzmani` rolu olmayan kisiyi kendi paneline geri
-    atiyor. Kosulsuz gosterildiginde tiklayan egitmen hicbir aciklama
-    almadan ayni sayfaya donuyordu - calisan degil, SESSIZCE OLU bir dugme.
-    Artik yalnizca o role gercekten sahip olana gosteriliyor.
+    Buradaki `getCurrentUser` cagrisi ve `canGenerateQuestions` bayragi
+    KALDIRILDI: yalnizca kazanim panelindeki "soru uret" baglantisini role
+    gore gizlemek icin vardi. Panel yoneticiye tasindigi icin bu ekranda
+    kullanicinin rolune bakmaya gerek kalmadi - sayfa bir Supabase cagrisi
+    daha az yapiyor.
   */
-  const current = isSupabaseConfigured ? await getCurrentUser() : null;
-  const canGenerateQuestions = current
-    ? grantedRoles(current.profile).includes("icerik_uzmani")
-    : false;
 
   return (
     <>
@@ -180,32 +136,24 @@ export default async function EgitmenPage() {
       <PendingByClassroom reviews={classroomReviews} />
 
       {/*
-        SINAV DURUMU.
-        Sayilar bir sinavin YAYINDA OLUP kimseye atanmadigini soylemiyordu;
-        oyle bir sinav kimse fark etmeden orada duruyordu. Bu panel sayiyi
-        degil yapilacak isi gosterir.
+        SINAV DURUMU PANELI KALDIRILDI (2026-08-24).
 
-        Buranin oncesinde "Sinavlarim" diye bir kart vardi: /sinavlar
-        sayfasinin daha az bilgi tasiyan, üstelik TIKLANAMAYAN bir kopyasi.
-        Ayni listeyi iki yerde tutmak yerine ust basliktaki "Tüm sınavlar"
-        baglantisi birakildi.
+        Bilesen ve mantik SILINMEDI: components/shared/exam-status-alerts.tsx
+        ile lib/exam-alerts.ts (ve testleri) oldugu gibi duruyor; gerekirse
+        tek satirla geri baglanir. Bu sayfa artik yalnizca gunluk isi
+        gosteriyor: hizli eylemler, sayilar ve sinif bazli puan onayi.
       */}
-      <ExamStatusAlerts alerts={alerts} />
 
       {/*
-        SINIFIN OGRENME DURUMU.
-        Sartnamenin 2. slaydi "egitmen sinifin ogrenme durumunu tek ekrandan
-        gorur" diyor. Sinav ortalamasi bunu vermiyordu: "%61" hangi parcanin
-        zayif oldugunu soylemiyor.
+        KAZANIM BAZLI BASARI PANELI BURADAN KALDIRILDI (2026-08-24).
 
-        En zayif 5 kazanim gosteriliyor - panel bir ozet ekrani, tam liste
-        yonetici raporunda.
+        Kazanim analizi ve ondan cikarilan istatistik/raporlama EGITIM
+        YONETICISININ isi; panel /dashboard/yonetici sayfasinda duruyor ve
+        orada tam liste halinde. Egitmen panelinde 5 satirlik kirpilmis bir
+        kopyasi vardi: egitmenin gunluk isi (puan onayi, sinav kurma, sinav
+        durumu) ile ayni ekranda yarisiyor, "58 kazanim daha var" deyip
+        eyleme donusmeyen bir blok olarak yer kapliyordu.
       */}
-      <OutcomeAnalysis
-        rows={outcomeAnalysis}
-        canGenerate={canGenerateQuestions}
-        limit={5}
-      />
     </>
   );
 }

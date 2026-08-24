@@ -52,7 +52,7 @@ export default async function OgrenciSonuclariPage() {
 
       {results.length === 0 ? (
         <Card className="border-dashed">
-          <CardContent className="py-16 text-center">
+          <CardContent className="flex flex-col items-center justify-center py-16 text-center min-h-[240px]">
             <CheckCircle2 className="mx-auto h-9 w-9 text-muted-foreground/50" />
             <p className="mt-4 text-sm font-medium">Henuz aciklanan sonucunuz yok</p>
             <p className="mt-1 text-sm text-muted-foreground">

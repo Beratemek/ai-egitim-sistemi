@@ -55,7 +55,7 @@ export default async function SinavlarPage() {
 
       {exams.length === 0 ? (
         <Card className="border-dashed">
-          <CardContent className="flex flex-col items-center justify-center gap-2 py-16 text-center">
+          <CardContent className="flex flex-col items-center justify-center gap-2 py-16 text-center min-h-[240px]">
             <Library className="h-8 w-8 text-muted-foreground/50" />
             <p className="font-medium">Henüz sınav oluşturulmadı</p>
             <p className="max-w-sm text-sm text-muted-foreground">

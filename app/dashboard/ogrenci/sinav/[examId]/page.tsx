@@ -246,7 +246,7 @@ export default async function OgrenciSinavPage({
 
       {!requiresStart && questions.length === 0 && questionCount > 0 ? (
         <Card className="border-dashed">
-          <CardContent className="py-12 text-center text-sm text-muted-foreground">
+          <CardContent className="flex flex-col items-center justify-center py-12 text-center text-sm text-muted-foreground min-h-[240px]">
             <p className="font-medium text-foreground">Sorular yüklenemedi</p>
             <p className="mx-auto mt-1.5 max-w-sm">
               Bu sınavda {questionCount} soru var ama size gösterilemedi.
