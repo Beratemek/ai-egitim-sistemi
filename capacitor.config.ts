@@ -42,7 +42,7 @@ if (!sunucuAdresi) {
 
 const config: CapacitorConfig = {
   appId: "com.t3.aiegitim",
-  appName: "AI Eğitim",
+  appName: "İzometri",
 
   /**
    * `server.url` kullanıldığında bu klasörün içeriği ekrana gelmez, ama

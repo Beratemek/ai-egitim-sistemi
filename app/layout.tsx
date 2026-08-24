@@ -27,12 +27,17 @@ const stix = STIX_Two_Text({
 });
 
 export const metadata: Metadata = {
+  applicationName: "İzometri",
   title: {
-    default: "AI Destekli Eğitim Sistemi",
-    template: "%s | AI Destekli Eğitim Sistemi",
+    default: "İzometri | Öğrenmeyi görünür kıl",
+    template: "%s | İzometri",
   },
   description:
-    "Yapay zeka ile soru üreten, açık uçlu cevapları rubriğe göre puanlayan ve eğitmen onayıyla çalışan ölçme-değerlendirme platformu.",
+    "İzometri; soru hazırlama, sınav, değerlendirme ve gelişim takibini aynı akışta buluşturan eğitim yönetim platformudur.",
+  icons: {
+    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
+    shortcut: "/icon.svg",
+  },
 };
 
 /**
