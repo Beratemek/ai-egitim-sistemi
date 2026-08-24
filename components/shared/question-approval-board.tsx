@@ -14,7 +14,7 @@ import {
 import { toast } from "sonner";
 
 import { updateQuestionStatus } from "@/app/actions/questions";
-import { QuestionTypeBadge } from "@/components/shared/status-badge";
+import { QuestionBody } from "@/components/shared/question-body";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -28,13 +28,16 @@ import {
 } from "@/components/ui/select";
 import {
   countByType,
+  difficultyOf,
   formatTypeCounts,
   groupBySubject,
   UNASSIGNED_SUBJECT,
 } from "@/lib/question-pool";
 import {
+  DIFFICULTY_LABELS,
   QUESTION_TYPES,
   type Question,
+  type QuestionDifficulty,
   type QuestionStatus,
   type QuestionType,
 } from "@/lib/types";
@@ -102,6 +105,20 @@ export function QuestionApprovalBoard({
   const [rows, setRows] = React.useState<readonly Question[]>(questions);
   const [search, setSearch] = React.useState("");
   const [typeFilter, setTypeFilter] = React.useState<TypeFilter>("hepsi");
+  /**
+   * Zorluk suzgeci - egitmenin havuz gezgininde vardi, ONAY ekraninda yoktu.
+   *
+   * Onay bir DENGE isidir: uzman "bu konuda yeterince zor soru onayladim mi"
+   * sorusunu ancak zorluga gore suzerek gorebiliyor. Kirilim (durum -> ders ->
+   * konu) zaten vardi, eksik olan bu ucuncu eksendi.
+   *
+   * `difficultyOf` kullaniliyor, `question.difficulty` DEGIL: veritabanindaki
+   * sutun sonradan eklendi ve o goc calistirilmadiysa alan hic gelmiyor -
+   * dogrudan karsilastirma butun sorulari eleyip havuzu bos gosterirdi.
+   */
+  const [difficultyFilter, setDifficultyFilter] = React.useState<
+    QuestionDifficulty | "hepsi"
+  >("hepsi");
   const [pendingId, setPendingId] = React.useState<string | null>(null);
 
   /**
@@ -125,6 +142,8 @@ export function QuestionApprovalBoard({
   const visible = React.useMemo(() => {
     return rows.filter((question) => {
       if (typeFilter !== "hepsi" && question.type !== typeFilter) return false;
+      if (difficultyFilter !== "hepsi" && difficultyOf(question) !== difficultyFilter)
+        return false;
       if (!needle) return true;
 
       return (
@@ -133,7 +152,7 @@ export function QuestionApprovalBoard({
         (question.subject ?? "").toLocaleLowerCase("tr").includes(needle)
       );
     });
-  }, [rows, needle, typeFilter]);
+  }, [rows, needle, typeFilter, difficultyFilter]);
 
   /** Durum -> ders -> konu agaci. Bos durum kumeleri de listelenir. */
   const sections = React.useMemo(
@@ -236,12 +255,32 @@ export function QuestionApprovalBoard({
           </SelectContent>
         </Select>
 
+        <Select
+          value={difficultyFilter}
+          onValueChange={(value) =>
+            setDifficultyFilter(value as QuestionDifficulty | "hepsi")
+          }
+        >
+          <SelectTrigger className="sm:w-44" aria-label="Zorluğa göre filtrele">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="hepsi">Tüm zorluklar</SelectItem>
+            {(["kolay", "orta", "zor"] as const).map((level) => (
+              <SelectItem key={level} value={level}>
+                {DIFFICULTY_LABELS[level]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-muted-foreground">
           {visible.length} / {rows.length} soru
-          {searching || typeFilter !== "hepsi" ? " (filtreli)" : ""}
+          {searching || typeFilter !== "hepsi" || difficultyFilter !== "hepsi"
+            ? " (filtreli)"
+            : ""}
         </p>
 
         <div className="flex gap-1">
@@ -460,17 +499,40 @@ function QuestionRow({
       </span>
 
       <div className="min-w-0 flex-1 space-y-3">
+        {/*
+          Yalnizca BU EKRANA ozgu iki bilgi: sorunun kaynagi (AI/manuel) ve
+          son degisiklik zamani. Tip rozeti, konu, zorluk, soru metni ve
+          siklar asagidaki QuestionBody'nin isi.
+        */}
         <div className="flex flex-wrap items-center gap-1.5">
-          <QuestionTypeBadge type={question.type} />
           <SourceBadge aiGenerated={question.ai_generated} />
           <span className="ml-auto text-xs text-muted-foreground">
             {formatDateTime(question.updated_at)}
           </span>
         </div>
 
-        <p className="font-medium leading-relaxed">{question.text}</p>
+        {/*
+          PAYLASILAN QuestionBody.
 
-        <QuestionBody question={question} />
+          Burada uzun sure bu dosyanin ICINDE yasayan bir ikinci QuestionBody
+          vardi; yalnizca siklari ve rubrigi ciziyordu. Sonucu su oldu: gorselli
+          ve grafikli sorular havuza kaydediliyor (visual_json sutunu dolu),
+          egitmenin havuzunda gorunuyor, ama ONAY ekraninda gorunmuyordu -
+          yani uzman ONAYLADIGI GORSELI GOREMIYORDU. Ayni sebeple zorluk
+          rozeti de bu ekrana hic ulasmadi.
+
+          Kopya silindi. Artik soru gosteren butun ekranlar (onay, havuz,
+          sinav kagidi, ogrenci ekrani, kontrol) tek bilesenden geciyor;
+          birine eklenen bir sey otomatik hepsine geliyor.
+
+          revealAnswer: uzman dogru sikki GORMELI - onayladigi sey o.
+          showRubric: acik uclu sorularda puanlama olcutu de onayin parcasi.
+        */}
+        {/*
+          `topic` BILEREK verilmiyor: konu adi ust kademenin basliginda zaten
+          yaziyor, kartta tekrar etmek bu ekranin en buyuk gurultu kaynagiydi.
+        */}
+        <QuestionBody question={question} revealAnswer showRubric />
 
         <div className="flex flex-wrap gap-2 border-t pt-3">
           <Button
@@ -526,54 +588,7 @@ function EmptyState() {
   );
 }
 
-/**
- * Sorunun govdesi: siklar ya da rubrik.
- *
- * "Secenekler" basligi KALDIRILDI - siklar zaten A) B) C) ile kendini
- * anlatiyor, her soruda bir kez daha yazmak listeyi uzatiyordu. Rubrik
- * basligi duruyor cunku duz metin oldugu icin ne oldugu belli degil.
- */
-function QuestionBody({ question }: { question: Question }) {
-  if (question.type === "test") {
-    return (
-      <div className="space-y-2">
-        <ul className="space-y-1">
-          {(question.options_json ?? []).map((option) => {
-            const isCorrect = option.key === question.correct_answer;
-
-            return (
-              <li
-                key={option.key}
-                className={cn(
-                  "flex gap-2 rounded-md px-2 py-1.5 text-sm leading-relaxed",
-                  isCorrect
-                    ? "bg-success/10 font-medium text-success"
-                    : "text-muted-foreground",
-                )}
-              >
-                <span className="w-4 shrink-0 font-mono text-xs leading-relaxed opacity-70">
-                  {option.key})
-                </span>
-                <span className="min-w-0 flex-1">{option.text}</span>
-                {isCorrect ? (
-                  <Check className="mt-0.5 h-4 w-4 shrink-0" aria-label="Doğru cevap" />
-                ) : null}
-              </li>
-            );
-          })}
-        </ul>
-      </div>
-    );
-  }
-
-  return (
-    <div className="rounded-lg bg-muted/60 p-3">
-      <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-        Rubrik
-      </p>
-      <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">
-        {question.rubric ?? "Rubrik tanımlanmamış."}
-      </pre>
-    </div>
-  );
-}
+/*
+  Bu dosyada bir zamanlar YEREL bir QuestionBody vardi; silindi.
+  Gerekcesi yukarida, QuestionRow icindeki yorumda.
+*/

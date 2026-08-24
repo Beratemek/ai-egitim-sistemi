@@ -49,15 +49,32 @@ import type {
 
 type TypeChoice = QuestionType | "karisik";
 
-/**
- * Kazanim secicisinde "kayitli kazanim kullanmiyorum" secenegi.
- *
- * Select bileseni bos dizeyi deger olarak kabul etmedigi icin ayri bir
- * anahtar kullaniliyor.
- */
+/** Yukleniyor iskeletinde kac sahte kart gosterilir (2 sutun x 2 satir). */
+const ISKELET_SAYISI = 4;
 
-/** "Daha fazla goster" ile her tiklamada kac taslak daha acilir (2 satir). */
-const BATCH_SIZE = 4;
+/**
+ * Taslak listesinin "A4 sayfasi" kutusu.
+ *
+ * Olculer BILEREK mm cinsinden: `210mm x 297mm` A4'un ta kendisi, yani kutu
+ * ekranda gercekten bir sayfa kadar. Tarayici mm'yi 96dpi'a gore cevirir
+ * (210mm ~ 794px), o yuzden pikselle ugrasmak gerekmiyor ve niyet koda
+ * yaziliyor.
+ *
+ * Iki detay onemli:
+ *
+ *   `h-` (max-h- DEGIL) - kutu SABIT boyda. Onceki denemede `max-h` vardi;
+ *   o yalnizca bir ust sinir koyuyor, kutu icerik kadar buyuyup kucululuyordu
+ *   ve "sayfa alta dogru uzuyor" sikayeti aynen duruyordu. Sabit boyda 3 soru
+ *   da 20 soru da AYNI kutuda duruyor - dosya gezgini penceresi gibi.
+ *
+ *   `min(297mm, 78vh)` - kisa ekranlarda tam A4 boyu (~1123px) pencereyi
+ *   asar ve kutunun kendi kaydirmasi ise yaramaz hale gelirdi; bu yuzden boy
+ *   her zaman goruntu alanina sigar. Genis ekranda gercek A4'e cikar.
+ *
+ * Ayni olcu iskelette ve bos durumda da kullaniliyor: uretim baslayip
+ * bitince kutu boyu degismedigi icin sayfa ziplayamiyor.
+ */
+const SAYFA_KUTUSU = "mx-auto h-[min(297mm,78vh)] w-full max-w-[210mm]";
 
 const DIFFICULTY_OPTIONS: readonly { value: DifficultyChoice; label: string }[] = [
   { value: "karisik", label: "Karisik" },
@@ -151,24 +168,6 @@ export function QuestionGeneratorForm({
   const [error, setError] = React.useState<string | null>(null);
   const [results, setResults] = React.useState<GeneratedQuestion[]>([]);
   const [selected, setSelected] = React.useState<Set<number>>(new Set());
-  /**
-   * Kac taslak GORUNUR - hepsi degil.
-   *
-   * Once tum liste TEK SEFERDE, ic ice iki ayri kaydirma alaniyla
-   * (sayfanin kendisi + sabit boylu bir kutu) gosteriliyordu. Iki bagimsiz
-   * kaydirma alani ayni anda calisinca fare tekerlegi hangisine gittigini
-   * karistiriyor, kartlar yari kesilmis gibi cakisik gorunuyordu - "bozuk"
-   * hissi tam olarak buradan geliyordu.
-   *
-   * SONSUZ KAYDIRMA ile NESTED SCROLL BOX AYNI SEY DEGIL: buradaki "sonsuz
-   * kaydirma", asagida bir gozlemci (IntersectionObserver) ile GORUNTU
-   * ALANINA yaklasildikca otomatik daha fazla taslak acmak - kaydiran hep
-   * SAYFANIN KENDISI, ayri bir kutu yok. Bu yuzden onceki "cift kaydirma"
-   * sorunu geri gelmiyor.
-   */
-  const [visibleCount, setVisibleCount] = React.useState(BATCH_SIZE);
-  /** Sayfanin sonuna yaklasildigini yakalayan gorunmez isaretci. */
-  const sentinelRef = React.useRef<HTMLDivElement | null>(null);
   /** Toplu revizyon sırasında hangi talimat çalışıyor ve kacinci soruda. */
   const [bulkPreset, setBulkPreset] = React.useState<string | null>(null);
   const [bulkDone, setBulkDone] = React.useState(0);
@@ -216,36 +215,12 @@ export function QuestionGeneratorForm({
     return selectedOutcome ? [selectedOutcome, ...matching] : matching;
   }, [outcomes, subject, outcomeId]);
 
-  /**
-   * SONSUZ KAYDIRMA: asagidaki gorunmez isaretci EKRANA YAKLASINCA
-   * (rootMargin sayesinde tam dibe gelmeden ONCEDEN) bir sonraki grup
-   * acilir. Gozlemci HER ZAMAN sayfanin kendi kaydirmasini izler (varsayilan
-   * `root: null`) - ayri bir kutu YOK, bu yuzden onceki cift kaydirma
-   * sorunu geri gelmez.
-   *
-   * `visibleCount >= results.length` iken isaretci render edilmiyor
-   * (asagida), o yuzden bu efekt de o durumda hicbir seye baglanmaz.
-   */
-  React.useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el || visibleCount >= results.length) return;
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry?.isIntersecting) {
-          setVisibleCount((count) => Math.min(count + BATCH_SIZE, results.length));
-        }
-      },
-      // 150px: kullanici gercekten yaklasirken (tam dibe varmadan biraz
-      // once) tetiklensin. Daha buyuk bir deger (or. 600px) sayfa ilk
-      // acildiginda bile - hic kaydirilmadan - tum listeyi birden acabiliyor,
-      // bu da "kademeli" hissi yok ediyor.
-      { rootMargin: "150px" },
-    );
-
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [visibleCount, results.length]);
+  /*
+    Kademeli acilma (IntersectionObserver) KALDIRILDI: taslak listesi artik
+    kendi icinde kayan sinirli yukseklikte bir kutuda duruyor (asagi bkz.),
+    yani "sayfa evrenin sonuna kadar uzuyor" sorunu kutunun kendisiyle
+    cozuluyor. Ikisini birlikte tutmak ayni isi iki kez yapmak olurdu.
+  */
 
   /**
    * Kazanim secildiginde ders ve konu KAZANIMDAN alinir.
@@ -320,9 +295,6 @@ export function QuestionGeneratorForm({
 
       setResults(body.data);
       setSelected(new Set());
-      // Yeni parti geldi: onceki partiden acilmis kalan goruntu sayisi yeni
-      // partiye tasinmasin, bastan basla.
-      setVisibleCount(BATCH_SIZE);
       toast.success(`${body.data.length} soru taslağı üretildi`, {
         description:
           scopedTotal > 0
@@ -688,24 +660,30 @@ export function QuestionGeneratorForm({
         ) : null}
 
         {pending ? (
-          <div className="grid items-start gap-3 sm:grid-cols-2">
-            {Array.from({ length: BATCH_SIZE }, (_, index) => (
-              // exam-paper HER KARTIN KENDISINE uygulanir, ortak sarmalayiciya
-              // degil - asagidaki asil listedeki gerekce burada da gecerli.
-              <Card key={index} className="exam-paper">
-                <CardContent className="space-y-3 p-4">
-                  <Skeleton className="h-5 w-40" />
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-4/5" />
-                </CardContent>
-              </Card>
-            ))}
+          // Iskelet de AYNI sayfanin icinde: uretim bitince kutu yerinde
+          // kaliyor, yalnizca icerigi degisiyor.
+          <div
+            className={`exam-paper ${SAYFA_KUTUSU} overflow-hidden rounded-xl border p-4 shadow-sm`}
+          >
+            <div className="flex gap-3">
+              {[0, 1].map((sutun) => (
+                <div key={sutun} className="flex min-w-0 flex-1 flex-col gap-3">
+                  {Array.from({ length: ISKELET_SAYISI / 2 }, (_, index) => (
+                    <Card key={index}>
+                      <CardContent className="space-y-3 p-4">
+                        <Skeleton className="h-5 w-40" />
+                        <Skeleton className="h-4 w-full" />
+                        <Skeleton className="h-4 w-4/5" />
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ))}
+            </div>
           </div>
         ) : results.length === 0 ? (
-          // Kutu bilerek bir tik yuksek: form sutunu yaninda cok kisa
-          // kalinca sag taraf "bos birakilmis" gibi duruyordu.
-          <Card className="border-dashed">
-            <CardContent className="flex min-h-[320px] flex-col items-center justify-center gap-2 py-16 text-center">
+          <Card className={`${SAYFA_KUTUSU} border-dashed`}>
+            <CardContent className="flex h-full flex-col items-center justify-center gap-2 text-center">
               <Sparkles className="h-8 w-8 text-muted-foreground/50" />
               <p className="font-medium">Henuz soru uretilmedi</p>
               <p className="max-w-xs text-sm text-muted-foreground">
@@ -714,71 +692,74 @@ export function QuestionGeneratorForm({
             </CardContent>
           </Card>
         ) : (
-          <>
-            {/*
-              IKI SUTUN, KADEMELI ACILAN LISTE.
-              Once sinirli yukseklikte KENDI ICINDE kayan bir kutu vardi
-              ("dosya gezgini gibi"). Bu, sayfanin kendi kaydirmasi ile
-              kutunun ic kaydirmasi AYNI ANDA calisinca kafa karistirdi -
-              fare tekerlegi hangisine gidiyor belli olmuyordu ve kartlar
-              yari kesilmis/cakismis gibi gorunuyordu.
+          /*
+            KENDI ICINDE KAYAN A4 SAYFASI + IKI BAGIMSIZ SUTUN.
 
-              Tek kaydirma alani (sayfanin kendisi) + kademeli acilan liste
-              ayni sorunu (yirmiye kadar soru sayfayi "evrenin sonuna
-              kadar" uzatiyordu) ic ice kaydirma OLMADAN cozer: varsayilan
-              olarak yalnizca ilk `BATCH_SIZE` taslak gorunur, gerisi
-              asagidaki isaretciye gore OTOMATIK acilir (bkz. yukaridaki
-              IntersectionObserver efekti) - sayfa normal sekilde uzar, tek
-              ve tanidik bir kaydirma davranisi olur.
+            Iki sikayet vardi, ikisi de burada cozuluyor:
 
-              `items-start` + `min-h`: grid varsayilan olarak ayni satirdaki
-              kartlari birbirine esitleyip KISA karti UZUN kartin (grafikli)
-              boyuna kadar geriyordu - kisa kartin altinda bos, cirkin bir
-              alan kaliyordu. `items-start` bu zorlamayi kaldirir; `min-h`
-              ise TERS yonde asiriliga (bir metin karti bir grafik kartinin
-              yaninda "cok kucuk" durmasi) karsi TABAN olusturur - kart
-              icerigi tabani asarsa (grafik gibi) buyumeye devam eder, kisa
-              bir kart ise en az bu boyda gorunur. Ikisi celismiyor: biri
-              UST siniri kaldirir, digeri ALT siniri koyar.
+            1. "Sorular evrenin sonuna kadar gitmesin, A4 boyutunda bir kutu
+               kendi icinde kaysin, alta dogru buyumesin."
+               Kutunun olcusu `SAYFA_KUTUSU` sabitinde: SABIT boyda (h-, max-h-
+               degil) ve A4 genisliginde. Yirmi soru uretilse de sayfanin boyu
+               degismiyor, kaydirma kutunun ICINDE oluyor.
 
-              BEYAZ ZEMIN HER KARTIN KENDISINDE, ORTAK SARMALAYICIDA DEGIL.
-              `.exam-paper` `<Card>`'in KENDISINE geciyor (cardClassName) -
-              kartlar koyu zemin uzerinde ayri ayri duran beyaz adacıklar;
-              aralardaki bosluk ve dis cerceve normal (koyu) arayuz
-              renginde kalir.
-            */}
-            <ul className="grid items-start gap-3 sm:grid-cols-2">
-              {results.slice(0, visibleCount).map((question, index) => (
-                <li key={`${question.text}-${index}`}>
-                  <GeneratedQuestionCard
-                    question={question}
-                    index={index}
-                    selected={selected.has(index)}
-                    onToggleSelected={(value) => toggleSelected(index, value)}
-                    onReplace={(revised) => replaceResult(index, revised)}
-                    cardClassName="exam-paper min-h-[19rem]"
-                    {...(kazanim ? { kazanim } : {})}
-                    {...(context ? { context } : {})}
-                    {...(outcomeId ? { outcomeId } : {})}
-                    {...(subject ? { subject } : {})}
-                  />
-                </li>
+               `overscroll-contain` KRITIK: bunun onceki denemesinde kutunun
+               sonuna gelince kaydirma SAYFAYA atliyordu ve "fare tekerlegi
+               hangisine gidiyor" karmasasi cikiyordu. Bu ozellik zinciri
+               kesiyor - kutu bittiginde sayfa kendiliginden kaymiyor.
+
+            2. "Bosluklu bosluklu, dengesiz siralanmis."
+               Sebep CSS grid'in SATIR mantigi: ayni satirdaki en uzun kart
+               (grafikli olan) satirin yuksekligini belirliyor, kisa kartin
+               altinda bir sonraki satira kadar bos alan kaliyordu.
+               `items-start` kartin kendisini germiyordu ama BOSLUGU yok
+               etmiyordu - cunku sorun kartta degil, satirda.
+
+               Cozum satir kavramini TUMDEN kaldirmak: iki bagimsiz dikey
+               sutun (flex-col). Kartlar tek tek, sirayla soldaki ve sagdaki
+               sutuna dagitiliyor; her sutun kendi icinde sikisik paketleniyor
+               ve komsu sutunla HIZALANMA ZORUNLULUGU olmuyor. Pinterest'in
+               yaptigi is - satir yok, dolayisiyla satir boslugu da yok.
+
+               `min-h` de kaldirildi: artik gerek yok, cunku kartin kisa
+               olmasi bir bosluk yaratmiyor. Kart tam icerigi kadar.
+
+            BEYAZ ZEMIN: `.exam-paper` hem SAYFANIN kendisinde hem her
+            `<Card>`'ta (cardClassName). Sayfa krem kagit, kartlar onun
+            uzerinde bir tik daha beyaz - gercek bir sinav kagidindaki soru
+            bloklari gibi. Karttaki tekrar gereksiz gorunebilir ama kart bu
+            kutunun DISINDA da kullaniliyor (havuz onayi, revizyon diyalogu);
+            oradaki beyaz zemini saglayan sey o.
+          */
+          <div
+            className={`exam-paper ${SAYFA_KUTUSU} overflow-y-auto overscroll-contain rounded-xl border p-4 shadow-sm`}
+          >
+            <div className="flex gap-3">
+              {[0, 1].map((sutun) => (
+                <ul key={sutun} className="flex min-w-0 flex-1 flex-col gap-3">
+                  {results
+                    .map((question, index) => ({ question, index }))
+                    .filter(({ index }) => index % 2 === sutun)
+                    .map(({ question, index }) => (
+                      <li key={`${question.text}-${index}`}>
+                        <GeneratedQuestionCard
+                          question={question}
+                          index={index}
+                          selected={selected.has(index)}
+                          onToggleSelected={(value) => toggleSelected(index, value)}
+                          onReplace={(revised) => replaceResult(index, revised)}
+                          cardClassName="exam-paper"
+                          {...(kazanim ? { kazanim } : {})}
+                          {...(context ? { context } : {})}
+                          {...(outcomeId ? { outcomeId } : {})}
+                          {...(subject ? { subject } : {})}
+                        />
+                      </li>
+                    ))}
+                </ul>
               ))}
-            </ul>
-
-            {visibleCount < results.length ? (
-              <>
-                {/* Gozle gorunur bir yukleniyor gostergesi yok: veri zaten
-                    istemcide, ekleme aninda oluyor - bir spinner goze
-                    carpip hemen kaybolurdu. */}
-                <p className="text-center text-xs text-muted-foreground">
-                  {results.length - visibleCount} soru daha var, aşağı
-                  kaydırdıkça yüklenecek.
-                </p>
-                <div ref={sentinelRef} aria-hidden className="h-1" />
-              </>
-            ) : null}
-          </>
+            </div>
+          </div>
         )}
 
         {/*

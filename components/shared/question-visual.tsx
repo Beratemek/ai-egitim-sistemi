@@ -24,6 +24,20 @@ const QuestionChart = dynamic(
   },
 );
 
+/**
+ * Bu lisans atif (kaynak gosterme) zorunlulugu getiriyor mu?
+ *
+ * Kamu malı ve CC0 gorseller serbesttir - atif hukuken gerekmez. CC BY,
+ * CC BY-SA, GFDL gibi lisanslar ise eseri kullanirken kaynagi gostermeyi
+ * SART kosar. Emin olunamayan bir lisans metni geldiginde GUVENLI TARAFTA
+ * kalinir: atif gosterilir. Yanlis tarafta hata yapmak telif ihlali olur.
+ */
+function atifGerekli(license: string): boolean {
+  const l = license.toLocaleLowerCase("en");
+  const serbest = ["public domain", "cc0", "pd-", "kamu mal"];
+  return !serbest.some((kalip) => l.includes(kalip));
+}
+
 export interface QuestionVisualProps {
   visual: QuestionVisualData;
   /** Sik gorselleri kucuk cizilir. */
@@ -125,23 +139,37 @@ export function QuestionVisual({ visual, compact, className }: QuestionVisualPro
         className="w-full object-contain"
         style={{ maxHeight: yukseklik }}
       />
-      <figcaption className="border-t px-3 py-2 text-[11px] leading-relaxed text-muted-foreground">
-        {visual.alt ? <span className="block">{visual.alt}</span> : null}
-        Kaynak: {visual.credit} · Lisans: {visual.license}
-        {visual.sourceUrl ? (
-          <>
-            {" · "}
-            <a
-              href={visual.sourceUrl}
-              target="_blank"
-              rel="noreferrer noopener"
-              className="underline hover:text-foreground"
-            >
-              dosya sayfası
-            </a>
-          </>
-        ) : null}
-      </figcaption>
+      {/*
+        ATIF YALNIZCA GEREKTIGINDE.
+
+        Bu satir sus degil, LISANS SARTI: Wikimedia'dan gelen CC BY / CC BY-SA
+        gorsellerinde kaynak ve lisans gostermek ZORUNLU - kaldirmak telif
+        ihlali olur. Ama kamu malı (public domain / CC0) gorsellerde boyle bir
+        yukumluluk YOK; onlarda satiri gostermek soruyu gereksiz yere
+        kalabaliklastiriyordu.
+
+        Bu yuzden karar lisansa BAKILARAK veriliyor: serbest lisanslarda
+        altyazi hic basilmiyor, sart koyan lisanslarda basiliyor. Boylece
+        soru kartlari temiz kaliyor ve yukumluluk yine karsilaniyor.
+      */}
+      {atifGerekli(visual.license) ? (
+        <figcaption className="border-t px-3 py-2 text-[11px] leading-relaxed text-muted-foreground">
+          {visual.credit} · {visual.license}
+          {visual.sourceUrl ? (
+            <>
+              {" · "}
+              <a
+                href={visual.sourceUrl}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="underline hover:text-foreground"
+              >
+                kaynak
+              </a>
+            </>
+          ) : null}
+        </figcaption>
+      ) : null}
     </figure>
   );
 }
