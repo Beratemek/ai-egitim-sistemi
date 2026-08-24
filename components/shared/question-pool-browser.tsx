@@ -28,6 +28,7 @@ import {
   Card,
   CardContent,
 } from "@/components/ui/card";
+import { QuestionVisual } from "@/components/shared/question-visual";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
@@ -719,6 +720,20 @@ function PaperQuestion({
             {question.text}
           </p>
 
+          {/*
+            SORUNUN GORSELI (grafik / sema / fotograf).
+
+            Buraya hic cizilmiyordu: icerik uzmani gorselli soru uretse de
+            havuz onizlemesinde yalnizca metni gorunuyordu. Veri kaybi yoktu
+            (visual_json sutunu dolu, QuestionBody onu zaten ciziyor) ama bu
+            onizleme bakmiyordu; egitmen soruyu eksik sanabilirdi.
+
+            Siklardan ONCE gelir: once neye bakilacagi, sonra secenekler.
+          */}
+          {question.visual_json ? (
+            <QuestionVisual visual={question.visual_json} className="mt-3" />
+          ) : null}
+
           {isTest ? (
             <ol className="mt-2.5 space-y-1.5 text-[10.5pt] leading-[1.4]">
               {options.map((option) => {
@@ -733,7 +748,18 @@ function PaperQuestion({
                     )}
                   >
                     <span className="shrink-0 font-semibold">{option.key})</span>
-                    <span className="min-w-0">{option.text}</span>
+                    <span className="min-w-0">
+                      {option.text}
+                      {/* Sikkin KENDI gorseli - "hangisi dogru grafik?" tipi
+                          sorularda sikkin tamami gorseldir. */}
+                      {option.visual ? (
+                        <QuestionVisual
+                          visual={option.visual}
+                          compact
+                          className="mt-2"
+                        />
+                      ) : null}
+                    </span>
                     {isCorrect ? (
                       <span className="ml-auto shrink-0 self-center text-[8pt] font-semibold uppercase tracking-wide text-emerald-700">
                         doğru

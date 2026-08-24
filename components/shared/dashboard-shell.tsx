@@ -144,15 +144,26 @@ export function DashboardShell({
             </SheetContent>
           </Sheet>
 
+          {/*
+            ROL BASLIGI: SOLDA, dikeyde ortali.
+
+            Bir ara cubuga gore yatay ortalanmisti - istenen o degildi.
+            Baslik sola yaslı kalir; hizalama DIKEY olanidir.
+
+            leading-none: `font-display` bir serif ve kendi satir yuksekligi
+            metni kutunun icinde asagi itiyordu; ikon items-center ile tam
+            ortadayken yazi birkac piksel kayik duruyordu. Satir yuksekligi
+            sifirlaninca ikon ve yazi ayni eksende oturur.
+          */}
           {/* Mobilde marka, masaustunde rol başlığı */}
           <div className="flex min-w-0 flex-1 items-center gap-3">
             <div className="lg:hidden">
               <BrandMark />
             </div>
 
-            <div className="hidden items-center gap-2 lg:flex">
-              <RoleIcon className="h-4 w-4 text-muted-foreground" />
-              <span className="font-display text-[15px] font-semibold">
+            <div className="hidden min-w-0 items-center gap-2 lg:flex">
+              <RoleIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <span className="truncate font-display text-[15px] font-semibold leading-none">
                 {definition.label} Paneli
               </span>
             </div>
