@@ -4,7 +4,7 @@ import * as React from "react";
 import dynamic from "next/dynamic";
 
 import { cn } from "@/lib/utils";
-import type { QuestionVisual as QuestionVisualData } from "@/lib/visual";
+import { atifGerekli, type QuestionVisual as QuestionVisualData } from "@/lib/visual";
 
 /*
   Grafik motoru (recharts, ~130 kB) TALEP UZERINE yuklenir.
@@ -23,20 +23,6 @@ const QuestionChart = dynamic(
     ),
   },
 );
-
-/**
- * Bu lisans atif (kaynak gosterme) zorunlulugu getiriyor mu?
- *
- * Kamu malı ve CC0 gorseller serbesttir - atif hukuken gerekmez. CC BY,
- * CC BY-SA, GFDL gibi lisanslar ise eseri kullanirken kaynagi gostermeyi
- * SART kosar. Emin olunamayan bir lisans metni geldiginde GUVENLI TARAFTA
- * kalinir: atif gosterilir. Yanlis tarafta hata yapmak telif ihlali olur.
- */
-function atifGerekli(license: string): boolean {
-  const l = license.toLocaleLowerCase("en");
-  const serbest = ["public domain", "cc0", "pd-", "kamu mal"];
-  return !serbest.some((kalip) => l.includes(kalip));
-}
 
 export interface QuestionVisualProps {
   visual: QuestionVisualData;

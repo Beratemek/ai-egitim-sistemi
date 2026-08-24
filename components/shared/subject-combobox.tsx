@@ -8,7 +8,13 @@ import { subjectSearchKey } from "@/lib/subjects";
 import { cn } from "@/lib/utils";
 
 /**
- * Ders adi girisi - yazdikca eslesen dersleri altta onerir.
+ * Serbest metin girisi - yazdikca daha once girilmis degerleri altta onerir.
+ *
+ * Adi DERS icin konuldu ve varsayilanlari hala oyle; ama eslestirme kurali
+ * (Turkce normalizasyon) ve davranisi alandan bagimsiz. KONU alani da ayni
+ * bileseni kullaniyor: iki alan da "daha once ne yazmistim" sorusunu
+ * cevaplamak zorunda ve ikisi de serbest metin. Ikinci bir kopya yazmak,
+ * klavye/erisilebilirlik davranisinin zamanla ayrismasi demekti.
  *
  * NEDEN native <datalist> DEGIL:
  *   - Eslesmeyi tarayici yapar ve kurali TURKCE DEGILDIR: "matematik" yazan
@@ -31,8 +37,15 @@ export interface SubjectComboboxProps {
   id?: string;
   value: string;
   onChange: (value: string) => void;
-  /** Secilebilir ders adlari; soru havuzundan turetilir. */
+  /** Secilebilir degerler; soru havuzundan turetilir. */
   options: readonly string[];
+  /**
+   * Oneri listesinin ekran okuyucuya verilen adi.
+   *
+   * Ders disinda bir alanda kullanilirken "Eşleşen dersler" yanlis olurdu -
+   * ekran okuyucu kullanicisi konu listesini ders sanirdi.
+   */
+  listLabel?: string;
   placeholder?: string;
   disabled?: boolean;
   /** Enter'a basildiginda (oneri listesi kapaliyken) calisir - kaydetmek icin. */
@@ -49,6 +62,7 @@ export function SubjectCombobox({
   value,
   onChange,
   options,
+  listLabel = "Eşleşen dersler",
   placeholder,
   disabled = false,
   onEnter,
@@ -194,7 +208,7 @@ export function SubjectCombobox({
           ref={listeRef}
           id={listeId}
           role="listbox"
-          aria-label="Eşleşen dersler"
+          aria-label={listLabel}
           className="absolute left-0 right-0 top-full z-50 mt-1 max-h-64 overflow-y-auto rounded-lg border bg-popover p-1 shadow-lg"
         >
           {eslesenler.map((option, index) => {

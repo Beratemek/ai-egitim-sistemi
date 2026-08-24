@@ -22,13 +22,23 @@
  * fotografin sayilari sorunun beklentisiyle asla garanti uyusmaz.
  */
 
-import { parseVisual, type ImageVisual } from "@/lib/visual";
+import { atifGerekli, parseVisual, type ImageVisual } from "@/lib/visual";
 
 /** Commons API adresi. `origin=*` CORS icin degil, anonim erisim icin. */
 const COMMONS = "https://commons.wikimedia.org/w/api.php";
 
 /** Kucuk resim genisligi (px). Tam boy dosyalar 10+ MB olabiliyor. */
 const THUMB_WIDTH = 800;
+
+/**
+ * Aramadan kac aday istenir - istenen sonuc sayisinin bu kati kadar.
+ *
+ * Adaylarin buyuk cogunlugu lisans elemesinden geciyor (asagiya bakin);
+ * `limit` kadar istenirse geriye bir avuc sonuc kaliyordu. Ust sinir
+ * Commons'in `gsrlimit` tavani.
+ */
+const ADAY_KATI = 5;
+const ADAY_TAVANI = 50;
 
 interface CommonsPage {
   title?: string;
@@ -82,7 +92,7 @@ export async function searchWikimediaImages(
     generator: "search",
     gsrsearch: `filetype:bitmap ${trimmed}`,
     gsrnamespace: "6", // yalnizca File: ad alani
-    gsrlimit: String(limit),
+    gsrlimit: String(Math.min(limit * ADAY_KATI, ADAY_TAVANI)),
     prop: "imageinfo",
     iiprop: "url|extmetadata",
     iiurlwidth: String(THUMB_WIDTH),
@@ -100,9 +110,35 @@ export async function searchWikimediaImages(
       next: { revalidate: 3600 },
     });
 
-    if (!response.ok) return [];
+    /*
+      BASARISIZLIK SESSIZ KALMASIN.
+
+      Bos dizi donmek dogru davranis - bir aglantı hatasi butun soru
+      uretimini dusurmemeli. Ama bu, TESHISI de imkansiz kiliyordu: hiz
+      sinirina takilmak, sonuc bulunamamak ve servisin cokmesi disaridan
+      birebir ayni goruntuyu veriyordu ("gorsel yok").
+
+      Wikimedia arka arkaya gelen istekleri gercekten kisitliyor (HTTP 429
+      ya da duz metin "You are making too many requests") ve bir seferde on
+      soru ureten bir istek tam olarak bunu tetikliyor. Kayit dusmezse bu
+      durum "model gorsel istemedi" sanilir.
+    */
+    if (!response.ok) {
+      console.warn(
+        `[visual-search] Commons yanit vermedi (HTTP ${response.status})` +
+          (response.status === 429 ? " - hiz siniri" : "") +
+          `; sorgu: "${trimmed}"`,
+      );
+      return [];
+    }
     payload = (await response.json()) as typeof payload;
-  } catch {
+  } catch (caught) {
+    // JSON cozulemediyse Commons duz metin hata dondurmus olabilir
+    // (hiz sinirinda boyle yapiyor).
+    console.warn(
+      `[visual-search] Commons sorgusu basarisiz; sorgu: "${trimmed}"`,
+      caught instanceof Error ? caught.message : caught,
+    );
     return [];
   }
 
@@ -137,5 +173,26 @@ export async function searchWikimediaImages(
 
       return parsed?.kind === "image" ? parsed : null;
     })
-    .filter((item): item is ImageVisual => item !== null);
+    .filter((item): item is ImageVisual => item !== null)
+    /*
+      LISANS ELEMESI - yalnizca ATIF ISTEMEYEN gorseller.
+
+      Istek acikti: sorunun altinda kaynak/lisans satiri gorunmesin. Bir CC
+      BY-SA gorselinin altyazisini silmek telif ihlali oldugu icin bu istek
+      GORSELI SECERKEN karsilaniyor: kamu mali ve CC0 disina cikilmiyor,
+      dolayisiyla gosterilecek bir atif hic olusmuyor.
+
+      BEDELI ACIK OLSUN: aday havuzu daralir. Klasik eserler, haritalar, eski
+      fotograflar, bilimsel semalar cogunlukla kamu malidir ve gelmeye devam
+      eder; buna karsilik gunumuzde cekilmis fotograflarin cogu CC BY-SA'dir
+      ve artik SECILMEZ. Hicbir serbest gorsel bulunamazsa sonuc bos doner ve
+      soru gorselsiz uretilir - yanlis lisansli bir gorsel koymaktansa
+      gorselsiz birakmak dogru.
+
+      NOT: bu kural yalnizca YENI aramalar icin. Havuzda bu kuraldan once
+      kaydedilmis CC lisansli gorseller var; onlarin altyazisi hukuken
+      gerekli oldugu icin cizilmeye devam eder (question-visual.tsx).
+    */
+    .filter((item) => !atifGerekli(item.license))
+    .slice(0, limit);
 }
