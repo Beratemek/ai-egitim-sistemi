@@ -5,10 +5,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Loader2, MailCheck, TriangleAlert } from "lucide-react";
 
+import { signInWithPassword } from "@/app/actions/auth";
 import { GoogleSignInButton } from "@/components/shared/google-sign-in-button";
 import { ResendConfirmation } from "@/components/shared/resend-confirmation";
 import { ROLE_ICONS } from "@/components/shared/role-icons";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -24,24 +26,35 @@ import { SELECTABLE_ROLES, dashboardPathFor } from "@/lib/roles";
 import { createClient } from "@/lib/supabase";
 import { isUserRole, type UserRole } from "@/lib/types";
 
-type Mode = "giris" | "kayit";
+export type LoginMode = "giris" | "kayit";
 
 export interface LoginFormProps {
   /** /auth/callback tarafından ?error= ile tasinan hata mesaji. */
   callbackError?: string | null;
+  callbackMessage?: string | null;
+  initialMode?: LoginMode;
+  initialRole?: UserRole;
+  nextPath?: string | null;
 }
 
-export function LoginForm({ callbackError = null }: LoginFormProps) {
+export function LoginForm({
+  callbackError = null,
+  callbackMessage = null,
+  initialMode = "giris",
+  initialRole = "ogrenci",
+  nextPath = null,
+}: LoginFormProps) {
   const router = useRouter();
 
-  const [mode, setMode] = React.useState<Mode>("giris");
+  const [mode, setMode] = React.useState<LoginMode>(initialMode);
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [fullName, setFullName] = React.useState("");
-  const [role, setRole] = React.useState<UserRole>("ogrenci");
+  const [role, setRole] = React.useState<UserRole>(initialRole);
+  const [remember, setRemember] = React.useState(false);
   const [pending, setPending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(callbackError);
-  const [info, setInfo] = React.useState<string | null>(null);
+  const [info, setInfo] = React.useState<string | null>(callbackMessage);
   /** Supabase "email not confirmed" dediyse yeniden gonderme secenegi sunulur. */
   const [unconfirmed, setUnconfirmed] = React.useState(false);
 
@@ -53,9 +66,8 @@ export function LoginForm({ callbackError = null }: LoginFormProps) {
     let navigationStarted = false;
 
     try {
-      const supabase = createClient();
-
       if (mode === "kayit") {
+        const supabase = createClient();
         const { data, error: signUpError } = await supabase.auth.signUp({
           email,
           password,
@@ -85,12 +97,20 @@ export function LoginForm({ callbackError = null }: LoginFormProps) {
         return;
       }
 
-      const { error: signInError } = await supabase.auth.signInWithPassword({
+      const result = await signInWithPassword({
         email,
         password,
+        remember,
       });
 
-      if (signInError) throw signInError;
+      if (!result.ok) {
+        setUnconfirmed(
+          result.code === "email_not_confirmed" ||
+            /doğrulanmamış|not confirmed/i.test(result.error),
+        );
+        setError(result.error);
+        return;
+      }
 
       /*
        * Rol yonlendirmesinin tek kaynagi middleware'dir. Burada profili bir
@@ -101,12 +121,12 @@ export function LoginForm({ callbackError = null }: LoginFormProps) {
        * onay/rol durumuna gore dogru ekrana dagitir.
        */
       navigationStarted = true;
-      window.location.assign("/dashboard");
+      window.location.assign(nextPath ?? "/dashboard");
     } catch (caught) {
       const message =
         caught instanceof Error
           ? caught.message
-          : "Beklenmeyen bir hata oluştu. Lutfen tekrar deneyin.";
+          : "Beklenmeyen bir hata oluştu. Lütfen tekrar deneyin.";
 
       // Supabase bu durumda "Email not confirmed" döndürür.
       setUnconfirmed(/not confirmed/i.test(message));
@@ -128,9 +148,10 @@ export function LoginForm({ callbackError = null }: LoginFormProps) {
       <Tabs
         value={mode}
         onValueChange={(value) => {
-          setMode(value as Mode);
+          setMode(value as LoginMode);
           setError(null);
           setInfo(null);
+          setUnconfirmed(false);
         }}
       >
         <TabsList className="grid w-full grid-cols-2">
@@ -150,7 +171,7 @@ export function LoginForm({ callbackError = null }: LoginFormProps) {
               required
               value={fullName}
               onChange={(event) => setFullName(event.target.value)}
-              placeholder="Ayse Yılmaz"
+              placeholder="Ayşe Yılmaz"
             />
           </div>
 
@@ -209,12 +230,39 @@ export function LoginForm({ callbackError = null }: LoginFormProps) {
           type="password"
           autoComplete={mode === "kayit" ? "new-password" : "current-password"}
           required
-          minLength={6}
+          minLength={mode === "kayit" ? 8 : 6}
           value={password}
           onChange={(event) => setPassword(event.target.value)}
           placeholder="••••••••"
         />
+        {mode === "kayit" ? (
+          <p className="text-xs text-muted-foreground">En az 8 karakter kullanın.</p>
+        ) : null}
       </div>
+
+      {mode === "giris" ? (
+        <div className="flex items-center justify-between gap-4">
+          <label
+            htmlFor="remember"
+            className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground"
+          >
+            <Checkbox
+              id="remember"
+              name="remember"
+              checked={remember}
+              onChange={(event) => setRemember(event.target.checked)}
+            />
+            Beni hatırla
+          </label>
+
+          <Link
+            href="/sifremi-unuttum"
+            className="text-sm font-medium text-primary underline-offset-4 hover:underline"
+          >
+            Şifremi unuttum
+          </Link>
+        </div>
+      ) : null}
 
       {error ? (
         <div className="space-y-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2.5">
@@ -240,7 +288,7 @@ export function LoginForm({ callbackError = null }: LoginFormProps) {
         {pending ? (
           <>
             <Loader2 className="h-4 w-4 animate-spin" />
-            Lutfen bekleyin...
+            Lütfen bekleyin...
           </>
         ) : (
           <>

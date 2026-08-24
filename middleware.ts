@@ -1,7 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
-import { ROLE_CACHE_COOKIE } from "@/lib/auth-cookies";
+import {
+  AUTH_PERSISTENCE_COOKIE,
+  ROLE_CACHE_COOKIE,
+  authCookieOptions,
+  authPersistenceFromCookie,
+} from "@/lib/auth-cookies";
 import { DEV_ROLE_COOKIE, isDevRoleSwitchEnabled } from "@/lib/dev-mode";
 import { isSupabaseConfigured, publicEnv } from "@/lib/env";
 import { dashboardPathFor, roleForPath } from "@/lib/roles";
@@ -48,6 +53,10 @@ export async function middleware(request: NextRequest) {
   // Supabase yapilandirilmamissa demo modunda calisilir: koruma uygulanmaz.
   if (!isSupabaseConfigured) return response;
 
+  const authPersistence = authPersistenceFromCookie(
+    request.cookies.get(AUTH_PERSISTENCE_COOKIE)?.value,
+  );
+
   const supabase = createServerClient<Database>(
     publicEnv.supabaseUrl,
     publicEnv.supabaseAnonKey,
@@ -62,7 +71,11 @@ export async function middleware(request: NextRequest) {
           }
           response = NextResponse.next({ request: { headers: requestHeaders } });
           for (const { name, value, options } of cookiesToSet) {
-            response.cookies.set(name, value, options);
+            response.cookies.set(
+              name,
+              value,
+              authCookieOptions(options, value, authPersistence),
+            );
           }
         },
       },

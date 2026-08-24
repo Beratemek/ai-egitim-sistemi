@@ -16,6 +16,12 @@ import { createServerClient } from "@supabase/ssr";
 import { createClient as createSupabaseJsClient } from "@supabase/supabase-js";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 
+import {
+  AUTH_PERSISTENCE_COOKIE,
+  authCookieOptions,
+  authPersistenceFromCookie,
+  type AuthPersistence,
+} from "@/lib/auth-cookies";
 import { requireSupabaseEnv, serverEnv } from "@/lib/env";
 import type { Database, UserProfile, UserRole } from "@/lib/types";
 
@@ -25,9 +31,14 @@ export type TypedServerClient = SupabaseClient<Database>;
  * Oturum cerezlerine bagli Supabase istemcisi.
  * Next.js 15'te `cookies()` asenkron oldugu icin bu fonksiyon da asenkrondur.
  */
-export async function createServerSupabaseClient(): Promise<TypedServerClient> {
+export async function createServerSupabaseClient(options?: {
+  persistence?: AuthPersistence;
+}): Promise<TypedServerClient> {
   const { url, anonKey } = requireSupabaseEnv();
   const cookieStore = await cookies();
+  const persistence =
+    options?.persistence ??
+    authPersistenceFromCookie(cookieStore.get(AUTH_PERSISTENCE_COOKIE)?.value);
 
   return createServerClient<Database>(url, anonKey, {
     cookies: {
@@ -37,7 +48,11 @@ export async function createServerSupabaseClient(): Promise<TypedServerClient> {
       setAll(cookiesToSet) {
         try {
           for (const { name, value, options } of cookiesToSet) {
-            cookieStore.set(name, value, options);
+            cookieStore.set(
+              name,
+              value,
+              authCookieOptions(options, value, persistence),
+            );
           }
         } catch {
           // Server Component icinden cerez yazilamaz. Oturum yenilemesi
