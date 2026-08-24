@@ -6,6 +6,7 @@ import { CalendarClock, CheckCircle2, Loader2, Play, TriangleAlert } from "lucid
 import { toast } from "sonner";
 
 import { startExam } from "@/app/actions/submissions";
+import { ProctoringGate } from "@/components/shared/proctoring-gate";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatDateTime } from "@/lib/utils";
@@ -15,6 +16,7 @@ interface ExamStartPanelProps {
   questionCount: number;
   totalPoints: number;
   endsAt: string | null;
+  proctored: boolean;
 }
 
 /** Soruları gostermeden önce sınav kurallarini ve baslatma onayini sunar. */
@@ -23,6 +25,7 @@ export function ExamStartPanel({
   questionCount,
   totalPoints,
   endsAt,
+  proctored,
 }: ExamStartPanelProps) {
   const router = useRouter();
   const [pending, setPending] = React.useState(false);
@@ -81,12 +84,52 @@ export function ExamStartPanel({
           </p>
         ) : null}
 
-        <Button onClick={handleStart} disabled={pending || questionCount === 0} className="w-full gap-2">
-          {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-          {pending ? "Sınav başlatılıyor..." : "Sınava başla"}
-        </Button>
+        {proctored ? (
+          <ProctoringGate examId={examId} mode="preflight">
+            <StartButton
+              pending={pending}
+              disabled={questionCount === 0}
+              onStart={handleStart}
+              readyLabel="Cihazlar hazır — sınava başla"
+            />
+          </ProctoringGate>
+        ) : (
+          <StartButton
+            pending={pending}
+            disabled={questionCount === 0}
+            onStart={handleStart}
+          />
+        )}
       </CardContent>
     </Card>
+  );
+}
+
+function StartButton({
+  pending,
+  disabled,
+  onStart,
+  readyLabel = "Sınava başla",
+}: {
+  pending: boolean;
+  disabled: boolean;
+  onStart: () => void;
+  readyLabel?: string;
+}) {
+  return (
+    <Button
+      type="button"
+      onClick={onStart}
+      disabled={pending || disabled}
+      className="w-full gap-2"
+    >
+      {pending ? (
+        <Loader2 className="h-4 w-4 animate-spin" />
+      ) : (
+        <Play className="h-4 w-4" />
+      )}
+      {pending ? "Sınav başlatılıyor..." : readyLabel}
+    </Button>
   );
 }
 

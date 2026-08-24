@@ -5,6 +5,7 @@ export interface RecommendationSource {
   outcomeText: string | null;
   averageScore: number;
   approvedAnswerCount: number;
+  latestExamId?: string | null;
 }
 
 export type StudyPriority = "yuksek" | "orta" | "pekistir";
@@ -17,7 +18,13 @@ export interface StudyRecommendation {
   priorityLabel: string;
   action: string;
   evidence: string;
+  outcomeId: string | null;
+  latestExamId: string | null;
 }
+
+const scoreFormatter = new Intl.NumberFormat("tr-TR", {
+  maximumFractionDigits: 1,
+});
 
 /** En dusuk kazanımlardan baslayarak uygulanabilir, veri destekli calisma adimi uretir. */
 export function buildStudyRecommendations(
@@ -34,16 +41,18 @@ export function buildStudyRecommendations(
         id: source.outcomeId ?? `${source.subject}:${source.topic}`,
         title: source.outcomeText ?? source.topic,
         context: `${source.subject} · ${source.topic}`,
-        evidence: `${source.approvedAnswerCount} onayli cevapta ${source.averageScore}/100 ortalama`,
+        evidence: `${source.approvedAnswerCount} onaylı cevap üzerinden ${scoreFormatter.format(source.averageScore)}/100 ortalama`,
+        outcomeId: source.outcomeId,
+        latestExamId: source.latestExamId ?? null,
       };
 
       if (source.averageScore < 50) {
         return {
           ...base,
           priority: "yuksek" as const,
-          priorityLabel: "Oncelikli tekrar",
+          priorityLabel: "Öncelikli tekrar",
           action:
-            "Temel kavramlari kisa bir konu anlatimiyla tekrar et; ardindan 5 temel duzey soru coz.",
+            "Temel kavramları kısa bir konu anlatımıyla tekrar et; ardından 5 temel düzey soru çöz.",
         };
       }
 
@@ -53,16 +62,16 @@ export function buildStudyRecommendations(
           priority: "orta" as const,
           priorityLabel: "Pratik gerekli",
           action:
-            "Yanlis yaptigin adimlari geri bildirimlerden incele ve ayni kazanimdan 3 uygulama sorusu coz.",
+            "Yanlış yaptığın adımları geri bildirimlerden incele ve aynı kazanımdan 3 uygulama sorusu çöz.",
         };
       }
 
       return {
         ...base,
         priority: "pekistir" as const,
-        priorityLabel: "Pekistir",
+        priorityLabel: "Pekiştir",
         action:
-          "Basarini korumak icin daha zor bir uygulama sorusu coz ve cozumunu kendi cumlelerinle acikla.",
+          "Başarını korumak için daha zor bir uygulama sorusu çöz ve çözümünü kendi cümlelerinle açıkla.",
       };
     });
 }

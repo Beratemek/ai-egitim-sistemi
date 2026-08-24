@@ -21,6 +21,7 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { isSupabaseConfigured, publicEnv } from "@/lib/env";
 import { SELECTABLE_ROLES, dashboardPathFor } from "@/lib/roles";
+import { createClient } from "@/lib/supabase";
 import { isUserRole, type UserRole } from "@/lib/types";
 
 type Mode = "giris" | "kayit";
@@ -49,19 +50,9 @@ export function LoginForm({ callbackError = null }: LoginFormProps) {
     setError(null);
     setInfo(null);
     setPending(true);
+    let navigationStarted = false;
 
     try {
-      /*
-        Supabase istemcisi TALEP UZERINE yukleniyor.
-
-        Statik import edildiginde `@supabase/ssr` + `@supabase/supabase-js`
-        giris sayfasinin ILK YUKLEMESINE giriyordu (~79 kB rota boyutu).
-        Oysa istemciye yalnizca kullanici formu gonderdiginde ihtiyac var;
-        sayfayi acip bakan herkes bedelini odemek zorunda degil. Giris
-        sayfasi uygulamanin en cok acilan sayfasi oldugu icin bu fark
-        dogrudan ilk acilis suresine yansiyor.
-      */
-      const { createClient } = await import("@/lib/supabase");
       const supabase = createClient();
 
       if (mode === "kayit") {
@@ -94,23 +85,23 @@ export function LoginForm({ callbackError = null }: LoginFormProps) {
         return;
       }
 
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+      const { error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (signInError) throw signInError;
 
-      const { data: profile } = await supabase
-        .from("users")
-        .select("role")
-        .eq("id", data.user.id)
-        .single();
-
-      const resolvedRole: UserRole = isUserRole(profile?.role) ? profile.role : "ogrenci";
-
-      router.replace(dashboardPathFor(resolvedRole));
-      router.refresh();
+      /*
+       * Rol yonlendirmesinin tek kaynagi middleware'dir. Burada profili bir
+       * kez daha tarayicidan sorgulamak hem gereksiz bir ag istegiydi hem de
+       * bu sorgu geciktiginde giris basarili olmasina ragmen formun ekranda
+       * kalmasina neden oluyordu. Tam sayfa gecisi yeni oturum cerezini de
+       * kesin olarak bir sonraki istege tasir; middleware kullaniciyi kendi
+       * onay/rol durumuna gore dogru ekrana dagitir.
+       */
+      navigationStarted = true;
+      window.location.assign("/dashboard");
     } catch (caught) {
       const message =
         caught instanceof Error
@@ -121,7 +112,10 @@ export function LoginForm({ callbackError = null }: LoginFormProps) {
       setUnconfirmed(/not confirmed/i.test(message));
       setError(message);
     } finally {
-      setPending(false);
+      // Tam sayfa yonlendirmesi uzak Supabase gecikmesine bagli olarak birkac
+      // saniye surebilir. Bu sirada butonu yeniden etkinlestirmek, tiklama hic
+      // olmamis izlenimi veriyor ve yinelenen giris isteklerine yol aciyordu.
+      if (!navigationStarted) setPending(false);
     }
   }
 

@@ -141,7 +141,11 @@ export default async function SinavCozPage({ params }: PageProps) {
         birakip gezintiyi gereksiz yere uzatiyordu.
       */}
       <main className="mx-auto w-full max-w-[1560px] flex-1 space-y-3 px-3 py-4 sm:space-y-4 sm:px-8 sm:py-5">
-        {exam.proctored ? <ProctoringGate>{govde}</ProctoringGate> : govde}
+        {exam.proctored ? (
+          <ProctoringGate examId={exam.id}>{govde}</ProctoringGate>
+        ) : (
+          govde
+        )}
       </main>
 
       <footer className="safe-bottom border-t">

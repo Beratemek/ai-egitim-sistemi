@@ -7,6 +7,7 @@ import {
   Check,
   ChevronDown,
   Circle,
+  X,
 } from "lucide-react";
 
 import { AnswerForm } from "@/components/shared/answer-form";
@@ -55,7 +56,10 @@ export function StudentExamQuestions({
   const firstUnanswered = questions.findIndex(
     (question) => !answerByQuestion.has(question.id),
   );
-  /** Gezinti acik mi? Sinav ekraninda oncelik soruda. */
+  /**
+   * Dar ekranda gezinti açılıp kapanabilir. Masaüstünde bu değer dikkate
+   * alınmaz; sağ sütun sınav boyunca sürekli görünür kalır.
+   */
   const [navOpen, setNavOpen] = React.useState(false);
   const [activeIndex, setActiveIndex] = React.useState(
     firstUnanswered >= 0 ? firstUnanswered : 0,
@@ -162,7 +166,8 @@ export function StudentExamQuestions({
                 type="button"
                 onClick={() => setNavOpen((acik) => !acik)}
                 aria-expanded={navOpen}
-                className="flex items-center gap-1.5 text-sm font-medium hover:text-primary"
+                aria-controls="student-question-navigation"
+                className="flex items-center gap-1.5 text-sm font-medium hover:text-primary lg:hidden"
               >
                 Soru gezintisi
                 <ChevronDown
@@ -173,21 +178,34 @@ export function StudentExamQuestions({
                 />
               </button>
 
+              <p className="hidden text-sm font-medium lg:block">
+                Soru gezintisi
+              </p>
+
               <span className="text-xs tabular text-muted-foreground">
                 {activeIndex + 1} / {questions.length}
               </span>
             </div>
 
-            <div // Esit genislikte kutucuklar: flex-wrap son satiri seyreltip dagitiyordu.
-            className={cn(
-              "grid grid-cols-[repeat(auto-fill,minmax(42px,1fr))] gap-1.5",
-              !navOpen && "hidden",
-            )}>
+            <div
+              id="student-question-navigation"
+              // Masaüstünde sürekli açık; mobilde 50 düğme sorunun önüne
+              // geçmesin diye öğrenci isterse açar.
+              className={cn(
+                "grid grid-cols-[repeat(auto-fill,minmax(42px,1fr))] gap-1.5",
+                !navOpen && "hidden lg:grid",
+              )}
+            >
               {questions.map((item, index) => {
                 const submission = answerByQuestion.get(item.id);
                 const isAnswered = Boolean(submission);
                 const isFinal =
                   submission && submission.status !== "gonderildi";
+                const receivedNoPoints = Boolean(
+                  revealResults &&
+                    submission?.status === "egitmen_onayli" &&
+                    submission.instructor_approved_score === 0,
+                );
                 const isActive = index === activeIndex;
 
                 return (
@@ -195,20 +213,30 @@ export function StudentExamQuestions({
                     key={item.id}
                     type="button"
                     onClick={() => setActiveIndex(index)}
-                    aria-label={`${index + 1}. soruya git${isAnswered ? ", cevaplandı" : ""}`}
+                    aria-label={`${index + 1}. soruya git${
+                      receivedNoPoints
+                        ? ", puan alamadı"
+                        : isAnswered
+                          ? ", cevaplandı"
+                          : ", boş"
+                    }`}
                     aria-current={isActive ? "step" : undefined}
                     className={cn(
                       "flex h-8 items-center justify-center gap-1 rounded-md border px-1 text-xs font-semibold transition-colors",
-                      isActive
-                        ? "border-primary bg-primary text-primary-foreground"
+                      receivedNoPoints
+                        ? "border-destructive bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         : isFinal
-                          ? "border-success/30 bg-success/10 text-success"
-                          : isAnswered
-                            ? "border-primary/30 bg-primary/5 text-primary"
-                            : "bg-background text-muted-foreground hover:border-primary/40",
+                          ? "border-success bg-success text-success-foreground"
+                        : isAnswered
+                          ? "border-success/60 bg-success/15 text-success hover:bg-success/20"
+                          : "border-border bg-background text-muted-foreground hover:border-primary/60 hover:bg-accent",
+                      isActive &&
+                        "relative z-10 ring-2 ring-primary ring-offset-2 ring-offset-background",
                     )}
                   >
-                    {isAnswered ? (
+                    {receivedNoPoints ? (
+                      <X className="h-3.5 w-3.5" />
+                    ) : isAnswered ? (
                       <Check className="h-3.5 w-3.5" />
                     ) : (
                       <Circle className="h-3 w-3" />
@@ -219,8 +247,31 @@ export function StudentExamQuestions({
               })}
             </div>
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-              <span>Daire: cevaplanmadı</span>
-              <span>Tık: kaydedildi</span>
+              <span className="flex items-center gap-1.5">
+                <Circle className="h-3 w-3" />
+                Boş
+              </span>
+              {revealResults ? (
+                <>
+                  <span className="flex items-center gap-1.5 text-success">
+                    <Check className="h-3.5 w-3.5" />
+                    Puan aldı
+                  </span>
+                  <span className="flex items-center gap-1.5 text-destructive">
+                    <X className="h-3.5 w-3.5" />
+                    Puan alamadı
+                  </span>
+                </>
+              ) : (
+                <span className="flex items-center gap-1.5 text-success">
+                  <Check className="h-3.5 w-3.5" />
+                  Kaydedildi
+                </span>
+              )}
+              <span className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-sm ring-2 ring-primary" />
+                Şu anki soru
+              </span>
             </div>
           </CardContent>
         </Card>

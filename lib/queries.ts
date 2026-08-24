@@ -647,6 +647,10 @@ export interface StudentGrowthTopic {
   outcomeText: string | null;
   averageScore: number;
   approvedAnswerCount: number;
+  /** Bu alanla ilgili en son tamamlanan sinav; geri bildirim aksiyonunun hedefi. */
+  latestExamId: string | null;
+  /** Ilk ve son tamamlanan sinavdaki alan ortalamasi arasindaki fark. */
+  scoreChange: number | null;
 }
 
 /** Egitmen onayli cevaplardan kazanim (yoksa konu) bazli gelisimi hesaplar. */
@@ -658,7 +662,7 @@ export async function getStudentGrowth(): Promise<StudentGrowthTopic[]> {
   const supabase = await createServerSupabaseClient();
   const { data: completedAttempts, error: attemptError } = await supabase
     .from("exam_attempts")
-    .select("exam_id")
+    .select("exam_id, completed_at")
     .eq("student_id", current.user.id)
     .eq("status", "sonuclandi");
   if (attemptError || !completedAttempts?.length) return [];
@@ -683,17 +687,30 @@ export async function getStudentGrowth(): Promise<StudentGrowthTopic[]> {
       supabase.rpc("get_student_exam_questions", { target_exam: examId }),
     ),
   );
-  const safeQuestions = safeResults.flatMap((result) => result.data ?? []);
-  const questions =
+  const safeQuestions = safeResults.flatMap((result, index) =>
+    (result.data ?? []).map((question) => ({
+      ...question,
+      examId: examIds[index],
+    })),
+  );
+  const fallbackQuestions =
     safeQuestions.length > 0
-      ? safeQuestions
+      ? []
       : (
           await supabase
             .from("questions")
             .select("id, topic, subject, outcome_id")
             .in("id", questionIds)
         ).data ?? [];
-  const questionById = new Map(questions.map((question) => [question.id, question]));
+  const questions =
+    safeQuestions.length > 0
+      ? safeQuestions
+      : fallbackQuestions.flatMap((question) =>
+          examIds.map((examId) => ({ ...question, examId, points: 1 })),
+        );
+  const questionByExamAndId = new Map(
+    questions.map((question) => [`${question.examId}:${question.id}`, question]),
+  );
   const outcomeIds = [
     ...new Set(
       questions
@@ -717,13 +734,22 @@ export async function getStudentGrowth(): Promise<StudentGrowthTopic[]> {
       subject: string;
       outcomeId: string | null;
       outcomeText: string | null;
-      scores: number[];
+      entries: Array<{
+        score: number;
+        points: number;
+        examId: string;
+        completedAt: string | null;
+      }>;
     }
   >();
 
+  const completedAtByExam = new Map(
+    completedAttempts.map((attempt) => [attempt.exam_id, attempt.completed_at]),
+  );
+
   for (const submission of approved) {
     const question = submission.question_id
-      ? questionById.get(submission.question_id)
+      ? questionByExamAndId.get(`${submission.exam_id}:${submission.question_id}`)
       : null;
     if (!question || submission.instructor_approved_score === null) continue;
     const outcomeText = question.outcome_id
@@ -735,26 +761,78 @@ export async function getStudentGrowth(): Promise<StudentGrowthTopic[]> {
       subject: question.subject,
       outcomeId: question.outcome_id,
       outcomeText,
-      scores: [],
+      entries: [],
     };
-    bucket.scores.push(submission.instructor_approved_score);
+    bucket.entries.push({
+      score: Math.min(100, Math.max(0, submission.instructor_approved_score)),
+      points: Math.max(0, question.points ?? 1),
+      examId: submission.exam_id,
+      completedAt: completedAtByExam.get(submission.exam_id) ?? null,
+    });
     buckets.set(key, bucket);
   }
 
   return [...buckets.values()]
-    .map((bucket) => ({
-      topic: bucket.topic,
-      subject: bucket.subject,
-      outcomeId: bucket.outcomeId,
-      outcomeText: bucket.outcomeText,
-      averageScore:
+    .map((bucket) => {
+      const pointTotal = bucket.entries.reduce(
+        (total, entry) => total + entry.points,
+        0,
+      );
+      const weightedTotal = bucket.entries.reduce(
+        (total, entry) => total + entry.score * entry.points,
+        0,
+      );
+      const averageScore =
         Math.round(
-          (bucket.scores.reduce((total, score) => total + score, 0) /
-            bucket.scores.length) *
-            10,
-        ) / 10,
-      approvedAnswerCount: bucket.scores.length,
-    }))
+          (pointTotal > 0
+            ? weightedTotal / pointTotal
+            : bucket.entries.reduce((total, entry) => total + entry.score, 0) /
+              bucket.entries.length) * 10,
+        ) / 10;
+
+      const byExam = new Map<
+        string,
+        { weightedTotal: number; pointTotal: number; completedAt: string | null }
+      >();
+      for (const entry of bucket.entries) {
+        const current = byExam.get(entry.examId) ?? {
+          weightedTotal: 0,
+          pointTotal: 0,
+          completedAt: entry.completedAt,
+        };
+        current.weightedTotal += entry.score * entry.points;
+        current.pointTotal += entry.points;
+        byExam.set(entry.examId, current);
+      }
+
+      const history = [...byExam.entries()]
+        .map(([examId, entry]) => ({
+          examId,
+          completedAt: entry.completedAt,
+          score: entry.pointTotal > 0 ? entry.weightedTotal / entry.pointTotal : 0,
+        }))
+        .sort(
+          (a, b) =>
+            new Date(a.completedAt ?? 0).getTime() -
+            new Date(b.completedAt ?? 0).getTime(),
+        );
+      const first = history[0];
+      const latest = history.at(-1);
+
+      return {
+        topic: bucket.topic,
+        subject: bucket.subject,
+        outcomeId: bucket.outcomeId,
+        outcomeText: bucket.outcomeText,
+        averageScore,
+        approvedAnswerCount: bucket.entries.length,
+        latestExamId: latest?.examId ?? null,
+        scoreChange:
+          first && latest && first.examId !== latest.examId
+            ? Math.round((latest.score - first.score) * 10) / 10
+            : null,
+      };
+    })
     .sort((a, b) => b.averageScore - a.averageScore);
 }
 

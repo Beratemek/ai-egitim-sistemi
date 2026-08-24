@@ -160,6 +160,7 @@ export default async function OgrenciSinavPage({
           questionCount={questionCount}
           totalPoints={totalPoints}
           endsAt={exam.ends_at}
+          proctored={exam.proctored}
         />
       ) : null}
 
@@ -284,7 +285,7 @@ function getLockReason(
     case "onay_bekliyor":
       return "Tüm cevaplarınız kaydedildi. Sonuçlar eğitmen değerlendirmesinden sonra açıklanacak.";
     case "sonuclandi":
-      return "Sınavınız değerlendirildi. Onaylanan sonuçlarınızı aşağıda görebilirsiniz.";
+      return "Sınav sonucunuz açıklandı. Yanıtladığınız soruların onaylı puan ve geri bildirimlerini soru gezintisinden inceleyebilirsiniz.";
     default:
       return null;
   }
@@ -339,7 +340,14 @@ function ExamAvailabilityNotice({
   message: string;
 }) {
   const isExpired = status === "suresi_doldu";
-  const Icon = isExpired ? LockKeyhole : status === "yaklasan" ? Clock3 : Hourglass;
+  const isCompleted = status === "sonuclandi";
+  const Icon = isExpired
+    ? LockKeyhole
+    : status === "yaklasan"
+      ? Clock3
+      : isCompleted
+        ? CheckCircle2
+        : Hourglass;
 
   return (
     <div
@@ -347,6 +355,8 @@ function ExamAvailabilityNotice({
       className={
         isExpired
           ? "flex items-start gap-3 rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-destructive"
+          : isCompleted
+            ? "flex items-start gap-3 rounded-xl border border-success/40 bg-success/10 px-4 py-3 text-success"
           : "flex items-start gap-3 rounded-xl border border-warning/40 bg-warning/10 px-4 py-3 text-warning"
       }
     >
