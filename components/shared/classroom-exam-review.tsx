@@ -13,6 +13,10 @@ import {
 import { toast } from "sonner";
 
 import { approveSubmissions } from "@/app/actions/submissions";
+import {
+  QuestionBody,
+  StudentAnswerBlock,
+} from "@/components/shared/question-body";
 import { SubmissionReviewDialog } from "@/components/shared/submission-review-dialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -380,27 +384,60 @@ function AnswerCard({
 }: AnswerCardProps) {
   const approved = submission.instructor_approved_score;
   const isApproved = submission.status === "egitmen_onayli";
+  const isTest = question?.type === "test";
 
   return (
-    <div className="rounded-lg border bg-background p-3">
+    /*
+      Soru burada TAM govdesiyle cizilir: metin, gorsel ve siklar.
+
+      Onceden yalnizca soru metni ve ogrencinin ham cevabi ("A") vardi.
+      Coktan secmeli bir soruda bu, egitmenden puani A'nin NE OLDUGUNU
+      gormeden onaylamasini istemek demekti - ekranin tek isi buyken.
+    */
+    <div className="rounded-xl border bg-background p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <p className="min-w-0 flex-1 text-sm font-medium leading-snug">
-          {position !== null ? `${position}. ` : ""}
-          {question?.text ?? "Soru bulunamadı"}
-        </p>
+        <div className="min-w-0 flex-1">
+          {question ? (
+            <QuestionBody
+              question={question}
+              number={position}
+              topic={question.topic}
+              studentAnswer={isTest ? submission.answer_text : null}
+              revealAnswer
+              showRubric
+            />
+          ) : (
+            <p className="text-sm italic text-muted-foreground">
+              {position !== null ? `${position}. ` : ""}
+              Soru bulunamadı — havuzdan silinmiş olabilir.
+            </p>
+          )}
+        </div>
 
         {isApproved ? (
-          <Badge variant="success">Onaylı</Badge>
+          <Badge variant="success" className="shrink-0">
+            Onaylı
+          </Badge>
         ) : (
-          <Badge variant="warning">Bekliyor</Badge>
+          <Badge variant="warning" className="shrink-0">
+            Bekliyor
+          </Badge>
         )}
       </div>
 
-      <p className="mt-2 whitespace-pre-wrap rounded-md bg-muted/60 px-3 py-2 text-sm leading-relaxed">
-        {submission.answer_text || "(boş cevap)"}
-      </p>
+      {/*
+        Yazili cevap yalnizca ACIK UCLU sorularda ayri bir kutuda; test
+        sorusunda ogrencinin secimi zaten sikkin uzerinde isaretli, ayrica
+        "A" yazan bir kutu tekrar olurdu.
+      */}
+      {isTest ? null : (
+        <StudentAnswerBlock
+          answerText={submission.answer_text}
+          className="mt-4"
+        />
+      )}
 
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t pt-3">
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <span className="shrink-0 text-xs text-muted-foreground">
             AI: <span className="font-semibold tabular-nums">
@@ -425,7 +462,7 @@ function AnswerCard({
         <SubmissionReviewDialog
           submission={submission}
           studentName={studentName}
-          questionText={question?.text}
+          question={question}
           canPersist={canPersist}
         />
       </div>

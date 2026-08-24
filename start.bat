@@ -7,6 +7,19 @@ REM    start.bat          -> paketleri kontrol et + npm run dev
 REM    start.bat build    -> npm run build + npm run start
 REM    start.bat clean    -> .next ve node_modules sil, sifirdan kur
 REM ============================================================
+REM  KAPSAM SOZU (2026-08-24) - bu script SADECE bu klasore dokunur:
+REM    - port      : 8080 (ve orada bir sey varsa ONCE sorar)
+REM    - dosyalar  : bu klasordeki .next / node_modules / .start-cache
+REM  Docker'a HIC dokunmaz: bu proje Next.js + Supabase, container
+REM  gerektirmez. Engine kapaliysa kapali kalir, acmaz. Diger
+REM  projelerin (borsa-botu, morf, VMCP) container'lari yalnizca
+REM  ayaktaysa BILGI AMACLI listelenir - hicbiri durdurulmaz.
+REM
+REM  Neden bu not var: Docker engine acilinca "restart: unless-stopped"
+REM  politikali eski container'lar kendiliginden geri geliyor ve 16 GB'lik
+REM  makinede RAM'i doldurup donmaya yol aciyordu. T3 uzerinde
+REM  calisirken hicbir container'a ihtiyacin yok.
+REM ============================================================
 setlocal EnableExtensions EnableDelayedExpansion
 title T3 - AI Egitim Sistemi
 cd /d "%~dp0"
@@ -117,8 +130,13 @@ REM ---------- port bos mu ----------
 set "PIDONPORT="
 for /f "tokens=5" %%p in ('netstat -ano -p tcp 2^>nul ^| findstr /r /c:":%PORT% .*LISTENING"') do set "PIDONPORT=%%p"
 if not "!PIDONPORT!"=="" (
+  REM Sureci ADIYLA goster: 8080'i tutan sey baska bir projenin sunucusu
+  REM olabilir. Kapsam sozu geregi kimseyi sormadan oldurmuyoruz.
+  set "PROCNAME=?"
+  for /f "tokens=1 delims=," %%n in ('tasklist /fi "PID eq !PIDONPORT!" /nh /fo csv 2^>nul') do set "PROCNAME=%%~n"
   echo.
-  echo   [UYARI] %PORT% portu kullanimda ^(PID !PIDONPORT!^).
+  echo   [UYARI] %PORT% portu kullanimda ^(PID !PIDONPORT! - !PROCNAME!^).
+  echo           Bu T3'un onceki sunucusu degilse ^(baska bir proje^) [H]ayir deyin.
   choice /c EH /n /m "          Bu islemi kapatayim mi? [E]vet / [H]ayir: "
   if errorlevel 2 (
     echo          Devam ediliyor - Next.js baska bir porta gecebilir.
@@ -126,6 +144,24 @@ if not "!PIDONPORT!"=="" (
   ) else (
     taskkill /f /pid !PIDONPORT! >nul 2>&1
     echo          PID !PIDONPORT! kapatildi.
+  )
+)
+
+REM ---------- SALT-OKUNUR: bosuna RAM yiyen container var mi? ----------
+REM  T3 hicbir container'a ihtiyac duymaz. Docker engine kapaliysa bu blok
+REM  sessizce atlanir - engine ACILMAZ, hicbir container durdurulmaz.
+where docker >nul 2>&1
+if not errorlevel 1 (
+  set /a DSAYI=0
+  for /f "delims=" %%c in ('docker ps --format "{{.Names}}" 2^>nul') do (
+    set /a DSAYI+=1
+    if !DSAYI!==1 echo   [i] Ayakta olan container'lar ^(T3 icin gereksiz, dokunulmadi^):
+    echo         - %%c
+  )
+  if !DSAYI! GTR 0 (
+    echo       !DSAYI! container RAM tuketiyor. Sadece T3 ile calisacaksan
+    echo       ilgili projenin durdurma dosyasini calistirip RAM'i geri alabilirsin.
+    echo.
   )
 )
 

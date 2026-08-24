@@ -5,9 +5,12 @@ import { ArrowLeft } from "lucide-react";
 
 import { ExamBuilder } from "@/components/shared/exam-builder";
 import { ExamClassroomAssign } from "@/components/shared/exam-classroom-assign";
+import { ExamDetailTabs } from "@/components/shared/exam-detail-tabs";
+import { ExamPaperPanel } from "@/components/shared/exam-paper-panel";
 import { ExamSettingsPanel } from "@/components/shared/exam-settings-panel";
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
 import { isSupabaseConfigured } from "@/lib/env";
 import {
   getExamAssignedStudentIds,
@@ -17,6 +20,7 @@ import {
   getSubmissions,
   getUsers,
 } from "@/lib/queries";
+import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Sınav Detayı" };
 
@@ -67,17 +71,28 @@ export default async function SinavDetayPage({
     .map(([name, counts]) => ({ name, ...counts }))
     .sort((a, b) => a.name.localeCompare(b.name, "tr"));
 
+  /** Sinava fiilen ogrenci atanmis sinif adlari; kagida on dolgu gecer. */
+  const assignedClassrooms = classrooms
+    .filter((classroom) => classroom.assignedCount > 0)
+    .map((classroom) => classroom.name);
+
+  const totalPoints = detail.questions.reduce((sum, q) => sum + q.points, 0);
+
   return (
     <>
       <Link
         href="/dashboard/egitmen/sinavlar"
-        className="flex w-fit items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+        className={cn(
+          buttonVariants({ variant: "ghost", size: "sm" }),
+          "-ml-2 w-fit gap-1.5 text-muted-foreground print:hidden",
+        )}
       >
         <ArrowLeft className="h-4 w-4" />
         Sınavlar
       </Link>
 
       <PageHeader
+        className="print:hidden"
         title={detail.exam.title}
         description={
           detail.exam.description || "Havuzdan soru ekleyip sınavı yayına alın."
@@ -89,30 +104,53 @@ export default async function SinavDetayPage({
         }
       />
 
-      <ExamSettingsPanel
-        examId={examId}
-        subject={detail.exam.subject}
-        durationMinutes={detail.exam.duration_minutes}
-        proctored={detail.exam.proctored}
-        subjectOptions={subjectOptions}
+      <ExamDetailTabs
+        exam={detail.exam}
         questionCount={detail.questions.length}
-        totalPoints={detail.questions.reduce((sum, q) => sum + q.points, 0)}
-        pointsAuto={detail.exam.points_auto}
+        totalPoints={totalPoints}
+        assignedCount={assignedIds.length}
         canPersist={isSupabaseConfigured}
-      />
+        kurulum={
+          <>
+            <ExamSettingsPanel
+              examId={examId}
+              subject={detail.exam.subject}
+              durationMinutes={detail.exam.duration_minutes}
+              proctored={detail.exam.proctored}
+              startsAt={detail.exam.starts_at}
+              endsAt={detail.exam.ends_at}
+              subjectOptions={subjectOptions}
+              questionCount={detail.questions.length}
+              totalPoints={totalPoints}
+              pointsAuto={detail.exam.points_auto}
+              canPersist={isSupabaseConfigured}
+            />
 
-      <ExamClassroomAssign
-        examId={examId}
-        classrooms={classrooms}
-        canPersist={isSupabaseConfigured}
-      />
-
-      <ExamBuilder
-          exam={detail.exam}
-          examQuestions={detail.questions}
-          pool={pool}
-          hasSubmissions={submissions.length > 0}
-        canPersist={isSupabaseConfigured}
+            <ExamBuilder
+              exam={detail.exam}
+              examQuestions={detail.questions}
+              pool={pool}
+              hasSubmissions={submissions.length > 0}
+              canPersist={isSupabaseConfigured}
+            />
+          </>
+        }
+        siniflar={
+          <ExamClassroomAssign
+            examId={examId}
+            classrooms={classrooms}
+            canPersist={isSupabaseConfigured}
+          />
+        }
+        kagit={
+          <ExamPaperPanel
+            examTitle={detail.exam.title}
+            subject={detail.exam.subject}
+            durationMinutes={detail.exam.duration_minutes}
+            questions={detail.questions}
+            classrooms={assignedClassrooms}
+          />
+        }
       />
     </>
   );

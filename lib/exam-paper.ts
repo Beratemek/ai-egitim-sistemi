@@ -209,3 +209,22 @@ export function toFileName(title: string, fallback = "sinav"): string {
 
   return cleaned.length > 0 ? cleaned : fallback;
 }
+
+/**
+ * Kayitli bir sinavin sorularina KENDI puanlariyla sira numarasi isler.
+ *
+ * `numberQuestions` puanlari 100 uzerinden yeniden dagitir; bu, havuzdan
+ * derlenen taze bir kagit icin dogru ama KAYITLI bir sinav icin yanlistir.
+ * O sinavin puanlari `exam_questions` tablosunda zaten belli ve ogrencinin
+ * ekraninda gordugu puanla basilan kagittaki puan AYNI olmak zorunda -
+ * aksi halde ayni sinavin iki farkli puan cetveli dolasima girer.
+ */
+export function withNumbers(
+  questions: readonly (Question & { points: number })[],
+): NumberedQuestion[] {
+  return questions.map((question, index) => ({
+    ...question,
+    number: index + 1,
+    points: question.points,
+  }));
+}

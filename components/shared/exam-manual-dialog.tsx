@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { UNASSIGNED_SUBJECT } from "@/lib/question-pool";
 import type { Question } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -141,13 +142,21 @@ export function ExamManualDialog({
           )
         : undefined;
 
+    /*
+      "Ders atanmamis" bir ders ADI DEGIL, dersi girilmemis sorularin
+      toplandigi yer tutucudur (bkz. lib/question-pool.ts). Yer tutucu
+      kaydedilseydi ders YETKI sisteminde var olmayan bir ders gibi
+      davranmaya baslardi.
+    */
+    const gecerliDers = ders.trim() === UNASSIGNED_SUBJECT ? "" : ders.trim();
+
     setPending(true);
 
     try {
       const result = await createExamWithQuestions({
         title: baslik,
         description: "Soru havuzundan seçilerek hazırlandı.",
-        ...(ders.trim() ? { subject: ders.trim() } : {}),
+        ...(gecerliDers ? { subject: gecerliDers } : {}),
         ...(Number.isFinite(dakika) ? { durationMinutes: dakika } : {}),
         proctored: kamera,
         questionIds: questions.map((question) => question.id),

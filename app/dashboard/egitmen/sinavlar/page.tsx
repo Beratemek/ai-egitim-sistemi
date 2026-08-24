@@ -38,7 +38,7 @@ export default async function SinavlarPage() {
   return (
     <>
       <PageHeader
-        title="Sinavlar"
+        title="Sınavlar"
         description="Havuzdaki onaylı sorulardan sınav seti oluşturun ve yayına alın."
         actions={
           <div className="flex items-center gap-2">
@@ -57,7 +57,7 @@ export default async function SinavlarPage() {
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center justify-center gap-2 py-16 text-center">
             <Library className="h-8 w-8 text-muted-foreground/50" />
-            <p className="font-medium">Henuz sinav olusturulmadi</p>
+            <p className="font-medium">Henüz sınav oluşturulmadı</p>
             <p className="max-w-sm text-sm text-muted-foreground">
               &ldquo;Yeni sınav&rdquo; ile başlayın; ardından soru havuzundan onaylı
               soruları seçerek sınav setini kurun.
@@ -77,7 +77,7 @@ export default async function SinavlarPage() {
                   <div className="flex items-start justify-between gap-2">
                     <CardTitle className="leading-snug">{exam.title}</CardTitle>
                     <Badge variant={exam.is_published ? "success" : "soft"}>
-                      {exam.is_published ? "Yayinda" : "Taslak"}
+                      {exam.is_published ? "Yayında" : "Taslak"}
                     </Badge>
                   </div>
                   {exam.description ? (
@@ -110,11 +110,16 @@ export default async function SinavlarPage() {
                   </div>
 
                   <div className="flex items-center justify-between gap-2">
+                    {/*
+                      Once yalnizca baslangic yaziliyordu; tarih verilmemis
+                      sinavlar da "Tarih belirlenmedi" diyordu ve bu bir
+                      EKSIKLIK gibi okunuyordu. Oysa tarihsiz sinav gecerli
+                      bir durum: yayinda oldugu surece acik kalir. Artik
+                      pencerenin iki ucu birden ve dogru ifadeyle yaziliyor.
+                    */}
                     <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <CalendarClock className="h-3.5 w-3.5" />
-                      {exam.starts_at
-                        ? formatDateTime(exam.starts_at)
-                        : "Tarih belirlenmedi"}
+                      <CalendarClock className="h-3.5 w-3.5 shrink-0" />
+                      {examWindowLabel(exam.starts_at, exam.ends_at)}
                     </span>
                     <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
                   </div>
@@ -126,4 +131,19 @@ export default async function SinavlarPage() {
       )}
     </>
   );
+}
+
+/**
+ * Sinav penceresini tek satirda anlatir.
+ *
+ * Tarihsiz sinav bir eksiklik DEGIL: yayinda oldugu surece acik kalir.
+ * "Tarih belirlenmedi" ifadesi bunu bir bosluk gibi gosteriyordu.
+ */
+function examWindowLabel(startsAt: string | null, endsAt: string | null): string {
+  if (!startsAt && !endsAt) return "Tarih sınırı yok";
+  if (startsAt && endsAt) {
+    return `${formatDateTime(startsAt)} → ${formatDateTime(endsAt)}`;
+  }
+  if (startsAt) return `${formatDateTime(startsAt)} sonrası`;
+  return `${formatDateTime(endsAt)} öncesi`;
 }

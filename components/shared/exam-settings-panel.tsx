@@ -4,6 +4,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import {
   BookMarked,
+  CalendarClock,
   Camera,
   Check,
   Clock3,
@@ -50,6 +51,10 @@ export interface ExamSettingsPanelProps {
   subject: string | null;
   durationMinutes: number | null;
   proctored: boolean;
+  /** Sinavin acildigi an (ISO) - null ise yayina alinir alinmaz acilir. */
+  startsAt?: string | null;
+  /** Sinavin kapandigi an (ISO) - null ise kendiliginden kapanmaz. */
+  endsAt?: string | null;
   /** Secilebilir ders adlari; soru havuzundan turetilir. */
   subjectOptions?: readonly string[];
   /** Sinavdaki toplam puan; sure alaninin yaninda ozet olarak gosterilir. */
@@ -60,11 +65,16 @@ export interface ExamSettingsPanelProps {
   canPersist?: boolean;
 }
 
+/** Bos pencere degeri; iki ucun de "yok" halini tek yerden anlatir. */
+const BOS_PENCERE = { baslangic: "", bitis: "" } as const;
+
 export function ExamSettingsPanel({
   examId,
   subject,
   durationMinutes,
   proctored,
+  startsAt = null,
+  endsAt = null,
   subjectOptions = [],
   totalPoints = 0,
   questionCount = 0,
@@ -80,15 +90,41 @@ export function ExamSettingsPanel({
   const [ders, setDers] = React.useState(subject ?? "");
   const [pending, setPending] = React.useState<string | null>(null);
 
+  /*
+    Tarih alanlari `datetime-local` ve degerleri YEREL saattir. Baslangic
+    degerini dogrudan `useState` icinde hesaplamak sunucu ile tarayicinin
+    saat dilimi ayrildiginda hydration uyusmazligi uretirdi; bu yuzden
+    ikisi de bos dogar ve ilk cizimden SONRA, tarayicida doldurulur.
+
+    `temel`, kaydedilmis halin ayni bicime cevrilmisidir: "degisti mi?"
+    karsilastirmasi ham ISO ile degil bu kopya ile yapiliyor.
+  */
+  const [pencere, setPencere] = React.useState<{ baslangic: string; bitis: string }>(
+    BOS_PENCERE,
+  );
+  const [temel, setTemel] = React.useState<{ baslangic: string; bitis: string }>(
+    BOS_PENCERE,
+  );
+
   React.useEffect(() => setKamera(proctored), [proctored]);
   React.useEffect(
     () => setSure(durationMinutes === null ? "" : String(durationMinutes)),
     [durationMinutes],
   );
   React.useEffect(() => setDers(subject ?? ""), [subject]);
+  React.useEffect(() => {
+    const next = {
+      baslangic: isoToLocalInput(startsAt),
+      bitis: isoToLocalInput(endsAt),
+    };
+    setPencere(next);
+    setTemel(next);
+  }, [startsAt, endsAt]);
 
   const sureDirty = sure.trim() !== (durationMinutes === null ? "" : String(durationMinutes));
   const dersDirty = ders.trim() !== (subject ?? "");
+  const pencereDirty =
+    pencere.baslangic !== temel.baslangic || pencere.bitis !== temel.bitis;
 
   function demoUyarisi() {
     toast.error("Tanıtım modunda kayıt yapılmaz");
@@ -168,6 +204,54 @@ export function ExamSettingsPanel({
       router.refresh();
     } catch (caught) {
       toast.error("Puanlar dağıtılamadı", {
+        description: caught instanceof Error ? caught.message : "Tekrar deneyin.",
+      });
+    } finally {
+      setPending(null);
+    }
+  }
+
+  async function pencereyiKaydet() {
+    if (!canPersist) return demoUyarisi();
+
+    const baslangic = localInputToIso(pencere.baslangic);
+    const bitis = localInputToIso(pencere.bitis);
+
+    if (baslangic === undefined || bitis === undefined) {
+      toast.error("Tarih okunamadı", { description: "Alanları yeniden doldurun." });
+      return;
+    }
+
+    // Sunucu da ayni kurali uyguluyor; buradaki kontrol yalnizca gereksiz
+    // gidis-donusu kesip hatayi aninda gostermek icin.
+    if (baslangic && bitis && bitis <= baslangic) {
+      toast.error("Bitiş, başlangıçtan sonra olmalı");
+      return;
+    }
+
+    setPending("pencere");
+
+    try {
+      const result = await updateExamSettings(examId, {
+        startsAt: baslangic,
+        endsAt: bitis,
+      });
+      if (!result.ok) throw new Error(result.error);
+
+      toast.success(
+        result.data.startsAt || result.data.endsAt
+          ? "Sınav penceresi kaydedildi"
+          : "Sınav penceresi kaldırıldı",
+        {
+          description:
+            result.data.startsAt || result.data.endsAt
+              ? undefined
+              : "Sınav, yayına alındığı sürece açık kalır.",
+        },
+      );
+      router.refresh();
+    } catch (caught) {
+      toast.error("Tarihler kaydedilemedi", {
         description: caught instanceof Error ? caught.message : "Tekrar deneyin.",
       });
     } finally {
@@ -293,6 +377,87 @@ export function ExamSettingsPanel({
           </div>
         </div>
 
+        {/* ---------- Sinav penceresi ---------- */}
+        <div className="space-y-2 rounded-lg border p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="flex items-center gap-1.5 text-sm font-medium">
+              <CalendarClock className="h-3.5 w-3.5 text-muted-foreground" />
+              Sınav penceresi
+            </span>
+
+            <div className="flex items-center gap-1.5">
+              {pencere.baslangic || pencere.bitis ? (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-8 text-xs text-muted-foreground"
+                  disabled={pending !== null}
+                  onClick={() => setPencere({ baslangic: "", bitis: "" })}
+                >
+                  Temizle
+                </Button>
+              ) : null}
+
+              <KaydetDugmesi
+                dirty={pencereDirty}
+                busy={pending === "pencere"}
+                disabled={pending !== null}
+                onClick={() => void pencereyiKaydet()}
+                label="Sınav penceresini kaydet"
+              />
+            </div>
+          </div>
+
+          {/*
+            Iki alan dar ekranda ALT ALTA: `datetime-local` denetiminin kendi
+            asgari genisligi var (tarih + saat + takvim ikonu), yan yana
+            sikistirildiginda ikon kutunun disina tasiyor.
+          */}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="ayar-baslangic" className="text-xs text-muted-foreground">
+                Başlangıç
+              </Label>
+              <Input
+                id="ayar-baslangic"
+                type="datetime-local"
+                value={pencere.baslangic}
+                disabled={pending !== null}
+                onChange={(event) =>
+                  setPencere((current) => ({
+                    ...current,
+                    baslangic: event.target.value,
+                  }))
+                }
+                className="w-full"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="ayar-bitis" className="text-xs text-muted-foreground">
+                Bitiş
+              </Label>
+              <Input
+                id="ayar-bitis"
+                type="datetime-local"
+                value={pencere.bitis}
+                disabled={pending !== null}
+                min={pencere.baslangic || undefined}
+                onChange={(event) =>
+                  setPencere((current) => ({ ...current, bitis: event.target.value }))
+                }
+                className="w-full"
+              />
+            </div>
+          </div>
+
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            {!startsAt && !endsAt
+              ? "Tarih verilmedi: sınav, yayında olduğu sürece açık kalır."
+              : "Süre alanından farklıdır: pencere sınavın AÇIK OLDUĞU aralık, süre ise her öğrenciye başladığı andan itibaren tanınan zamandır. Hangisi önce biterse o bağlar."}
+          </p>
+        </div>
+
         {/* ---------- Kamera ---------- */}
         <label
           htmlFor="ayar-kamera"
@@ -413,4 +578,36 @@ function KaydetDugmesi({
       )}
     </Button>
   );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Tarih donusumleri                                                         */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * ISO an -> `datetime-local` girdisinin bekledigi YEREL "yyyy-aa-ggTss:dd".
+ *
+ * `toISOString()` her zaman UTC verir; girdi ise yerel saat bekler. Aradaki
+ * farki once dilim kaymasi kadar geri alarak kapatiyoruz - aksi halde
+ * Turkiye'de kurulan 14:00'lik bir sinav kutuda 11:00 gorunurdu.
+ *
+ * YALNIZCA tarayicida cagrilmali: sunucunun dilimi baska olabilir.
+ */
+function isoToLocalInput(iso: string | null): string {
+  if (!iso) return "";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 16);
+}
+
+/**
+ * `datetime-local` degeri -> ISO an. Bos alan `null` (pencere ucu yok)
+ * demektir; okunamayan deger `undefined` doner ve cagiran kaydetmeyi keser.
+ */
+function localInputToIso(value: string): string | null | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const date = new Date(trimmed);
+  return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
 }

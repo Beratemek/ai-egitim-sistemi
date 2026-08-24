@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import {
   CalendarClock,
+  ClipboardCheck,
   ClipboardList,
   FileCheck2,
   Layers,
@@ -9,28 +10,25 @@ import {
 } from "lucide-react";
 
 import { AiMockNotice } from "@/components/shared/ai-mock-notice";
+import { ExamStatusAlerts } from "@/components/shared/exam-status-alerts";
 import { PageHeader } from "@/components/shared/page-header";
 import { OutcomeAnalysis } from "@/components/shared/outcome-analysis";
 import { PendingByClassroom } from "@/components/shared/pending-by-classroom";
+import { QuickActions } from "@/components/shared/quick-actions";
 import { StatCard } from "@/components/shared/stat-card";
-import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { serverEnv } from "@/lib/env";
+import { buildExamAlerts } from "@/lib/exam-alerts";
+import { isSupabaseConfigured, serverEnv } from "@/lib/env";
 import {
   getClassroomExamReviews,
-  getExams,
+  getExamSummaries,
   getOutcomeAnalysis,
   getQuestions,
   getSubmissions,
 } from "@/lib/queries";
-import { cn, formatDateTime } from "@/lib/utils";
+import { grantedRoles } from "@/lib/roles";
+import { getCurrentUser } from "@/lib/supabase-server";
+import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Eğitmen" };
 
@@ -38,7 +36,7 @@ export default async function EgitmenPage() {
   const [questions, exams, submissions, classroomReviews, outcomeAnalysis] =
     await Promise.all([
       getQuestions(),
-      getExams(),
+      getExamSummaries(),
       getSubmissions(),
       getClassroomExamReviews(),
       getOutcomeAnalysis(),
@@ -52,29 +50,99 @@ export default async function EgitmenPage() {
     (submission) => submission.status === "ai_degerlendirildi",
   );
 
+  /*
+    Sinav basina atanmis ogrenci sayisi.
+
+    Ayri bir sorgu ACILMIYOR: `getClassroomExamReviews` zaten atamalardan
+    turetiliyor ve bu sayfa onu her halukarda okuyor. Atamasi olmayan sinav
+    hic satir uretmedigi icin haritada bulunmamasi "0 ogrenci" demektir -
+    uyari mantiginin aradigi bilgi tam olarak budur.
+  */
+  const assignedByExam = new Map<string, number>();
+  for (const review of classroomReviews) {
+    assignedByExam.set(
+      review.exam.id,
+      (assignedByExam.get(review.exam.id) ?? 0) + review.assignedCount,
+    );
+  }
+
+  /*
+    "Simdi" TEK BIR AN olarak sabitlenir. Satir satir `Date.now()` cagirmak
+    ayni listedeki sinavlari birbirinden milisaniyeler farkli anlara gore
+    degerlendirmek olurdu.
+  */
+  const alerts = buildExamAlerts(
+    exams.map((exam) => ({
+      id: exam.id,
+      title: exam.title,
+      is_published: exam.is_published,
+      ends_at: exam.ends_at,
+      questionCount: exam.questionCount,
+      assignedCount: assignedByExam.get(exam.id) ?? 0,
+    })),
+    Date.now(),
+  );
+
+  const pendingReviewCount = classroomReviews.reduce(
+    (sum, review) => sum + review.pendingCount,
+    0,
+  );
+
+  /*
+    KAZANIM PANELINDEKI "soru uret" BAGLANTISI.
+
+    Baglanti icerik uzmaninin ekranina gidiyor ve o ekran ROLE BAGLI:
+    middleware, `icerik_uzmani` rolu olmayan kisiyi kendi paneline geri
+    atiyor. Kosulsuz gosterildiginde tiklayan egitmen hicbir aciklama
+    almadan ayni sayfaya donuyordu - calisan degil, SESSIZCE OLU bir dugme.
+    Artik yalnizca o role gercekten sahip olana gosteriliyor.
+  */
+  const current = isSupabaseConfigured ? await getCurrentUser() : null;
+  const canGenerateQuestions = current
+    ? grantedRoles(current.profile).includes("icerik_uzmani")
+    : false;
+
   return (
     <>
       <PageHeader
         title="Genel Bakış"
         description="Havuzdan sınav oluşturun, öğrenci cevaplarının puanlarını onaylayın."
         actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <Link
-              href="/dashboard/egitmen/soru-havuzu"
-              className={cn(buttonVariants({ variant: "outline" }), "gap-2")}
-            >
-              <Library className="h-4 w-4" />
-              Soru havuzu
-            </Link>
-            <Link
-              href="/dashboard/egitmen/sinavlar"
-              className={cn(buttonVariants(), "gap-2")}
-            >
-              <ClipboardList className="h-4 w-4" />
-              Sınavlar
-            </Link>
-          </div>
+          <Link
+            href="/dashboard/egitmen/sinavlar"
+            className={cn(buttonVariants({ variant: "outline" }), "gap-2")}
+          >
+            <ClipboardList className="h-4 w-4" />
+            Tüm sınavlar
+          </Link>
         }
+      />
+
+      <QuickActions
+        actions={[
+          {
+            href: "/dashboard/egitmen/kontrol",
+            label: "Sınav kontrolü",
+            description: "Sınıf bazlı bütün değerlendirme, toplu puan onayı",
+            icon: ClipboardCheck,
+            count: pendingReviewCount,
+            emphasis: true,
+          },
+          {
+            href: "/dashboard/egitmen/soru-havuzu",
+            label: "Soru havuzu",
+            description: "Ders ve konuya göre gezin, seçtiklerinden sınav kurun",
+            icon: Library,
+            count: approved.length,
+          },
+          {
+            href: "/dashboard/egitmen/sinavlar",
+            label: "Sınavlar",
+            description: "Yeni sınav oluşturun, yayına alın, kâğıdını yazdırın",
+            icon: ClipboardList,
+            count: exams.length,
+          },
+        ]}
       />
 
       <div className="grid grid-cols-2 gap-2.5 sm:gap-4 xl:grid-cols-4">
@@ -92,7 +160,12 @@ export default async function EgitmenPage() {
           icon={Layers}
           accent="primary"
         />
-        <StatCard label="Sınav" value={exams.length} icon={CalendarClock} />
+        <StatCard
+          label="Sınav"
+          value={exams.length}
+          hint={`${exams.filter((exam) => exam.is_published).length} tanesi yayında`}
+          icon={CalendarClock}
+        />
         <StatCard
           label="Puan onayı bekleyen"
           value={pendingSubmissions.length}
@@ -107,44 +180,32 @@ export default async function EgitmenPage() {
       <PendingByClassroom reviews={classroomReviews} />
 
       {/*
+        SINAV DURUMU.
+        Sayilar bir sinavin YAYINDA OLUP kimseye atanmadigini soylemiyordu;
+        oyle bir sinav kimse fark etmeden orada duruyordu. Bu panel sayiyi
+        degil yapilacak isi gosterir.
+
+        Buranin oncesinde "Sinavlarim" diye bir kart vardi: /sinavlar
+        sayfasinin daha az bilgi tasiyan, üstelik TIKLANAMAYAN bir kopyasi.
+        Ayni listeyi iki yerde tutmak yerine ust basliktaki "Tüm sınavlar"
+        baglantisi birakildi.
+      */}
+      <ExamStatusAlerts alerts={alerts} />
+
+      {/*
         SINIFIN OGRENME DURUMU.
         Sartnamenin 2. slaydi "egitmen sinifin ogrenme durumunu tek ekrandan
         gorur" diyor. Sinav ortalamasi bunu vermiyordu: "%61" hangi parcanin
         zayif oldugunu soylemiyor.
 
         En zayif 5 kazanim gosteriliyor - panel bir ozet ekrani, tam liste
-        yonetici raporunda. Her satirda "tekrar sorusu uret" baglantisi var:
-        analiz -> uretim -> olcme -> analiz dongusu boylece kapaniyor.
+        yonetici raporunda.
       */}
-      <OutcomeAnalysis rows={outcomeAnalysis} canGenerate limit={5} />
-
-      {/* ---------- Sınavlar ---------- */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Sınavlarım</CardTitle>
-          <CardDescription>Oluşturduğunuz sınavlar ve yayın durumları.</CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-3 sm:grid-cols-2">
-          {exams.map((exam) => (
-            <div
-              key={exam.id}
-              className="flex flex-col gap-2 rounded-xl border p-4 transition-colors hover:border-primary/40"
-            >
-              <div className="flex items-start justify-between gap-2">
-                <p className="font-medium leading-snug">{exam.title}</p>
-                <Badge variant={exam.is_published ? "success" : "soft"}>
-                  {exam.is_published ? "Yayinda" : "Taslak"}
-                </Badge>
-              </div>
-              <p className="text-sm text-muted-foreground">{exam.description}</p>
-              <p className="mt-auto flex items-center gap-1.5 pt-2 text-xs text-muted-foreground">
-                <CalendarClock className="h-3.5 w-3.5" />
-                {exam.starts_at ? formatDateTime(exam.starts_at) : "Tarih belirlenmedi"}
-              </p>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
+      <OutcomeAnalysis
+        rows={outcomeAnalysis}
+        canGenerate={canGenerateQuestions}
+        limit={5}
+      />
     </>
   );
 }

@@ -2,25 +2,15 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import {
-  Check,
-  EyeOff,
-  Loader2,
-  Plus,
-  Search,
-  Send,
-  Trash2,
-} from "lucide-react";
+import { Check, Loader2, Plus, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import {
   addExamQuestions,
   removeExamQuestion,
   setExamQuestionPoints,
-  setExamPublished,
 } from "@/app/actions/exams";
 import { QuestionTypeBadge } from "@/components/shared/status-badge";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -50,10 +40,16 @@ export interface ExamBuilderProps {
 }
 
 /**
- * Sınav kurma ekrani: havuzdan soru ekle/çıkar ve sınavı yayına al.
+ * Sınav kurma ekrani: havuzdan soru ekle / çıkar, soru puanlarini ayarla.
  *
  * Yalnızca Onaylı sorular eklenebilir; taslak veya reddedilmis soru sınava
  * girmemeli ("onaylanan sorular havuza alınır; seçilerek sınav seti oluşturulur").
+ *
+ * YAYINA ALMA BURADA DEGIL: eskiden bu bilesenin en ustunde duruyordu ve
+ * sinav detay sayfasinda ayarlarin, sinif atamasinin ardindan uc dev panelin
+ * ortasina gomuluyordu - egitmen sinavin birincil eylemine ulasmak icin
+ * kaydirmak zorundaydi. Artik sayfanin tepesindeki yapiskan durum seridinde
+ * ve hangi sekmede olursa olsun gorunur (bkz. exam-detail-tabs.tsx).
  */
 export function ExamBuilder({
   exam,
@@ -126,65 +122,8 @@ export function ExamBuilder({
     router.refresh();
   }
 
-  async function handlePublish(next: boolean) {
-    setPendingAction("publish");
-    const result = await setExamPublished(exam.id, next);
-    setPendingAction(null);
-
-    if (!result.ok) {
-      toast.error(next ? "Yayına alınamadı" : "Yayından çıkarılamadı", {
-        description: result.error,
-      });
-      return;
-    }
-
-    toast.success(next ? "Sınav yayında" : "Sınav yayından çıkarıldı", {
-      description: next
-        ? "Öğrenciler artık bu sınava girebilir."
-        : "Öğrenciler bu sınavı artık görmeyecek.",
-    });
-    router.refresh();
-  }
-
   return (
     <div className="space-y-6">
-      {/* ---------- Yayın durumu ---------- */}
-      <Card>
-        <CardContent className="flex flex-wrap items-center justify-between gap-4 p-5">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <Badge variant={exam.is_published ? "success" : "soft"}>
-                {exam.is_published ? "Yayinda" : "Taslak"}
-              </Badge>
-              <span className="text-sm text-muted-foreground">
-                {examQuestions.length} soru
-              </span>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              {exam.is_published
-                ? "Öğrenciler bu sınava girebiliyor."
-                : "Yayına almadan öğrenciler bu sınavı görmez."}
-            </p>
-          </div>
-
-          <Button
-            variant={exam.is_published ? "outline" : "default"}
-            className="gap-2"
-            disabled={pendingAction === "publish"}
-            onClick={() => void handlePublish(!exam.is_published)}
-          >
-            {pendingAction === "publish" ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : exam.is_published ? (
-              <EyeOff className="h-4 w-4" />
-            ) : (
-              <Send className="h-4 w-4" />
-            )}
-            {exam.is_published ? "Yayından çıkar" : "Yayına al"}
-          </Button>
-        </CardContent>
-      </Card>
-
       {/* ---------- Sınavdaki sorular ---------- */}
       <Card>
         <CardHeader>
@@ -192,7 +131,7 @@ export function ExamBuilder({
           <CardDescription>
             {examQuestions.length === 0
               ? "Henüz soru eklenmedi. Aşağıdaki havuzdan seçim yapın."
-              : `Öğrenciye bu sirayla gösterilir. ${examQuestions.length} soru · toplam ${examQuestions.reduce((sum, q) => sum + q.points, 0)} puan.`}
+              : `Öğrenciye bu sırayla gösterilir. ${examQuestions.length} soru · toplam ${examQuestions.reduce((sum, q) => sum + q.points, 0)} puan.`}
           </CardDescription>
         </CardHeader>
 
@@ -255,8 +194,8 @@ export function ExamBuilder({
 
           {hasSubmissions && examQuestions.length > 0 ? (
             <p className="rounded-lg bg-warning/10 px-3 py-2 text-xs text-warning">
-              Bu sınava cevap verilmis. Soru cikarmak verilen cevapları silmez ama
-              istatistikleri degistirir.
+              Bu sınava cevap verilmiş. Soru çıkarmak verilen cevapları silmez ama
+              istatistikleri değiştirir.
             </p>
           ) : null}
         </CardContent>

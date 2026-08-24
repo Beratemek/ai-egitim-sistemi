@@ -40,6 +40,7 @@ import {
   countTopicsByType,
   formatTypeCounts,
   groupBySubject,
+  UNASSIGNED_SUBJECT,
   type SubjectGroup,
   type TopicGroup,
 } from "@/lib/question-pool";
@@ -130,6 +131,24 @@ export function QuestionPoolBrowser({
         : (openSubject.topics.find((group) => group.topic === activeTopic) ?? null),
     [openSubject, activeTopic],
   );
+
+  /**
+   * GERCEK ders adlari: "Ders atanmamis" yer tutucusu disarida.
+   * Sinav kurma pencerelerine yalnizca bunlar gecer - gerekcesi asagida,
+   * pencerelerin cizildigi yerde.
+   */
+  const realSubjectNames = React.useMemo(
+    () =>
+      allSubjects
+        .map((group) => group.subject)
+        .filter((subject) => subject !== UNASSIGNED_SUBJECT),
+    [allSubjects],
+  );
+
+  const realDefaultSubject =
+    openSubject && openSubject.subject !== UNASSIGNED_SUBJECT
+      ? openSubject.subject
+      : null;
 
   /* ------------------------------ gezinme -------------------------------- */
 
@@ -263,12 +282,19 @@ export function QuestionPoolBrowser({
         onClear={() => setSelectedIds(new Set())}
       />
 
+      {/*
+        "Ders atanmamis" kutusu havuzda GEZINMEK icin var - dersi girilmemis
+        sorular kaybolmasin diye. Bir ders ADI degildir, bu yuzden sinav
+        kurma pencerelerine ne secenek ne de on secim olarak gecer; oldugu
+        gibi kaydedilseydi sinavin gercek dersi olur ve ders yetki
+        sisteminde var olmayan bir ders gibi davranirdi.
+      */}
       <ExamManualDialog
         open={manualOpen}
         onOpenChange={setManualOpen}
         questions={selectedQuestions}
-        subjectOptions={allSubjects.map((group) => group.subject)}
-        defaultSubject={openSubject?.subject ?? null}
+        subjectOptions={realSubjectNames}
+        defaultSubject={realDefaultSubject}
         canPersist={canPersist}
         onCreated={() => setSelectedIds(new Set())}
       />
@@ -278,7 +304,8 @@ export function QuestionPoolBrowser({
         onOpenChange={setComposeOpen}
         subjects={allSubjects}
         selectedIds={[...selectedIds]}
-        defaultSubject={openSubject?.subject ?? null}
+        defaultSubject={realDefaultSubject}
+        canPersist={canPersist}
         onCreated={() => setSelectedIds(new Set())}
       />
     </div>

@@ -319,6 +319,17 @@ export interface ExamSettingsInput {
   durationMinutes?: number | null;
   /** Kamera+mikrofon zorunlulugu. */
   proctored?: boolean;
+  /** Sinavin acildigi an (ISO). null: sinav yayina alindigi anda acilir. */
+  startsAt?: string | null;
+  /** Sinavin kapandigi an (ISO). null: kendiliginden kapanmaz. */
+  endsAt?: string | null;
+}
+
+/** ISO tarih dizesini dogrular; gecersizse null yerine undefined doner. */
+function parseIsoOrNull(value: string | null): string | null | undefined {
+  if (value === null) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
 }
 
 /**
@@ -332,11 +343,20 @@ export interface ExamSettingsInput {
 export async function updateExamSettings(
   examId: string,
   input: ExamSettingsInput,
-): Promise<ActionResult<{ durationMinutes: number | null; proctored: boolean }>> {
+): Promise<
+  ActionResult<{
+    durationMinutes: number | null;
+    proctored: boolean;
+    startsAt: string | null;
+    endsAt: string | null;
+  }>
+> {
   if (!isSupabaseConfigured) return demoGuard();
   if (!examId) return { ok: false, error: "Sinav secilmedi." };
 
-  const patch: Partial<Pick<Exam, "duration_minutes" | "proctored">> = {};
+  const patch: Partial<
+    Pick<Exam, "duration_minutes" | "proctored" | "starts_at" | "ends_at">
+  > = {};
 
   if (input.durationMinutes !== undefined) {
     const dakika = input.durationMinutes;
@@ -351,11 +371,45 @@ export async function updateExamSettings(
 
   if (input.proctored !== undefined) patch.proctored = input.proctored;
 
+  if (input.startsAt !== undefined) {
+    const parsed = parseIsoOrNull(input.startsAt);
+    if (parsed === undefined) return { ok: false, error: "Baslangic tarihi gecersiz." };
+    patch.starts_at = parsed;
+  }
+
+  if (input.endsAt !== undefined) {
+    const parsed = parseIsoOrNull(input.endsAt);
+    if (parsed === undefined) return { ok: false, error: "Bitis tarihi gecersiz." };
+    patch.ends_at = parsed;
+  }
+
   if (Object.keys(patch).length === 0) {
     return { ok: false, error: "Degistirilecek ayar verilmedi." };
   }
 
   const supabase = await createServerSupabaseClient();
+
+  /*
+    Pencere kismi guncellenebildigi icin (yalnizca bitis degistirilebilir)
+    "bitis > baslangic" kurali YAZILACAK degerle degil, YAZILDIKTAN SONRAKI
+    degerle sinanmali. Dokunulmayan ucu veritabanindan okuyoruz; aksi halde
+    yalnizca bitisi geri ceken bir duzenleme sessizce ters pencere birakirdi.
+  */
+  if (patch.starts_at !== undefined || patch.ends_at !== undefined) {
+    const { data: mevcut } = await supabase
+      .from("exams")
+      .select("starts_at, ends_at")
+      .eq("id", examId)
+      .maybeSingle();
+
+    const baslangic =
+      patch.starts_at !== undefined ? patch.starts_at : (mevcut?.starts_at ?? null);
+    const bitis = patch.ends_at !== undefined ? patch.ends_at : (mevcut?.ends_at ?? null);
+
+    if (baslangic && bitis && bitis <= baslangic) {
+      return { ok: false, error: "Bitis tarihi baslangictan sonra olmalidir." };
+    }
+  }
 
   // `.select()` sart: RLS eslesmezse PostgREST hata dondurmez, sessizce
   // 0 satir gunceller ve egitmen "kaydedildi" sanir.
@@ -363,7 +417,7 @@ export async function updateExamSettings(
     .from("exams")
     .update(patch)
     .eq("id", examId)
-    .select("id, duration_minutes, proctored");
+    .select("id, duration_minutes, proctored, starts_at, ends_at");
 
   if (error) return { ok: false, error: error.message };
 
@@ -383,6 +437,8 @@ export async function updateExamSettings(
     data: {
       durationMinutes: updated[0]?.duration_minutes ?? null,
       proctored: updated[0]?.proctored ?? false,
+      startsAt: updated[0]?.starts_at ?? null,
+      endsAt: updated[0]?.ends_at ?? null,
     },
   };
 }

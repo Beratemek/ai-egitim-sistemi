@@ -6,6 +6,10 @@ import { ArrowRight, Check, Loader2, Sparkles, TriangleAlert } from "lucide-reac
 import { toast } from "sonner";
 
 import { approveSubmission } from "@/app/actions/submissions";
+import {
+  QuestionBody,
+  StudentAnswerBlock,
+} from "@/components/shared/question-body";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -21,14 +25,21 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
-import type { Submission } from "@/lib/types";
+import type { Question, Submission } from "@/lib/types";
 
 export interface SubmissionReviewDialogProps {
   submission: Submission;
   /** Öğrenci adi - baslikta gösterilir. */
   studentName: string;
-  /** Cevabın ait oldugu soru metni; elde yoksa gecilebilir. */
-  questionText?: string;
+  /**
+   * Cevabın ait oldugu SORU - metni, gorseli ve siklariyla.
+   *
+   * Onceden yalnizca `questionText` aliniyordu; coktan secmeli bir soruda
+   * bu, egitmene "ogrenci A dedi" deyip A'nin ne oldugunu gostermemek
+   * demekti. Puani belirleyecek olan ekranda eksik olmamasi gereken tam da
+   * bu bilgiydi. Soru bulunamiyorsa (havuzdan silinmis olabilir) null.
+   */
+  question?: Question | null;
   canPersist?: boolean;
 }
 
@@ -42,12 +53,13 @@ export interface SubmissionReviewDialogProps {
 export function SubmissionReviewDialog({
   submission,
   studentName,
-  questionText,
+  question = null,
   canPersist = true,
 }: SubmissionReviewDialogProps) {
   const router = useRouter();
 
   const aiScore = submission.ai_score;
+  const isTest = question?.type === "test";
 
   const [open, setOpen] = React.useState(false);
 
@@ -123,7 +135,7 @@ export function SubmissionReviewDialog({
         </Button>
       </DialogTrigger>
 
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>Puanı onayla</DialogTitle>
           <DialogDescription>
@@ -133,23 +145,22 @@ export function SubmissionReviewDialog({
         </DialogHeader>
 
         <div className="space-y-4">
-          {questionText ? (
-            <div className="space-y-1">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Soru
-              </p>
-              <p className="text-sm leading-relaxed">{questionText}</p>
-            </div>
+          {question ? (
+            <QuestionBody
+              question={question}
+              topic={question.topic}
+              studentAnswer={isTest ? submission.answer_text : null}
+              revealAnswer
+              showRubric
+              className="rounded-xl border bg-muted/20 p-3"
+            />
           ) : null}
 
-          <div className="space-y-1">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Öğrencinin cevabı
-            </p>
-            <p className="max-h-40 overflow-y-auto whitespace-pre-wrap rounded-lg border bg-muted/30 p-3 text-sm leading-relaxed">
-              {submission.answer_text}
-            </p>
-          </div>
+          {/* Test sorusunda secim zaten sikkin uzerinde isaretli; ayrica
+              "A" yazan bir kutu tekrar olurdu. */}
+          {isTest ? null : (
+            <StudentAnswerBlock answerText={submission.answer_text} />
+          )}
 
           {aiScore !== null ? (
             <div className="space-y-2 rounded-lg border bg-muted/40 p-3">

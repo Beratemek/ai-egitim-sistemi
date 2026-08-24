@@ -37,6 +37,7 @@ import {
   countByType,
   countTopicsByType,
   pickBalancedByType,
+  UNASSIGNED_SUBJECT,
   type SubjectGroup,
 } from "@/lib/question-pool";
 import { cn } from "@/lib/utils";
@@ -184,6 +185,15 @@ export function ExamComposeDialog({
 
     const dakika = Number.parseInt(sure.trim(), 10);
 
+    /*
+      "Ders atanmamis" bir ders ADI DEGIL, dersi girilmemis sorularin
+      toplandigi yer tutucudur (bkz. lib/question-pool.ts). Oldugu gibi
+      gonderilseydi sinavin gercek dersi olarak kaydedilir, oradan
+      `getSubjectOptions` uzerinden ders listesine sizip ders YETKI
+      sisteminde var olmayan bir ders gibi davranmaya baslardi.
+    */
+    const gecerliDers = ders === UNASSIGNED_SUBJECT ? "" : ders;
+
     setPending(true);
 
     try {
@@ -192,8 +202,10 @@ export function ExamComposeDialog({
         description:
           kaynak === "secili"
             ? "Soru havuzundan seçilerek hazırlandı."
-            : `${ders} dersinden hazırlandı.`,
-        ...(kaynak === "otomatik" && ders ? { subject: ders } : {}),
+            : gecerliDers
+              ? `${gecerliDers} dersinden hazırlandı.`
+              : "Soru havuzundan hazırlandı.",
+        ...(kaynak === "otomatik" && gecerliDers ? { subject: gecerliDers } : {}),
         ...(Number.isFinite(dakika) ? { durationMinutes: dakika } : {}),
         questionIds: ids,
       });
