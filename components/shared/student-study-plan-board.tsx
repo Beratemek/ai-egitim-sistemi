@@ -13,6 +13,7 @@ import {
   Trash2,
 } from "lucide-react";
 
+import { StatCard } from "@/components/shared/stat-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -187,9 +188,24 @@ export function StudentStudyPlanBoard() {
   return (
     <div className="space-y-5">
       <div className="grid gap-4 sm:grid-cols-3">
-        <SummaryCard label="Plandaki çalışma" value={items.length} icon={ListTodo} />
-        <SummaryCard label="Üzerinde çalışılan" value={inProgressCount} icon={Clock3} />
-        <SummaryCard label="Tamamlanan" value={completedCount} icon={BookOpenCheck} />
+        <StatCard
+          label="Plandaki çalışma"
+          value={items.length}
+          icon={ListTodo}
+          accent="cat1"
+        />
+        <StatCard
+          label="Üzerinde çalışılan"
+          value={inProgressCount}
+          icon={Clock3}
+          accent="cat2"
+        />
+        <StatCard
+          label="Tamamlanan"
+          value={completedCount}
+          icon={BookOpenCheck}
+          accent="cat3"
+        />
       </div>
 
       <Card>
@@ -332,31 +348,5 @@ export function StudentStudyPlanBoard() {
         diğer cihazlarda da güncel haliyle görünür.
       </p>
     </div>
-  );
-}
-
-function SummaryCard({
-  label,
-  value,
-  icon: Icon,
-}: {
-  label: string;
-  value: number;
-  icon: typeof ListTodo;
-}) {
-  return (
-    <Card>
-      <CardContent className="flex min-h-24 items-center justify-between gap-4 p-5 text-left">
-        <div className="min-w-0">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            {label}
-          </p>
-          <p className="mt-2 text-2xl font-semibold tabular-nums">{value}</p>
-        </div>
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-          <Icon className="h-5 w-5" />
-        </span>
-      </CardContent>
-    </Card>
   );
 }

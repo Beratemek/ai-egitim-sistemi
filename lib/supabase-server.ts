@@ -21,15 +21,57 @@ import type { Database, UserProfile, UserRole } from "@/lib/types";
 
 export type TypedServerClient = SupabaseClient<Database>;
 
+export interface ServerSupabaseClientOptions {
+  /**
+   * Uzun sure acik kalan gelistirme sunucusunda Cloudflare/Supabase tarafindan
+   * kapatilmis bir keep-alive soketi yeniden kullanilirsa Node `fetch failed`
+   * uretebilir. Yalnizca tekrar edilmesi guvenli auth isteklerinde yeni baglanti
+   * ve tek tekrar denemesi kullanilir.
+   */
+  resilientAuthFetch?: boolean;
+}
+
+async function resilientAuthFetch(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): Promise<Response> {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const headers = new Headers(init?.headers);
+      headers.set("connection", "close");
+
+      return await fetch(input, {
+        ...init,
+        headers,
+        cache: "no-store",
+      });
+    } catch (error) {
+      lastError = error;
+      if (attempt === 0) {
+        await new Promise((resolve) => setTimeout(resolve, 250));
+      }
+    }
+  }
+
+  throw lastError;
+}
+
 /**
  * Oturum cerezlerine bagli Supabase istemcisi.
  * Next.js 15'te `cookies()` asenkron oldugu icin bu fonksiyon da asenkrondur.
  */
-export async function createServerSupabaseClient(): Promise<TypedServerClient> {
+export async function createServerSupabaseClient(
+  options: ServerSupabaseClientOptions = {},
+): Promise<TypedServerClient> {
   const { url, anonKey } = requireSupabaseEnv();
   const cookieStore = await cookies();
 
   return createServerClient<Database>(url, anonKey, {
+    global: options.resilientAuthFetch
+      ? { fetch: resilientAuthFetch }
+      : undefined,
     cookies: {
       getAll() {
         return cookieStore.getAll();
@@ -71,7 +113,6 @@ export interface AuthenticatedUser {
   user: User;
   /** Arayuzun kullandigi profil. Rol taklidi aktifse `role` degistirilmis olur. */
   profile: UserProfile;
-  /** Veritabanindaki gercek rol. */
   /** Veritabanindaki gercek etkin rol. */
   actualRole: UserRole;
 }

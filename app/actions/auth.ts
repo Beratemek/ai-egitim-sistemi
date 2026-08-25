@@ -29,6 +29,9 @@ function signInErrorMessage(message: string): string {
   if (/rate limit|too many requests/i.test(message)) {
     return "Çok fazla deneme yapıldı. Lütfen kısa bir süre sonra tekrar deneyin.";
   }
+  if (/fetch failed/i.test(message)) {
+    return "Kimlik doğrulama sunucusuna ulaşılamadı. Lütfen tekrar deneyin.";
+  }
   return "Giriş yapılamadı. Bilgilerinizi kontrol edip tekrar deneyin.";
 }
 
@@ -38,19 +41,33 @@ function signInErrorMessage(message: string): string {
 export async function signInWithPassword(
   input: SignInInput,
 ): Promise<AuthActionResult> {
-  const email = input.email.trim();
+  const email = input.email.trim().toLocaleLowerCase("en-US");
 
   if (!email || !input.password) {
     return { ok: false, error: "E-posta adresi ve parola zorunludur." };
   }
 
-  const supabase = await createServerSupabaseClient();
-  const { error } = await supabase.auth.signInWithPassword({
-    email,
-    password: input.password,
-  });
+  const supabase = await createServerSupabaseClient({ resilientAuthFetch: true });
+  let error: Awaited<ReturnType<typeof supabase.auth.signInWithPassword>>["error"];
+
+  try {
+    ({ error } = await supabase.auth.signInWithPassword({
+      email,
+      password: input.password,
+    }));
+  } catch (caught) {
+    const message = caught instanceof Error ? caught.message : "fetch failed";
+    return { ok: false, error: signInErrorMessage(message) };
+  }
 
   if (error) {
+    if (/fetch failed/i.test(error.message)) {
+      console.error("[auth] Supabase parola isteği ağ hatası", {
+        name: error.name,
+        status: error.status,
+        code: error.code,
+      });
+    }
     return {
       ok: false,
       error: signInErrorMessage(error.message),

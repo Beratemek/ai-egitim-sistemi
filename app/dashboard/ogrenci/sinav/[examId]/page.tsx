@@ -16,6 +16,7 @@ import { AiMockNotice } from "@/components/shared/ai-mock-notice";
 import { ExamCountdown } from "@/components/shared/exam-countdown";
 import { ExamStartPanel } from "@/components/shared/exam-start-panel";
 import { PageHeader } from "@/components/shared/page-header";
+import { ResultViewMarker } from "@/components/shared/result-view-marker";
 import { StudentExamQuestions } from "@/components/shared/student-exam-questions";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
@@ -108,6 +109,11 @@ export default async function OgrenciSinavPage({
 
   return (
     <>
+      {attempt?.status === "sonuclandi" &&
+      attempt.result_viewed_at === null ? (
+        <ResultViewMarker examId={exam.id} />
+      ) : null}
+
       <Link
         href="/dashboard/ogrenci"
         className="flex w-fit items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
@@ -143,7 +149,7 @@ export default async function OgrenciSinavPage({
               value={`${attempt.earned_points ?? "-"} / ${attempt.total_points ?? "-"}`}
             />
             <ResultMetric
-              label="Aciklanma"
+              label="Açıklanma"
               value={formatDateTime(attempt.completed_at)}
             />
           </CardContent>
@@ -322,7 +328,7 @@ function ExamStatusBadge({
       return (
         <Badge variant="success" className="gap-1.5">
           <CheckCircle2 className="h-3.5 w-3.5" />
-          Sonuclandi
+          Sonuçlandı
         </Badge>
       );
     case "devam_ediyor":

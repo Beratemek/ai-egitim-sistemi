@@ -8,7 +8,13 @@ import { toast } from "sonner";
 import { startExam } from "@/app/actions/submissions";
 import { ProctoringGate } from "@/components/shared/proctoring-gate";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { formatDateTime } from "@/lib/utils";
 
 interface ExamStartPanelProps {
@@ -19,7 +25,7 @@ interface ExamStartPanelProps {
   proctored: boolean;
 }
 
-/** Soruları gostermeden önce sınav kurallarini ve baslatma onayini sunar. */
+/** Soruları göstermeden önce sınav kurallarını ve başlatma onayını sunar. */
 export function ExamStartPanel({
   examId,
   questionCount,
@@ -44,14 +50,17 @@ export function ExamStartPanel({
     }
 
     toast.success("Sınav başlatıldı");
-    // Sinav kendi TAM EKRAN sayfasinda cozuluyor; panel kabugu disinda.
+    // Sınav kendi tam ekran sayfasında çözülüyor; panel kabuğunun dışında.
     router.push(`/sinav/${examId}`);
   }
 
   return (
-    <Card className="mx-auto max-w-2xl border-primary/20">
-      <CardHeader>
-        <CardTitle>Sınava başlamadan önce</CardTitle>
+    <Card className="mx-auto max-w-3xl overflow-hidden border-primary/25">
+      <CardHeader className="border-b bg-primary/[0.04]">
+        <CardTitle>Sınava hazır mısın?</CardTitle>
+        <CardDescription>
+          Bilgileri kontrol et; hazırsan sınavını güvenle başlat.
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="grid gap-3 sm:grid-cols-3">
@@ -64,16 +73,16 @@ export function ExamStartPanel({
         </div>
 
         <ul className="space-y-3 text-sm text-muted-foreground">
-          <Rule>Cevaplarınız her soruda ayrı ayrı kaydedilir.</Rule>
-          <Rule>Sınavı teslim edene kadar kaydedilen cevapları değiştirebilirsiniz.</Rule>
-          <Rule>Süre dolduğunda kaydedilen cevaplar otomatik teslim edilir.</Rule>
-          <Rule>Nihai sonucunuz eğitmen onayından sonra açıklanır.</Rule>
+          <Rule>Cevapların her soruda otomatik kaydedilir.</Rule>
+          <Rule>Sınavı bitirene kadar kaydettiğin cevapları değiştirebilirsin.</Rule>
+          <Rule>Süre dolduğunda kayıtlı cevapların otomatik teslim edilir.</Rule>
+          <Rule>Sonucun, eğitmen onayından sonra açıklanır.</Rule>
         </ul>
 
         {endsAt ? (
           <p className="flex items-start gap-2 rounded-lg bg-muted px-3 py-2.5 text-xs text-muted-foreground">
             <CalendarClock className="mt-0.5 h-4 w-4 shrink-0" />
-            Sınavı baslatmaniz son teslim zamanini degistirmez.
+            Sınavı başlatmanız son teslim zamanını değiştirmez.
           </p>
         ) : null}
 
@@ -90,7 +99,7 @@ export function ExamStartPanel({
               pending={pending}
               disabled={questionCount === 0}
               onStart={handleStart}
-              readyLabel="Cihazlar hazır — sınava başla"
+              readyLabel="Cihazlar hazır — sınavı başlat"
             />
           </ProctoringGate>
         ) : (
@@ -109,7 +118,7 @@ function StartButton({
   pending,
   disabled,
   onStart,
-  readyLabel = "Sınava başla",
+  readyLabel = "Sınavı başlat",
 }: {
   pending: boolean;
   disabled: boolean;

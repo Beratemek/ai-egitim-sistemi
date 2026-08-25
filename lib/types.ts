@@ -252,6 +252,30 @@ export type ExamAttempt = {
   earned_points: number | null;
   total_points: number | null;
   final_score: number | null;
+  /**
+   * Ogrencinin nihai sonuc ayrintisini ilk kez actigi an.
+   * Eski Supabase kurulumlari migration uygulanana kadar bu alani donmeyebilir.
+   */
+  result_viewed_at?: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CourseExperienceFeedback = {
+  id: string;
+  student_id: string;
+  source_exam_id: string;
+  instructor_id: string;
+  subject: string;
+  subject_key: string;
+  academic_period: string;
+  clarity_rating: number;
+  pace_rating: number;
+  materials_rating: number;
+  assessment_fairness_rating: number;
+  helpful_text: string | null;
+  improvement_text: string | null;
+  anonymous: true;
   created_at: string;
   updated_at: string;
 };
@@ -576,6 +600,7 @@ export interface Database {
           | "earned_points"
           | "total_points"
           | "final_score"
+          | "result_viewed_at"
           | "created_at"
           | "updated_at"
         >
@@ -603,6 +628,13 @@ export interface Database {
         Insertable<
           StudentStudyPlanRow,
           "id" | "status" | "saved_at" | "updated_at"
+        >
+      >;
+      course_experience_feedback: TableDefinition<
+        CourseExperienceFeedback,
+        Insertable<
+          CourseExperienceFeedback,
+          "id" | "anonymous" | "created_at" | "updated_at"
         >
       >;
       question_preferences: TableDefinition<
@@ -697,6 +729,39 @@ export interface Database {
       submit_exam_attempt: {
         Args: { target_exam: string };
         Returns: string;
+      };
+      mark_exam_result_viewed: {
+        Args: { target_exam: string };
+        Returns: boolean;
+      };
+      submit_course_experience_feedback: {
+        Args: {
+          target_exam: string;
+          clarity: number;
+          pace: number;
+          materials: number;
+          assessment_fairness: number;
+          helpful?: string | null;
+          improvement?: string | null;
+        };
+        Returns: string;
+      };
+      get_course_experience_feedback_summary: {
+        Args: Record<string, never>;
+        Returns: Array<{
+          instructor_id: string;
+          instructor_name: string;
+          subject: string;
+          academic_period: string;
+          response_count: number;
+          clarity_average: number | null;
+          pace_average: number | null;
+          materials_average: number | null;
+          assessment_fairness_average: number | null;
+          overall_average: number | null;
+          helpful_comments: string[];
+          improvement_comments: string[];
+        }>;
       };
       recalculate_exam_attempt_result: {
         Args: { target_exam: string; target_student: string };
