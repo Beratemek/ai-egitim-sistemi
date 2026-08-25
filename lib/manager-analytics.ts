@@ -8,9 +8,14 @@ import type {
   Submission,
   UserProfile,
 } from "@/lib/types";
+import {
+  buildOutcomeDiagnostics,
+  DEFAULT_MASTERY_THRESHOLD,
+  type OutcomeDiagnostic,
+} from "./outcome-diagnostics.ts";
 
 export const MANAGER_RISK_SCORE = 60;
-export const MANAGER_WEAK_OUTCOME_SCORE = 50;
+export const MANAGER_WEAK_OUTCOME_SCORE = DEFAULT_MASTERY_THRESHOLD;
 const KEY_SEPARATOR = "\u0000";
 
 export interface ManagerAnalyticsSource {
@@ -98,18 +103,7 @@ export interface ManagerExamSummary {
   endsAt: string | null;
 }
 
-export interface ManagerOutcomeSummary {
-  outcomeId: string;
-  outcomeText: string;
-  subject: string;
-  topic: string;
-  averageScore: number | null;
-  answerCount: number;
-  pendingCount: number;
-  studentCount: number;
-  classroomCount: number;
-  questionCount: number;
-}
+export type ManagerOutcomeSummary = OutcomeDiagnostic;
 
 export interface ManagerTrendPoint {
   examId: string;
@@ -128,11 +122,21 @@ export interface ManagerAnalytics {
   exams: ManagerExamSummary[];
   outcomes: ManagerOutcomeSummary[];
   trend: ManagerTrendPoint[];
+  masteryThreshold: number;
+  filterOptions: {
+    subjects: string[];
+    exams: Array<{ id: string; title: string; subject: string; date: string }>;
+  };
 }
 
 export interface ManagerAnalyticsScope {
   classroom?: string;
   studentId?: string;
+  subject?: string;
+  examId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  masteryThreshold?: number;
 }
 
 export function buildManagerAnalytics(
@@ -140,6 +144,7 @@ export function buildManagerAnalytics(
   scope: ManagerAnalyticsScope = {},
   now = Date.now(),
 ): ManagerAnalytics {
+  const masteryThreshold = normalizeThreshold(scope.masteryThreshold);
   const allStudents = source.users.filter((user) => user.roles.includes("ogrenci"));
   const students = allStudents.filter(
     (student) =>
@@ -148,11 +153,24 @@ export function buildManagerAnalytics(
   );
   const studentIds = new Set(students.map((student) => student.id));
 
-  const assignments = source.assignments.filter((row) => studentIds.has(row.student_id));
-  const attempts = source.attempts.filter((row) => studentIds.has(row.student_id));
-  const submissions = source.submissions.filter((row) => studentIds.has(row.student_id));
+  const selectedExams = source.exams.filter((exam) => {
+    if (scope.examId && exam.id !== scope.examId) return false;
+    if (scope.subject && exam.subject !== scope.subject) return false;
+    return isExamInDateRange(exam, scope.dateFrom, scope.dateTo);
+  });
+  const selectedExamIds = new Set(selectedExams.map((exam) => exam.id));
 
-  const examById = new Map(source.exams.map((exam) => [exam.id, exam]));
+  const assignments = source.assignments.filter(
+    (row) => studentIds.has(row.student_id) && selectedExamIds.has(row.exam_id),
+  );
+  const attempts = source.attempts.filter(
+    (row) => studentIds.has(row.student_id) && selectedExamIds.has(row.exam_id),
+  );
+  const submissions = source.submissions.filter(
+    (row) => studentIds.has(row.student_id) && selectedExamIds.has(row.exam_id),
+  );
+
+  const examById = new Map(selectedExams.map((exam) => [exam.id, exam]));
   const userById = new Map(allStudents.map((student) => [student.id, student]));
   const attemptByStudentExam = new Map(
     attempts.map((attempt) => [
@@ -161,81 +179,30 @@ export function buildManagerAnalytics(
     ]),
   );
 
-  const questionCounts = new Map<string, number>();
-  const outcomeByQuestion = new Map<string, string>();
-  for (const question of source.questions) {
-    if (!question.outcome_id) continue;
-    outcomeByQuestion.set(question.id, question.outcome_id);
-    questionCounts.set(
-      question.outcome_id,
-      (questionCounts.get(question.outcome_id) ?? 0) + 1,
-    );
-  }
-
-  type OutcomeBucket = {
-    scores: number[];
-    pending: number;
-    students: Set<string>;
-    classrooms: Set<string>;
-  };
-  const outcomeBuckets = new Map<string, OutcomeBucket>();
-  const studentOutcomeScores = new Map<string, Map<string, number[]>>();
-
-  for (const submission of submissions) {
-    if (!submission.question_id) continue;
-    const outcomeId = outcomeByQuestion.get(submission.question_id);
-    if (!outcomeId) continue;
-
-    let bucket = outcomeBuckets.get(outcomeId);
-    if (!bucket) {
-      bucket = {
-        scores: [],
-        pending: 0,
-        students: new Set(),
-        classrooms: new Set(),
-      };
-      outcomeBuckets.set(outcomeId, bucket);
-    }
-
-    bucket.students.add(submission.student_id);
-    const classroom = userById.get(submission.student_id)?.classroom;
-    if (classroom) bucket.classrooms.add(classroom);
-
-    if (
-      submission.status === "egitmen_onayli" &&
-      submission.instructor_approved_score !== null
-    ) {
-      bucket.scores.push(submission.instructor_approved_score);
-      let byOutcome = studentOutcomeScores.get(submission.student_id);
-      if (!byOutcome) {
-        byOutcome = new Map();
-        studentOutcomeScores.set(submission.student_id, byOutcome);
-      }
-      const scores = byOutcome.get(outcomeId) ?? [];
-      scores.push(submission.instructor_approved_score);
-      byOutcome.set(outcomeId, scores);
-    } else {
-      bucket.pending += 1;
-    }
-  }
-
-  const outcomes: ManagerOutcomeSummary[] = source.outcomes
-    .map((outcome) => {
-      const bucket = outcomeBuckets.get(outcome.id);
-      return {
-        outcomeId: outcome.id,
-        outcomeText: outcome.outcome_text,
-        subject: outcome.subject ?? "Ders belirtilmemiş",
-        topic: outcome.topic,
-        averageScore: average(bucket?.scores ?? []),
-        answerCount: bucket?.scores.length ?? 0,
-        pendingCount: bucket?.pending ?? 0,
-        studentCount: bucket?.students.size ?? 0,
-        classroomCount: bucket?.classrooms.size ?? 0,
-        questionCount: questionCounts.get(outcome.id) ?? 0,
-      };
-    })
-    .sort(compareOutcomes);
+  const examOutcomeIds = scope.examId
+    ? new Set(
+        source.examQuestions
+          .filter((link) => link.exam_id === scope.examId)
+          .map((link) => source.questions.find((question) => question.id === link.question_id)?.outcome_id)
+          .filter((outcomeId): outcomeId is string => Boolean(outcomeId)),
+      )
+    : undefined;
+  const outcomes = buildOutcomeDiagnostics(
+    {
+      outcomes: source.outcomes,
+      questions: source.questions,
+      examQuestions: source.examQuestions,
+      submissions,
+      exams: selectedExams,
+      students,
+    },
+    {
+      threshold: masteryThreshold,
+      examIds: selectedExamIds,
+      subject: scope.subject,
+      outcomeIds: examOutcomeIds,
+    },
+  );
 
   const assignmentsByStudent = groupBy(assignments, (row) => row.student_id);
   const attemptsByStudent = groupBy(attempts, (row) => row.student_id);
@@ -263,11 +230,19 @@ export function buildManagerAnalytics(
           new Date(b.completedAt ?? b.startedAt).getTime(),
       );
 
-    const scores = history
-      .map((item) => item.score)
-      .filter((score): score is number => score !== null);
-    const latestScore = scores.at(-1) ?? null;
-    const previousScore = scores.at(-2) ?? null;
+    const completedHistory = history.filter(
+      (item): item is ManagerStudentExamResult & { score: number } => item.score !== null,
+    );
+    const scores = completedHistory.map((item) => item.score);
+    const latestResult = completedHistory.at(-1) ?? null;
+    const latestScore = latestResult?.score ?? null;
+    const previousComparableResult = latestResult
+      ? completedHistory
+          .slice(0, -1)
+          .reverse()
+          .find((item) => item.subject === latestResult.subject) ?? null
+      : null;
+    const previousScore = previousComparableResult?.score ?? null;
     const scoreChange =
       latestScore !== null && previousScore !== null
         ? round(latestScore - previousScore)
@@ -283,9 +258,11 @@ export function buildManagerAnalytics(
       return deadline ? new Date(deadline).getTime() < now : false;
     }).length;
 
-    const weakOutcomeCount = [...(studentOutcomeScores.get(student.id)?.values() ?? [])]
-      .map((values) => average(values))
-      .filter((score) => score !== null && score < MANAGER_WEAK_OUTCOME_SCORE).length;
+    const weakOutcomeCount = outcomes.filter((outcome) =>
+      outcome.students.some(
+        (cell) => cell.groupId === student.id && cell.isActionableWeak,
+      ),
+    ).length;
 
     const submittedCount = studentAttempts.filter(
       (attempt) => attempt.status !== "devam_ediyor",
@@ -386,7 +363,7 @@ export function buildManagerAnalytics(
   const assignmentsByExam = groupBy(assignments, (row) => row.exam_id);
   const attemptsByExam = groupBy(attempts, (row) => row.exam_id);
   const submissionsByExam = groupBy(submissions, (row) => row.exam_id);
-  const examSummaries: ManagerExamSummary[] = source.exams
+  const examSummaries: ManagerExamSummary[] = selectedExams
     .map((exam) => {
       const examAssignments = assignmentsByExam.get(exam.id) ?? [];
       const examAttempts = attemptsByExam.get(exam.id) ?? [];
@@ -478,11 +455,7 @@ export function buildManagerAnalytics(
       atRiskStudentCount: studentSummaries.filter(
         (student) => student.riskLevel === "risk",
       ).length,
-      weakOutcomeCount: outcomes.filter(
-        (outcome) =>
-          outcome.averageScore !== null &&
-          outcome.averageScore < MANAGER_WEAK_OUTCOME_SCORE,
-      ).length,
+      weakOutcomeCount: outcomes.filter((outcome) => outcome.isActionableWeak).length,
       pendingReviewCount,
     },
     classrooms: classroomSummaries,
@@ -490,6 +463,24 @@ export function buildManagerAnalytics(
     exams: examSummaries,
     outcomes,
     trend,
+    masteryThreshold,
+    filterOptions: {
+      subjects: [
+        ...new Set(
+          source.exams
+            .map((exam) => exam.subject)
+            .filter((subject): subject is string => Boolean(subject)),
+        ),
+      ].sort((a, b) => a.localeCompare(b, "tr")),
+      exams: source.exams
+        .map((exam) => ({
+          id: exam.id,
+          title: exam.title,
+          subject: exam.subject ?? "Ders belirtilmemiş",
+          date: examDate(exam),
+        }))
+        .sort((a, b) => b.date.localeCompare(a.date)),
+    },
   };
 }
 
@@ -527,11 +518,26 @@ function compareStudents(a: ManagerStudentSummary, b: ManagerStudentSummary): nu
   return order[a.riskLevel] - order[b.riskLevel] || a.name.localeCompare(b.name, "tr");
 }
 
-function compareOutcomes(a: ManagerOutcomeSummary, b: ManagerOutcomeSummary): number {
-  if (a.averageScore === null && b.averageScore === null) {
-    return a.outcomeText.localeCompare(b.outcomeText, "tr");
-  }
-  if (a.averageScore === null) return 1;
-  if (b.averageScore === null) return -1;
-  return a.averageScore - b.averageScore || b.answerCount - a.answerCount;
+function normalizeThreshold(value: number | undefined): number {
+  if (!Number.isFinite(value)) return DEFAULT_MASTERY_THRESHOLD;
+  return Math.min(90, Math.max(40, value as number));
+}
+
+function isExamInDateRange(
+  exam: Exam,
+  dateFrom: string | undefined,
+  dateTo: string | undefined,
+): boolean {
+  const reference = new Date(examDate(exam)).getTime();
+  if (!Number.isFinite(reference)) return !dateFrom && !dateTo;
+
+  const from = dateFrom ? new Date(`${dateFrom}T00:00:00.000Z`).getTime() : null;
+  const to = dateTo ? new Date(`${dateTo}T23:59:59.999Z`).getTime() : null;
+  if (from !== null && Number.isFinite(from) && reference < from) return false;
+  if (to !== null && Number.isFinite(to) && reference > to) return false;
+  return true;
+}
+
+function examDate(exam: Exam): string {
+  return exam.ends_at ?? exam.starts_at ?? exam.created_at;
 }
