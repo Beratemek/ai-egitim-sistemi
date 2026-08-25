@@ -220,6 +220,35 @@ export interface StartExamResult {
   attemptId: string | null;
 }
 
+/** Ogrencinin sonuclanmis sinav ayrintisini gordugunu kalici olarak isaretler. */
+export async function markExamResultViewed(
+  examId: string,
+): Promise<ActionResult> {
+  if (!isSupabaseConfigured) return demoGuard();
+  if (!examId) return { ok: false, error: "Sınav kimliği zorunludur." };
+
+  const current = await getCurrentUser();
+  if (!current) return { ok: false, error: "Oturum açmanız gerekiyor." };
+
+  const supabase = await createServerSupabaseClient();
+  const { data, error } = await supabase.rpc("mark_exam_result_viewed", {
+    target_exam: examId,
+  });
+
+  if (error) return { ok: false, error: error.message };
+  if (!data) {
+    return {
+      ok: false,
+      error: "Görüntülenecek tamamlanmış sınav sonucu bulunamadı.",
+    };
+  }
+
+  revalidatePath("/dashboard/ogrenci");
+  revalidatePath("/dashboard/ogrenci/sonuclar");
+  revalidatePath(`/dashboard/ogrenci/sinav/${examId}`);
+  return { ok: true, data: undefined };
+}
+
 /** Atanmis sinav icin geri donulemez ogrenci oturumunu baslatir. */
 export async function startExam(
   examId: string,

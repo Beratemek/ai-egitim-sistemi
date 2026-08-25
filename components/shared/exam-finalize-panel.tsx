@@ -89,8 +89,8 @@ export function ExamFinalizePanel({
           <DialogHeader>
             <DialogTitle>Sınavı teslim etmek istiyor musunuz?</DialogTitle>
             <DialogDescription>
-              {questionCount} cevabınız AI on degerlendirmesine gonderilecek. Bu
-              islemden sonra cevaplarınızı degistiremezsiniz.
+              {questionCount} cevabınız yapay zekâ ön değerlendirmesine
+              gönderilecek. Bu işlemden sonra cevaplarınızı değiştiremezsiniz.
             </DialogDescription>
           </DialogHeader>
 
@@ -106,7 +106,7 @@ export function ExamFinalizePanel({
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)} disabled={pending}>
-              Cevaplara don
+              Cevaplara dön
             </Button>
             <Button onClick={handleFinalize} disabled={pending} className="gap-2">
               {pending ? (

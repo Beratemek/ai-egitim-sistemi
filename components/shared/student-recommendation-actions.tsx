@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { ArrowRight, BookmarkCheck, Plus } from "lucide-react";
+import { BookmarkCheck, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -102,20 +102,10 @@ export function StudentRecommendationActions({
     }
   }
 
-  const reviewHref = latestExamId
-    ? `/dashboard/ogrenci/sinav/${latestExamId}`
-    : "/dashboard/ogrenci/sonuclar";
-
   return (
-    <div className="grid gap-2 pt-1 sm:grid-cols-2 md:grid-cols-1 xl:grid-cols-2">
-      <Button asChild size="sm" className="justify-between">
-        <Link href={reviewHref}>
-          Geri bildirimi incele
-          <ArrowRight className="h-3.5 w-3.5" />
-        </Link>
-      </Button>
+    <div className="pt-1">
       {saved ? (
-        <Button asChild size="sm" variant="outline" className="justify-between">
+        <Button asChild size="sm" variant="outline" className="w-full justify-between">
           <Link href="/dashboard/ogrenci/calisma-plani">
             Planımda görüntüle
             <BookmarkCheck className="h-3.5 w-3.5" />
@@ -126,7 +116,7 @@ export function StudentRecommendationActions({
           type="button"
           size="sm"
           variant="outline"
-          className="justify-between"
+          className="w-full justify-between"
           disabled={saving}
           onClick={() => void saveToPlan()}
         >

@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { signInWithPassword } from "@/app/actions/auth";
 import { isSupabaseConfigured, publicEnv } from "@/lib/env";
 import { SELECTABLE_ROLES, dashboardPathFor } from "@/lib/roles";
 import { createClient } from "@/lib/supabase";
@@ -85,12 +86,9 @@ export function LoginForm({ callbackError = null }: LoginFormProps) {
         return;
       }
 
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      const result = await signInWithPassword(email, password);
 
-      if (signInError) throw signInError;
+      if (!result.ok) throw new Error(result.error);
 
       /*
        * Rol yonlendirmesinin tek kaynagi middleware'dir. Burada profili bir

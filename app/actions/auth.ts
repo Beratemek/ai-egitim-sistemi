@@ -8,6 +8,64 @@ export type AuthActionResult =
   | { ok: false; error: string };
 
 /**
+ * E-posta/parola ile oturum acmayi sunucu tarafinda gerceklestirir.
+ *
+ * Tarayicinin Supabase alan adina dogrudan istek atmasi; VPN, reklam
+ * engelleyici, DNS filtresi veya branch degisiminden sonra bellekte kalan eski
+ * istemci nedeniyle `fetch failed` hatasina yol acabiliyordu. Server Action
+ * ayni isi uygulama sunucusundan yapar ve Supabase'in oturum cerezlerini bu
+ * yanitin icinde guvenli sekilde yazar.
+ */
+export async function signInWithPassword(
+  email: string,
+  password: string,
+): Promise<AuthActionResult> {
+  const normalizedEmail = email.trim().toLocaleLowerCase("en-US");
+
+  if (!normalizedEmail || !password) {
+    return { ok: false, error: "E-posta ve parola alanlarını doldurun." };
+  }
+
+  const supabase = await createServerSupabaseClient({ resilientAuthFetch: true });
+
+  try {
+    const { error } = await supabase.auth.signInWithPassword({
+      email: normalizedEmail,
+      password,
+    });
+
+    if (error) {
+      if (/fetch failed/i.test(error.message)) {
+        console.error("[auth] Supabase parola istegi ag hatasi", {
+          name: error.name,
+          status: error.status,
+          code: error.code,
+        });
+      }
+
+      const message = /invalid login credentials/i.test(error.message)
+        ? "E-posta veya parola Supabase hesabıyla eşleşmiyor."
+        : /fetch failed/i.test(error.message)
+          ? "Kimlik doğrulama sunucusuna ulaşılamadı. Lütfen tekrar deneyin."
+          : error.message;
+
+      return { ok: false, error: message };
+    }
+
+    return { ok: true, message: "Giriş başarılı." };
+  } catch (caught) {
+    const message = caught instanceof Error ? caught.message : "fetch failed";
+
+    return {
+      ok: false,
+      error: /fetch failed/i.test(message)
+        ? "Kimlik doğrulama sunucusuna ulaşılamadı. Lütfen tekrar deneyin."
+        : message,
+    };
+  }
+}
+
+/**
  * Dogrulama e-postasini yeniden gonderir.
  *
  * Supabase'in yerlesik e-posta servisi saatte 2 mail ile sinirlidir; ust uste

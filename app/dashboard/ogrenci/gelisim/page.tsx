@@ -97,14 +97,14 @@ export default async function OgrenciGelisimPage() {
           value={totalAnswers}
           hint="Tamamlanan sınavlardan"
           icon={BookOpenCheck}
-          accent="primary"
+          accent="cat1"
         />
         <StatCard
           label="Puan ağırlıklı ortalama"
           value={weightedAverage ?? "-"}
           hint="Kazanılan / toplam puan · 100 üzerinden"
           icon={Target}
-          accent="success"
+          accent="cat2"
         />
         <StatCard
           label="Değerlendirilen kazanım"
@@ -115,6 +115,7 @@ export default async function OgrenciGelisimPage() {
               : "Tüm alanlar kazanımla eşleşmiş"
           }
           icon={TrendingUp}
+          accent="cat3"
         />
       </div>
 
@@ -139,7 +140,8 @@ export default async function OgrenciGelisimPage() {
                 Uygulanabilir çalışma önerileri
               </CardTitle>
               <p className="text-sm text-muted-foreground">
-                Öncelikli kazanımları planına ekle veya ilgili sınavdaki eğitmen geri bildirimine git.
+                Öncelikli kazanımları çalışma planına ekle ve ilerlemeni tek
+                ekrandan takip et.
               </p>
             </CardHeader>
             <CardContent className="grid gap-4 md:grid-cols-3">

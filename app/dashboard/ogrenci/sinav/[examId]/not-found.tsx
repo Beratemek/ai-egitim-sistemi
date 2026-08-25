@@ -9,14 +9,15 @@ export default function StudentExamNotFound() {
     <Card className="border-dashed">
       <CardContent className="flex min-h-72 flex-col items-center justify-center px-6 py-12 text-center">
         <FileQuestion className="h-10 w-10 text-muted-foreground/50" />
-        <h1 className="mt-5 text-xl font-semibold">Sinav bulunamadi</h1>
+        <h1 className="mt-5 text-xl font-semibold">Sınav bulunamadı</h1>
         <p className="mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
-          Bu sınav size atanmamış, yayından kaldirilmis veya baglanti gecersiz olabilir.
+          Bu sınav size atanmamış, yayından kaldırılmış veya bağlantı geçersiz
+          olabilir.
         </p>
         <Button asChild variant="outline" className="mt-6 gap-2">
           <Link href="/dashboard/ogrenci">
             <ArrowLeft className="h-4 w-4" />
-            Sınavlarıma don
+            Sınavlarıma dön
           </Link>
         </Button>
       </CardContent>

@@ -13,6 +13,7 @@ import {
   Library,
   ListChecks,
   ListTodo,
+  MessageSquareText,
   TrendingUp,
   Trophy,
   UserCog,
@@ -73,6 +74,12 @@ const BASE_NAV = {
       icon: ClipboardList,
       description: "Sınav oluştur, yayına al, PDF indir",
     },
+    {
+      href: "/dashboard/egitmen/geri-bildirimler",
+      label: "Ders Geri Bildirimleri",
+      icon: MessageSquareText,
+      description: "Anonim öğrenci deneyimi özeti",
+    },
   ],
   ogrenci: [
     {
@@ -106,6 +113,12 @@ const BASE_NAV = {
       label: "İstatistikler",
       icon: BarChart3,
       description: "Başarı ve katılım raporları",
+    },
+    {
+      href: "/dashboard/yonetici/geri-bildirimler",
+      label: "Ders Geri Bildirimleri",
+      icon: MessageSquareText,
+      description: "Ders ve eğitmen bazlı anonim rapor",
     },
   ],
 } satisfies Record<Exclude<UserRole, "admin">, readonly NavItem[]>;

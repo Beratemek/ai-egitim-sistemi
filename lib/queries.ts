@@ -8,6 +8,10 @@
 
 import { cache } from "react";
 
+import {
+  courseFeedbackPeriodKey,
+  courseFeedbackScopeKey,
+} from "@/lib/course-feedback";
 import { isSupabaseConfigured } from "@/lib/env";
 import { ALL_SUBJECTS, subjectKey } from "@/lib/subjects";
 import { selectStyleScope, type StyleScopeInput } from "@/lib/style-scope";
@@ -28,6 +32,7 @@ import {
   type TypedServerClient,
 } from "@/lib/supabase-server";
 import type {
+  CourseExperienceFeedback,
   Exam,
   ExamAssignment,
   ExamAttempt,
@@ -600,6 +605,7 @@ export async function getSubmissions(
 export interface StudentResultSummary {
   exam: Exam;
   attempt: ExamAttempt;
+  courseFeedback: CourseExperienceFeedback | null;
 }
 
 /** Yalnizca egitmen onayi tamamlanmis sinav sonuclarini dondurur. */
@@ -629,15 +635,97 @@ export async function getStudentResults(): Promise<StudentResultSummary[]> {
   if (error || !attempts || attempts.length === 0) return [];
 
   const examIds = [...new Set(attempts.map((attempt) => attempt.exam_id))];
-  const { data: exams } = await supabase.from("exams").select("*").in("id", examIds);
+  const [{ data: exams }, feedbackResult] = await Promise.all([
+    supabase.from("exams").select("*").in("id", examIds),
+    supabase
+      .from("course_experience_feedback")
+      .select("*")
+      .eq("student_id", current.user.id),
+  ]);
   const examById = new Map((exams ?? []).map((exam) => [exam.id, exam]));
+  const feedbackByScope = new Map(
+    (feedbackResult.data ?? []).map((feedback) => [
+      courseFeedbackScopeKey(
+        feedback.instructor_id,
+        feedback.subject,
+        feedback.academic_period,
+      ),
+      feedback,
+    ]),
+  );
 
   return attempts
     .map((attempt) => {
       const exam = examById.get(attempt.exam_id);
-      return exam ? { exam, attempt } : null;
+      if (!exam) return null;
+
+      const period = attempt.completed_at
+        ? courseFeedbackPeriodKey(attempt.completed_at)
+        : null;
+      const courseFeedback = period
+        ? feedbackByScope.get(
+            courseFeedbackScopeKey(
+              exam.instructor_id,
+              exam.subject ?? "Ders belirtilmemiş",
+              period,
+            ),
+          ) ?? null
+        : null;
+
+      return { exam, attempt, courseFeedback };
     })
     .filter((item): item is StudentResultSummary => item !== null);
+}
+
+export interface CourseFeedbackSummary {
+  instructorId: string;
+  instructorName: string;
+  subject: string;
+  academicPeriod: string;
+  responseCount: number;
+  clarityAverage: number | null;
+  paceAverage: number | null;
+  materialsAverage: number | null;
+  assessmentFairnessAverage: number | null;
+  overallAverage: number | null;
+  helpfulComments: string[];
+  improvementComments: string[];
+}
+
+/** Eğitmen ve yöneticinin yalnızca anonim, eşik uygulanmış özetini döndürür. */
+export async function getCourseFeedbackSummaries(): Promise<
+  CourseFeedbackSummary[]
+> {
+  if (!isSupabaseConfigured) return [];
+
+  const supabase = await createServerSupabaseClient();
+  const { data, error } = await supabase.rpc(
+    "get_course_experience_feedback_summary",
+  );
+  if (error || !data) return [];
+
+  return data.map((row) => ({
+    instructorId: row.instructor_id,
+    instructorName: row.instructor_name,
+    subject: row.subject,
+    academicPeriod: row.academic_period,
+    responseCount: Number(row.response_count),
+    clarityAverage: row.clarity_average,
+    paceAverage: row.pace_average,
+    materialsAverage: row.materials_average,
+    assessmentFairnessAverage: row.assessment_fairness_average,
+    overallAverage: row.overall_average,
+    helpfulComments: Array.isArray(row.helpful_comments)
+      ? row.helpful_comments.filter(
+          (comment): comment is string => typeof comment === "string",
+        )
+      : [],
+    improvementComments: Array.isArray(row.improvement_comments)
+      ? row.improvement_comments.filter(
+          (comment): comment is string => typeof comment === "string",
+        )
+      : [],
+  }));
 }
 
 export interface StudentGrowthTopic {
