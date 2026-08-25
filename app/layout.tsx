@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Figtree, STIX_Two_Text } from "next/font/google";
 
 import { NativeBridge } from "@/components/shared/native-bridge";
+import { SessionActivityGuard } from "@/components/shared/session-activity-guard";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 
@@ -74,6 +75,7 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <NativeBridge />
+          <SessionActivityGuard />
           {children}
           <Toaster richColors position="top-right" />
         </ThemeProvider>

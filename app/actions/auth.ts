@@ -2,13 +2,13 @@
 
 import { cookies } from "next/headers";
 
-import {
-  AUTH_PERSISTENCE_COOKIE,
-  SESSION_SCOPED_COOKIES,
-  type AuthPersistence,
-} from "@/lib/auth-cookies";
+import { SESSION_SCOPED_COOKIES } from "@/lib/auth-cookies";
 import { publicEnv } from "@/lib/env";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
+import {
+  SESSION_ACTIVITY_COOKIE,
+  SESSION_ACTIVITY_COOKIE_MAX_AGE,
+} from "@/lib/session-activity";
 
 export type AuthActionResult =
   | { ok: true; message: string }
@@ -17,10 +17,7 @@ export type AuthActionResult =
 export type SignInInput = {
   email: string;
   password: string;
-  remember: boolean;
 };
-
-const PERSISTENT_AUTH_MAX_AGE = 400 * 24 * 60 * 60;
 
 function signInErrorMessage(message: string): string {
   if (/invalid login credentials/i.test(message)) {
@@ -36,8 +33,7 @@ function signInErrorMessage(message: string): string {
 }
 
 /**
- * Parola ile girisi sunucuda yapar. Boylece "Beni hatirla" kapaliyken auth
- * cerezleri gercek birer oturum cerezi olarak (Expires/Max-Age olmadan) yazilir.
+ * Parola ile girisi sunucuda yapar ve ilk etkinlik zamanini yerel cereze yazar.
  */
 export async function signInWithPassword(
   input: SignInInput,
@@ -48,8 +44,7 @@ export async function signInWithPassword(
     return { ok: false, error: "E-posta adresi ve parola zorunludur." };
   }
 
-  const persistence: AuthPersistence = input.remember ? "persistent" : "session";
-  const supabase = await createServerSupabaseClient({ persistence });
+  const supabase = await createServerSupabaseClient();
   const { error } = await supabase.auth.signInWithPassword({
     email,
     password: input.password,
@@ -64,14 +59,14 @@ export async function signInWithPassword(
   }
 
   const cookieStore = await cookies();
-  cookieStore.set(AUTH_PERSISTENCE_COOKIE, persistence, {
-    // Yetki veya kimlik tasimaz. Tarayici Supabase istemcisi token'i
-    // yenilerken ayni kalicilik kuralini uygulayabilsin diye okunabilir.
+  cookieStore.set(SESSION_ACTIVITY_COOKIE, String(Date.now()), {
+    // Yetki kaynagi degildir; middleware'in bosta kalma suresini ilk istekte
+    // de denetleyebilmesi icin tarayici tarafindan yenilenebilir.
     httpOnly: false,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     path: "/",
-    ...(input.remember ? { maxAge: PERSISTENT_AUTH_MAX_AGE } : {}),
+    maxAge: SESSION_ACTIVITY_COOKIE_MAX_AGE,
   });
 
   return { ok: true, message: "Giriş başarılı." };

@@ -2,14 +2,16 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
 import {
-  AUTH_PERSISTENCE_COOKIE,
   ROLE_CACHE_COOKIE,
-  authCookieOptions,
-  authPersistenceFromCookie,
 } from "@/lib/auth-cookies";
 import { DEV_ROLE_COOKIE, isDevRoleSwitchEnabled } from "@/lib/dev-mode";
 import { isSupabaseConfigured, publicEnv } from "@/lib/env";
 import { dashboardPathFor, roleForPath } from "@/lib/roles";
+import {
+  SESSION_ACTIVITY_COOKIE,
+  isSessionIdle,
+  parseSessionActivity,
+} from "@/lib/session-activity";
 import { isRoleStatus, isUserRole } from "@/lib/types";
 import type { Database, RoleStatus, UserRole } from "@/lib/types";
 
@@ -53,9 +55,23 @@ export async function middleware(request: NextRequest) {
   // Supabase yapilandirilmamissa demo modunda calisilir: koruma uygulanmaz.
   if (!isSupabaseConfigured) return response;
 
-  const authPersistence = authPersistenceFromCookie(
-    request.cookies.get(AUTH_PERSISTENCE_COOKIE)?.value,
+  const isDashboard = pathname.startsWith("/dashboard");
+  const isExam = pathname.startsWith("/sinav/");
+  const isLogin = pathname === "/login";
+  const isOnboarding = pathname === ONBOARDING_PATH;
+  const isPending = pathname === PENDING_PATH;
+
+  const lastActivity = parseSessionActivity(
+    request.cookies.get(SESSION_ACTIVITY_COOKIE)?.value,
   );
+  if ((isDashboard || isExam) && isSessionIdle(lastActivity)) {
+    const signoutUrl = new URL("/auth/signout-and-login", request.url);
+    signoutUrl.searchParams.set(
+      "message",
+      "30 dakika işlem yapılmadığı için oturumunuz kapatıldı.",
+    );
+    return NextResponse.redirect(signoutUrl);
+  }
 
   const supabase = createServerClient<Database>(
     publicEnv.supabaseUrl,
@@ -71,11 +87,7 @@ export async function middleware(request: NextRequest) {
           }
           response = NextResponse.next({ request: { headers: requestHeaders } });
           for (const { name, value, options } of cookiesToSet) {
-            response.cookies.set(
-              name,
-              value,
-              authCookieOptions(options, value, authPersistence),
-            );
+            response.cookies.set(name, value, options);
           }
         },
       },
@@ -87,17 +99,11 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const isDashboard = pathname.startsWith("/dashboard");
   /**
    * Sinav cozme ekrani panel kabugunun disinda ama korumasi AYNI olmali:
    * oturum, e-posta dogrulamasi ve rol onayi burada da aranir. Ayri bir
    * kok yol acip korumayi unutmak, sinava herkesin girebilmesi demekti.
    */
-  const isExam = pathname.startsWith("/sinav/");
-  const isLogin = pathname === "/login";
-  const isOnboarding = pathname === ONBOARDING_PATH;
-  const isPending = pathname === PENDING_PATH;
-
   if (!user) {
     if (isDashboard || isExam || isOnboarding || isPending) {
       const loginUrl = new URL("/login", request.url);

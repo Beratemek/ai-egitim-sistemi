@@ -3,8 +3,8 @@
 import * as React from "react";
 import { Loader2, TriangleAlert } from "lucide-react";
 
+import { PasswordField } from "@/components/shared/password-field";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase";
 
@@ -55,10 +55,9 @@ export function UpdatePasswordForm() {
     <form onSubmit={handleSubmit} className="space-y-5">
       <div className="space-y-2">
         <Label htmlFor="new-password">Yeni parola</Label>
-        <Input
+        <PasswordField
           id="new-password"
           name="password"
-          type="password"
           autoComplete="new-password"
           required
           minLength={8}
@@ -66,16 +65,15 @@ export function UpdatePasswordForm() {
           value={password}
           onChange={(event) => setPassword(event.target.value)}
           placeholder="••••••••"
+          showStrength
         />
-        <p className="text-xs text-muted-foreground">En az 8 karakter kullanın.</p>
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="confirm-password">Yeni parola tekrar</Label>
-        <Input
+        <PasswordField
           id="confirm-password"
           name="passwordConfirmation"
-          type="password"
           autoComplete="new-password"
           required
           minLength={8}

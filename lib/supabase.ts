@@ -10,18 +10,9 @@
  * `lib/supabase-server.ts` kullanin - orada oturum cerezleri yonetilir.
  */
 
-import {
-  createBrowserClient,
-  parseCookieHeader,
-  serializeCookieHeader,
-} from "@supabase/ssr";
+import { createBrowserClient } from "@supabase/ssr";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import {
-  AUTH_PERSISTENCE_COOKIE,
-  authCookieOptions,
-  authPersistenceFromCookie,
-} from "@/lib/auth-cookies";
 import { requireSupabaseEnv } from "@/lib/env";
 import type { Database } from "@/lib/types";
 
@@ -38,27 +29,7 @@ export function createClient(): TypedSupabaseClient {
   if (browserClient) return browserClient;
 
   const { url, anonKey } = requireSupabaseEnv();
-  browserClient = createBrowserClient<Database>(url, anonKey, {
-    cookies: {
-      getAll() {
-        return parseCookieHeader(document.cookie);
-      },
-      setAll(cookiesToSet) {
-        const currentCookies = parseCookieHeader(document.cookie);
-        const persistence = authPersistenceFromCookie(
-          currentCookies.find(({ name }) => name === AUTH_PERSISTENCE_COOKIE)?.value,
-        );
-
-        for (const { name, value, options } of cookiesToSet) {
-          document.cookie = serializeCookieHeader(
-            name,
-            value,
-            authCookieOptions(options, value, persistence),
-          );
-        }
-      },
-    },
-  });
+  browserClient = createBrowserClient<Database>(url, anonKey);
   return browserClient;
 }
 

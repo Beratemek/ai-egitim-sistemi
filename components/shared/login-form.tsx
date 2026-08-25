@@ -7,10 +7,15 @@ import { ArrowRight, Loader2, MailCheck, TriangleAlert } from "lucide-react";
 
 import { signInWithPassword } from "@/app/actions/auth";
 import { GoogleSignInButton } from "@/components/shared/google-sign-in-button";
+import {
+  LegalConsent,
+  MOCK_LEGAL_VERSION,
+  type LegalConsentValue,
+} from "@/components/shared/legal-consent";
+import { PasswordField } from "@/components/shared/password-field";
 import { ResendConfirmation } from "@/components/shared/resend-confirmation";
 import { ROLE_ICONS } from "@/components/shared/role-icons";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -24,6 +29,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { isSupabaseConfigured, publicEnv } from "@/lib/env";
 import { SELECTABLE_ROLES, dashboardPathFor } from "@/lib/roles";
 import { createClient } from "@/lib/supabase";
+import { clearSessionActivity, markSessionActivity } from "@/lib/session-activity";
 import { isUserRole, type UserRole } from "@/lib/types";
 
 export type LoginMode = "giris" | "kayit";
@@ -51,30 +57,60 @@ export function LoginForm({
   const [password, setPassword] = React.useState("");
   const [fullName, setFullName] = React.useState("");
   const [role, setRole] = React.useState<UserRole>(initialRole);
-  const [remember, setRemember] = React.useState(false);
+  const [legalConsent, setLegalConsent] = React.useState<LegalConsentValue>({
+    kvkkAcknowledged: false,
+    termsAccepted: false,
+    optionalAnalyticsConsent: false,
+  });
   const [pending, setPending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(callbackError);
   const [info, setInfo] = React.useState<string | null>(callbackMessage);
   /** Supabase "email not confirmed" dediyse yeniden gonderme secenegi sunulur. */
   const [unconfirmed, setUnconfirmed] = React.useState(false);
+  const registrationRequirementsMet =
+    legalConsent.kvkkAcknowledged && legalConsent.termsAccepted;
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
     setInfo(null);
+
+    if (
+      mode === "kayit" &&
+      (!legalConsent.kvkkAcknowledged || !legalConsent.termsAccepted)
+    ) {
+      setError(
+        "Kayıt için KVKK Aydınlatma Metni'ni okuduğunuzu belirtmeli ve Kullanım Koşulları'nı kabul etmelisiniz.",
+      );
+      return;
+    }
+
     setPending(true);
     let navigationStarted = false;
 
     try {
       if (mode === "kayit") {
         const supabase = createClient();
+        const acceptedAt = new Date().toISOString();
         const { data, error: signUpError } = await supabase.auth.signUp({
           email,
           password,
           options: {
             // `handle_new_user` trigger'i bu meta veriden rolu okuyup
             // public.users profilini olusturur.
-            data: { full_name: fullName, role },
+            data: {
+              full_name: fullName,
+              role,
+              // Prototip kaydi: user_metadata denetim izi yerine gecmez.
+              // Uretimde degistirilemez bir consent_log tablosuna tasinmali.
+              legal_version: MOCK_LEGAL_VERSION,
+              kvkk_acknowledged_at: acceptedAt,
+              terms_accepted_at: acceptedAt,
+              optional_analytics_consent:
+                legalConsent.optionalAnalyticsConsent,
+              optional_analytics_consent_at:
+                legalConsent.optionalAnalyticsConsent ? acceptedAt : null,
+            },
             // Dogrulama e-postasindaki baglanti buraya doner. Belirtilmezse
             // Supabase "Site URL" koküne doner, oradaki ?code=... hicbir yerde
             // islenmez ve kullanıcı dogrulamaya ragmen oturum acmamis olur.
@@ -92,6 +128,7 @@ export function LoginForm({
           return;
         }
 
+        markSessionActivity();
         router.replace(dashboardPathFor(role));
         router.refresh();
         return;
@@ -100,7 +137,6 @@ export function LoginForm({
       const result = await signInWithPassword({
         email,
         password,
-        remember,
       });
 
       if (!result.ok) {
@@ -109,17 +145,11 @@ export function LoginForm({
             /doğrulanmamış|not confirmed/i.test(result.error),
         );
         setError(result.error);
+        clearSessionActivity();
         return;
       }
 
-      /*
-       * Rol yonlendirmesinin tek kaynagi middleware'dir. Burada profili bir
-       * kez daha tarayicidan sorgulamak hem gereksiz bir ag istegiydi hem de
-       * bu sorgu geciktiginde giris basarili olmasina ragmen formun ekranda
-       * kalmasina neden oluyordu. Tam sayfa gecisi yeni oturum cerezini de
-       * kesin olarak bir sonraki istege tasir; middleware kullaniciyi kendi
-       * onay/rol durumuna gore dogru ekrana dagitir.
-       */
+      markSessionActivity();
       navigationStarted = true;
       window.location.assign(nextPath ?? "/dashboard");
     } catch (caught) {
@@ -132,9 +162,6 @@ export function LoginForm({
       setUnconfirmed(/not confirmed/i.test(message));
       setError(message);
     } finally {
-      // Tam sayfa yonlendirmesi uzak Supabase gecikmesine bagli olarak birkac
-      // saniye surebilir. Bu sirada butonu yeniden etkinlestirmek, tiklama hic
-      // olmamis izlenimi veriyor ve yinelenen giris isteklerine yol aciyordu.
       if (!navigationStarted) setPending(false);
     }
   }
@@ -224,37 +251,29 @@ export function LoginForm({
 
       <div className="space-y-2">
         <Label htmlFor="password">Parola</Label>
-        <Input
+        <PasswordField
           id="password"
           name="password"
-          type="password"
           autoComplete={mode === "kayit" ? "new-password" : "current-password"}
           required
           minLength={mode === "kayit" ? 8 : 6}
           value={password}
           onChange={(event) => setPassword(event.target.value)}
           placeholder="••••••••"
+          showStrength={mode === "kayit"}
         />
-        {mode === "kayit" ? (
-          <p className="text-xs text-muted-foreground">En az 8 karakter kullanın.</p>
-        ) : null}
       </div>
 
-      {mode === "giris" ? (
-        <div className="flex items-center justify-between gap-4">
-          <label
-            htmlFor="remember"
-            className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground"
-          >
-            <Checkbox
-              id="remember"
-              name="remember"
-              checked={remember}
-              onChange={(event) => setRemember(event.target.checked)}
-            />
-            Beni hatırla
-          </label>
+      {mode === "kayit" ? (
+        <LegalConsent
+          value={legalConsent}
+          onChange={setLegalConsent}
+          disabled={pending}
+        />
+      ) : null}
 
+      {mode === "giris" ? (
+        <div className="flex justify-end">
           <Link
             href="/sifremi-unuttum"
             className="text-sm font-medium text-primary underline-offset-4 hover:underline"
@@ -284,7 +303,14 @@ export function LoginForm({
         </p>
       ) : null}
 
-      <Button type="submit" className="w-full gap-2" size="lg" disabled={pending}>
+      <Button
+        type="submit"
+        className="w-full gap-2"
+        size="lg"
+        disabled={
+          pending || (mode === "kayit" && !registrationRequirementsMet)
+        }
+      >
         {pending ? (
           <>
             <Loader2 className="h-4 w-4 animate-spin" />

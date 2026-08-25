@@ -116,7 +116,7 @@ export function LandingPillNav() {
               Kayıt Ol
             </Link>
             <Link
-              href="/auth/signout-and-login?mode=giris"
+              href="/dashboard"
               className={cn(buttonVariants(), "specular-cta h-10 rounded-full px-4 sm:px-5")}
             >
               <span className="sm:hidden">Giriş</span>

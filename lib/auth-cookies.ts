@@ -7,40 +7,7 @@
 
 /** Rolun kisa sureli onbellegi: "<userId>:<rol>" (bkz. middleware.ts). */
 export const ROLE_CACHE_COOKIE = "cached_role";
-
-/**
- * Supabase oturum cerezlerinin tarayici kapaninca silinip silinmeyecegini
- * belirtir. Degerin kendisi kimlik veya yetki tasimaz; yalnizca cerez omrunu
- * belirlemek icin sunucuda okunur.
- */
-export const AUTH_PERSISTENCE_COOKIE = "auth_persistence";
-
-export type AuthPersistence = "persistent" | "session";
-
-/** Bilinmeyen/eski oturumlarda Supabase'in tavsiye ettigi kalici davranisi korur. */
-export function authPersistenceFromCookie(value: string | undefined): AuthPersistence {
-  return value === "session" ? "session" : "persistent";
-}
-
-/**
- * "Beni hatirla" kapaliysa Supabase cerezlerini oturum cerezi yapar.
- * Silme cerezlerinde maxAge=0 korunmalidir; aksi halde cikis eski oturumu
- * tarayicidan temizleyemez.
- */
-export function authCookieOptions<T extends { maxAge?: number; expires?: Date }>(
-  options: T,
-  value: string,
-  persistence: AuthPersistence,
-): T {
-  if (persistence === "persistent" || value.length === 0 || options.maxAge === 0) {
-    return options;
-  }
-
-  const sessionOptions = { ...options };
-  delete sessionOptions.maxAge;
-  delete sessionOptions.expires;
-  return sessionOptions;
-}
+export const SESSION_ACTIVITY_COOKIE = "session_last_activity";
 
 /** Acik yonlendirmeyi engelleyerek yalnizca uygulama ici bir yolu kabul eder. */
 export function safeNextPath(value: string | null | undefined): string | null {
@@ -52,6 +19,6 @@ export function safeNextPath(value: string | null | undefined): string | null {
 /** Cikista silinecek cerezler. */
 export const SESSION_SCOPED_COOKIES: readonly string[] = [
   ROLE_CACHE_COOKIE,
-  AUTH_PERSISTENCE_COOKIE,
+  SESSION_ACTIVITY_COOKIE,
   "dev_role",
 ];

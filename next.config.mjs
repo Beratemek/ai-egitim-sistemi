@@ -1,13 +1,16 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { PHASE_DEVELOPMENT_SERVER } from "next/constants.js";
 
 const projectRoot = path.dirname(fileURLToPath(import.meta.url));
 
-/** @type {import('next').NextConfig} */
-const nextConfig = {
-  reactStrictMode: true,
-  typescript: { ignoreBuildErrors: false },
-  eslint: { ignoreDuringBuilds: false },
+/** @param {string} phase */
+const createNextConfig = (phase) => {
+  /** @type {import('next').NextConfig} */
+  const nextConfig = {
+    reactStrictMode: true,
+    typescript: { ignoreBuildErrors: false },
+    eslint: { ignoreDuringBuilds: false },
 
   /**
    * Dosya izlemesinin KOKU: bu proje klasoru.
@@ -26,21 +29,24 @@ const nextConfig = {
    * Kok acikca yazilinca tahmin devre disi kalir; disaridaki lockfile
    * durmaya devam etse bile bu projeyi etkilemez.
    */
-  outputFileTracingRoot: projectRoot,
+    outputFileTracingRoot: projectRoot,
 
   /**
    * `next dev` ve `next build` varsayilan olarak ayni `.next` klasorunu kullanir.
    * Dev sunucusu acikken build alinirsa dev'in chunk'lari ezilir ve tarayici
    * "ChunkLoadError: Loading chunk ... failed" verir.
    *
-   * NEXT_DIST_DIR ile dogrulama build'i ayri bir klasore alinabilir:
-   *   NEXT_DIST_DIR=.next-verify npx next build
-   *
-   * KURAL: dev sunucusu acikken ALINAN HER BUILD bu degiskeni set etmeli.
-   * Aksi halde tarayici stilsiz kalir (CSS 404) ve sayfa devasa bir SVG
-   * gibi gorunur - sebebi anlasilmasi zor, belirtisi ise dramatik.
+   * Next.js 15'te dev ve build ciktilari kendiliginden ayrilmaz. Bu nedenle
+   * gelistirme sunucusu `.next`, build/start ise `.next-prod` kullanir.
+   * NEXT_DIST_DIR yalnizca ozel bir dogrulama klasoru gerektiginde bu secimi
+   * gecersiz kilabilir.
    */
-  distDir: process.env.NEXT_DIST_DIR || ".next",
+    distDir:
+      process.env.NEXT_DIST_DIR ||
+      (phase === PHASE_DEVELOPMENT_SERVER ? ".next" : ".next-prod"),
+  };
+
+  return nextConfig;
 };
 
-export default nextConfig;
+export default createNextConfig;

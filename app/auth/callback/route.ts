@@ -3,6 +3,10 @@ import type { EmailOtpType } from "@supabase/supabase-js";
 
 import { safeNextPath } from "@/lib/auth-cookies";
 import { dashboardPathFor } from "@/lib/roles";
+import {
+  SESSION_ACTIVITY_COOKIE,
+  SESSION_ACTIVITY_COOKIE_MAX_AGE,
+} from "@/lib/session-activity";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { isUserRole } from "@/lib/types";
 
@@ -41,6 +45,18 @@ function isOtpType(value: string | null): value is EmailOtpType {
  */
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
+
+  function redirectWithActivity(destination: string) {
+    const response = NextResponse.redirect(destination);
+    response.cookies.set(SESSION_ACTIVITY_COOKIE, String(Date.now()), {
+      httpOnly: false,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      maxAge: SESSION_ACTIVITY_COOKIE_MAX_AGE,
+    });
+    return response;
+  }
 
   const next = safeNextPath(searchParams.get("next"));
   const tokenHash = searchParams.get("token_hash");
@@ -99,7 +115,7 @@ export async function GET(request: Request) {
     );
   }
 
-  if (next) return NextResponse.redirect(`${origin}${next}`);
+  if (next) return redirectWithActivity(`${origin}${next}`);
 
   const { data: profile } = await supabase
     .from("users")
@@ -109,5 +125,5 @@ export async function GET(request: Request) {
 
   const role = isUserRole(profile?.role) ? profile.role : "ogrenci";
 
-  return NextResponse.redirect(`${origin}${dashboardPathFor(role)}`);
+  return redirectWithActivity(`${origin}${dashboardPathFor(role)}`);
 }

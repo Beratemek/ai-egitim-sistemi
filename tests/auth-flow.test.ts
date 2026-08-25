@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { safeNextPath } from "../lib/auth-cookies.ts";
 import {
-  authCookieOptions,
-  authPersistenceFromCookie,
-  safeNextPath,
-} from "../lib/auth-cookies.ts";
+  SESSION_IDLE_TIMEOUT_MS,
+  isSessionIdle,
+  parseSessionActivity,
+} from "../lib/session-activity.ts";
 
 test("safeNextPath yalnizca uygulama ici yollari kabul eder", () => {
   assert.equal(safeNextPath("/dashboard/ogrenci"), "/dashboard/ogrenci");
@@ -15,26 +16,21 @@ test("safeNextPath yalnizca uygulama ici yollari kabul eder", () => {
   assert.equal(safeNextPath(null), null);
 });
 
-test("oturum tercihi bilinmeyen degerde guvenli varsayilana duser", () => {
-  assert.equal(authPersistenceFromCookie("session"), "session");
-  assert.equal(authPersistenceFromCookie("persistent"), "persistent");
-  assert.equal(authPersistenceFromCookie(undefined), "persistent");
+test("oturum etkinlik zamani yalnizca gecerli zaman damgasini kabul eder", () => {
+  assert.equal(parseSessionActivity("1700000000000"), 1700000000000);
+  assert.equal(parseSessionActivity("bozuk"), null);
+  assert.equal(parseSessionActivity(null), null);
 });
 
-test("hatirlanmayan oturumdan kalicilik alanlari kaldirilir", () => {
-  const original = {
-    path: "/",
-    sameSite: "lax" as const,
-    maxAge: 123,
-    expires: new Date("2030-01-01T00:00:00.000Z"),
-  };
-
-  const session = authCookieOptions(original, "auth-value", "session");
-  assert.equal(session.maxAge, undefined);
-  assert.equal(session.expires, undefined);
-  assert.equal(session.path, "/");
-  assert.equal(original.maxAge, 123);
-
-  const deletion = authCookieOptions({ ...original, maxAge: 0 }, "", "session");
-  assert.equal(deletion.maxAge, 0);
+test("oturum 30 dakika dolmadan aktif, esikte pasiftir", () => {
+  const lastActivity = 1_700_000_000_000;
+  assert.equal(
+    isSessionIdle(lastActivity, lastActivity + SESSION_IDLE_TIMEOUT_MS - 1),
+    false,
+  );
+  assert.equal(
+    isSessionIdle(lastActivity, lastActivity + SESSION_IDLE_TIMEOUT_MS),
+    true,
+  );
+  assert.equal(isSessionIdle(null, lastActivity + SESSION_IDLE_TIMEOUT_MS), false);
 });
