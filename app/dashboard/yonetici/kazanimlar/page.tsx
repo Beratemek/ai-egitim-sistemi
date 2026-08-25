@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import { AlertTriangle, BookOpenCheck, CircleDashed, Target } from "lucide-react";
 
 import { ManagerOutcomeRiskChart } from "@/components/shared/manager-analytics-charts";
+import { ManagerAnalyticsFilter } from "@/components/shared/manager-analytics-filter";
+import { ManagerDataQualityNotice } from "@/components/shared/manager-data-quality-notice";
+import { ManagerOutcomeHeatmap } from "@/components/shared/manager-outcome-heatmap";
 import { ManagerOutcomeBrowser } from "@/components/shared/manager-outcome-browser";
 import { PageHeader } from "@/components/shared/page-header";
 import { StatCard } from "@/components/shared/stat-card";
@@ -12,22 +15,26 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { MANAGER_WEAK_OUTCOME_SCORE } from "@/lib/manager-analytics";
 import { getManagerAnalytics } from "@/lib/manager-data";
+import {
+  managerScopeFromSearchParams,
+  managerScopeQuery,
+  type ManagerAnalyticsSearchParams,
+} from "@/lib/manager-filters";
 
 export const metadata: Metadata = { title: "Kazanımlar" };
 
 export default async function ManagerOutcomesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ durum?: string }>;
+  searchParams: Promise<ManagerAnalyticsSearchParams & { durum?: string }>;
 }) {
-  const { durum } = await searchParams;
-  const analytics = await getManagerAnalytics();
+  const params = await searchParams;
+  const scope = managerScopeFromSearchParams(params);
+  const analytics = await getManagerAnalytics(scope);
+  const { durum } = params;
   const measuredCount = analytics.outcomes.filter((outcome) => outcome.averageScore !== null).length;
-  const weakCount = analytics.outcomes.filter(
-    (outcome) => outcome.averageScore !== null && outcome.averageScore < MANAGER_WEAK_OUTCOME_SCORE,
-  ).length;
+  const weakCount = analytics.outcomes.filter((outcome) => outcome.isActionableWeak).length;
   const unmeasuredCount = analytics.outcomes.length - measuredCount;
   const pendingCount = analytics.outcomes.reduce((sum, outcome) => sum + outcome.pendingCount, 0);
 
@@ -37,6 +44,14 @@ export default async function ManagerOutcomesPage({
         title="Kazanımlar"
         description="Öğrenme çıktılarının hangi ders, sınıf ve öğrencilerde güçlendirilmesi gerektiğini eğitmen onaylı sonuçlarla izleyin."
       />
+
+      <ManagerAnalyticsFilter
+        basePath="/dashboard/yonetici/kazanimlar"
+        scope={scope}
+        options={analytics.filterOptions}
+      />
+
+      <ManagerDataQualityNotice overview={analytics.overview} />
 
       <div className="grid grid-cols-2 gap-2.5 sm:gap-4 xl:grid-cols-4">
         <StatCard
@@ -49,7 +64,7 @@ export default async function ManagerOutcomesPage({
         <StatCard
           label="Güçlendirilmeli"
           value={weakCount}
-          hint={`Başarı eşiği %${MANAGER_WEAK_OUTCOME_SCORE}`}
+          hint={`Başarı eşiği %${analytics.masteryThreshold} · destekli kanıt`}
           icon={AlertTriangle}
           accent="cat2"
         />
@@ -69,13 +84,19 @@ export default async function ManagerOutcomesPage({
         />
       </div>
 
+      <ManagerOutcomeHeatmap
+        outcomes={analytics.outcomes}
+        mode="classrooms"
+        query={managerScopeQuery(scope)}
+      />
+
       <ManagerOutcomeRiskChart outcomes={analytics.outcomes} />
 
       <Card>
         <CardHeader>
           <CardTitle>Kazanım tarayıcısı</CardTitle>
           <CardDescription>
-            Puanı yalnızca eğitmen tarafından onaylanan yanıtlar oluşturur; bekleyen yanıtlar ayrıca gösterilir.
+            Puanı yalnızca sonuçlanmış sınavlardaki eğitmen onaylı yanıtlar oluşturur; erken sinyaller kesin zayıflık sayılmaz.
           </CardDescription>
         </CardHeader>
         <CardContent>

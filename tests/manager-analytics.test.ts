@@ -327,6 +327,7 @@ test("öğrenci puan değişimi yalnızca aynı dersin önceki sonucu ile karş�
       completed_at: "2026-01-07T10:00:00.000Z",
     },
   ];
+  data.examQuestions.push(examLink("e3", "q1", 100));
 
   const result = buildManagerAnalytics(data, {}, NOW).students.find(
     (row) => row.studentId === "s1",
@@ -334,6 +335,41 @@ test("öğrenci puan değişimi yalnızca aynı dersin önceki sonucu ile karş�
 
   assert.equal(result?.latestScore, 70);
   assert.equal(result?.scoreChange, -10);
+});
+
+test("aynı dersin farklı kazanımlarındaki sınavlar gelişim diye kıyaslanmaz", () => {
+  const data = source();
+  const otherOutcome: LearningOutcome = {
+    ...outcome(),
+    id: "o2",
+    topic: "Kuvvet",
+    outcome_text: "Net kuvveti hesaplar.",
+  };
+  const otherQuestion: Question = {
+    ...question(),
+    id: "q2",
+    outcome_id: "o2",
+    topic: "Kuvvet",
+  };
+  data.outcomes.push(otherOutcome);
+  data.questions.push(otherQuestion);
+  data.exams.push({ ...exam(), id: "e2", title: "Kuvvet tarama" });
+  data.assignments.push({ ...assignment("as2", "s1"), exam_id: "e2" });
+  data.attempts.push({
+    ...completedAttempt(),
+    id: "a2",
+    exam_id: "e2",
+    completed_at: "2026-01-07T10:00:00.000Z",
+    final_score: 30,
+  });
+  data.examQuestions.push(examLink("e2", "q2", 100));
+
+  const result = buildManagerAnalytics(data, {}, NOW).students.find(
+    (row) => row.studentId === "s1",
+  );
+
+  assert.equal(result?.latestScore, 30);
+  assert.equal(result?.scoreChange, null);
 });
 
 test("ders, sınav ve tarih filtreleri bütün analitik kapsamına uygulanır", () => {

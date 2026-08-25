@@ -13,6 +13,9 @@ import {
   ManagerOutcomeRiskChart,
   ManagerScoreTrendChart,
 } from "@/components/shared/manager-analytics-charts";
+import { ManagerAnalyticsFilter } from "@/components/shared/manager-analytics-filter";
+import { ManagerDataQualityNotice } from "@/components/shared/manager-data-quality-notice";
+import { ManagerOutcomeHeatmap } from "@/components/shared/manager-outcome-heatmap";
 import {
   ManagerRiskBadge,
   ManagerScore,
@@ -38,17 +41,26 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { getManagerAnalytics } from "@/lib/manager-data";
+import {
+  managerScopeFromSearchParams,
+  managerScopeQuery,
+  type ManagerAnalyticsSearchParams,
+} from "@/lib/manager-filters";
 
 export const metadata: Metadata = { title: "Sınıf analizi" };
 
 export default async function ManagerClassroomDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ classroom: string }>;
+  searchParams: Promise<ManagerAnalyticsSearchParams>;
 }) {
   const { classroom: encodedClassroom } = await params;
   const classroomName = decodeURIComponent(encodedClassroom);
-  const analytics = await getManagerAnalytics({ classroom: classroomName });
+  const scope = managerScopeFromSearchParams(await searchParams);
+  const query = managerScopeQuery(scope);
+  const analytics = await getManagerAnalytics({ ...scope, classroom: classroomName });
   const classroom = analytics.classrooms.find((item) => item.name === classroomName);
 
   if (!classroom) notFound();
@@ -60,13 +72,21 @@ export default async function ManagerClassroomDetailPage({
         description="Sınıfın katılım, başarı, kazanım ve öğrenci gelişim görünümü."
         actions={
           <Button asChild variant="outline" size="sm">
-            <Link href="/dashboard/yonetici/siniflar">
+            <Link href={`/dashboard/yonetici/siniflar${query}`}>
               <ArrowLeft />
               Sınıflar
             </Link>
           </Button>
         }
       />
+
+      <ManagerAnalyticsFilter
+        basePath={`/dashboard/yonetici/siniflar/${encodeURIComponent(classroomName)}`}
+        scope={scope}
+        options={analytics.filterOptions}
+      />
+
+      <ManagerDataQualityNotice overview={analytics.overview} />
 
       <div className="grid grid-cols-2 gap-2.5 sm:gap-4 xl:grid-cols-4">
         <StatCard
@@ -104,6 +124,12 @@ export default async function ManagerClassroomDetailPage({
         <ManagerOutcomeRiskChart outcomes={analytics.outcomes} />
       </div>
 
+      <ManagerOutcomeHeatmap
+        outcomes={analytics.outcomes}
+        mode="students"
+        query={query}
+      />
+
       <Card>
         <CardHeader className="flex-row items-start justify-between gap-4 space-y-0">
           <div>
@@ -131,7 +157,7 @@ export default async function ManagerClassroomDetailPage({
                 <TableRow key={student.studentId}>
                   <TableCell>
                     <Link
-                      href={`/dashboard/yonetici/ogrenciler/${student.studentId}`}
+                      href={`/dashboard/yonetici/ogrenciler/${student.studentId}${query}`}
                       className="font-medium hover:text-primary hover:underline"
                     >
                       {student.name}

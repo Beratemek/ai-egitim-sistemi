@@ -56,6 +56,7 @@ export interface ManagerStudentExamResult {
   score: number | null;
   startedAt: string;
   completedAt: string | null;
+  outcomeIds: string[];
 }
 
 export interface ManagerStudentSummary {
@@ -174,6 +175,19 @@ export function buildManagerAnalytics(
 
   const examById = new Map(selectedExams.map((exam) => [exam.id, exam]));
   const userById = new Map(allStudents.map((student) => [student.id, student]));
+  const outcomeByQuestion = new Map(
+    source.questions
+      .filter((question) => question.outcome_id)
+      .map((question) => [question.id, question.outcome_id as string]),
+  );
+  const outcomeIdsByExam = new Map<string, Set<string>>();
+  for (const link of source.examQuestions) {
+    const outcomeId = outcomeByQuestion.get(link.question_id);
+    if (!outcomeId) continue;
+    const ids = outcomeIdsByExam.get(link.exam_id) ?? new Set<string>();
+    ids.add(outcomeId);
+    outcomeIdsByExam.set(link.exam_id, ids);
+  }
   const attemptByStudentExam = new Map(
     attempts.map((attempt) => [
       attempt.student_id + KEY_SEPARATOR + attempt.exam_id,
@@ -225,6 +239,7 @@ export function buildManagerAnalytics(
           score: attempt.status === "sonuclandi" ? attempt.final_score : null,
           startedAt: attempt.started_at,
           completedAt: attempt.completed_at,
+          outcomeIds: [...(outcomeIdsByExam.get(attempt.exam_id) ?? [])],
         };
       })
       .sort(
@@ -243,7 +258,11 @@ export function buildManagerAnalytics(
       ? completedHistory
           .slice(0, -1)
           .reverse()
-          .find((item) => item.subject === latestResult.subject) ?? null
+          .find(
+            (item) =>
+              item.subject === latestResult.subject &&
+              hasOutcomeOverlap(item.outcomeIds, latestResult.outcomeIds),
+          ) ?? null
       : null;
     const previousScore = previousComparableResult?.score ?? null;
     const scoreChange =
@@ -550,4 +569,10 @@ function isExamInDateRange(
 
 function examDate(exam: Exam): string {
   return exam.ends_at ?? exam.starts_at ?? exam.created_at;
+}
+
+function hasOutcomeOverlap(left: readonly string[], right: readonly string[]): boolean {
+  if (left.length === 0 || right.length === 0) return false;
+  const rightSet = new Set(right);
+  return left.some((outcomeId) => rightSet.has(outcomeId));
 }

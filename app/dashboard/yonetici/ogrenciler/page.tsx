@@ -6,6 +6,8 @@ import {
   ManagerRiskBadge,
   ManagerScore,
 } from "@/components/shared/manager-status";
+import { ManagerAnalyticsFilter } from "@/components/shared/manager-analytics-filter";
+import { ManagerDataQualityNotice } from "@/components/shared/manager-data-quality-notice";
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,8 +27,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { ManagerRiskLevel } from "@/lib/manager-analytics";
+import type { ManagerAnalyticsScope, ManagerRiskLevel } from "@/lib/manager-analytics";
 import { getManagerAnalytics } from "@/lib/manager-data";
+import {
+  managerScopeFromSearchParams,
+  managerScopeQuery,
+  type ManagerAnalyticsSearchParams,
+} from "@/lib/manager-filters";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Öğrenciler" };
@@ -42,11 +49,14 @@ const FILTERS: Array<{ value: "all" | ManagerRiskLevel; label: string }> = [
 export default async function ManagerStudentsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ durum?: string }>;
+  searchParams: Promise<ManagerAnalyticsSearchParams & { durum?: string }>;
 }) {
-  const { durum } = await searchParams;
+  const params = await searchParams;
+  const { durum } = params;
+  const scope = managerScopeFromSearchParams(params);
+  const query = managerScopeQuery(scope);
   const activeFilter = isRiskLevel(durum) ? durum : "all";
-  const analytics = await getManagerAnalytics();
+  const analytics = await getManagerAnalytics(scope);
   const students =
     activeFilter === "all"
       ? analytics.students
@@ -60,13 +70,18 @@ export default async function ManagerStudentsPage({
         actions={<Badge variant="soft">{analytics.students.length} öğrenci</Badge>}
       />
 
+      <ManagerAnalyticsFilter
+        basePath="/dashboard/yonetici/ogrenciler"
+        scope={scope}
+        options={analytics.filterOptions}
+      />
+
+      <ManagerDataQualityNotice overview={analytics.overview} />
+
       <div className="flex flex-wrap gap-2" aria-label="Öğrenci durum filtresi">
         {FILTERS.map((filter) => {
           const active = filter.value === activeFilter;
-          const href =
-            filter.value === "all"
-              ? "/dashboard/yonetici/ogrenciler"
-              : `/dashboard/yonetici/ogrenciler?durum=${filter.value}`;
+          const href = studentsFilterHref(filter.value, scope);
           return (
             <Button
               key={filter.value}
@@ -132,7 +147,7 @@ export default async function ManagerStudentsPage({
                   <TableRow key={student.studentId}>
                     <TableCell>
                       <Link
-                        href={`/dashboard/yonetici/ogrenciler/${student.studentId}`}
+                        href={`/dashboard/yonetici/ogrenciler/${student.studentId}${query}`}
                         className="font-medium hover:text-primary hover:underline"
                       >
                         {student.name}
@@ -171,7 +186,7 @@ export default async function ManagerStudentsPage({
                     <TableCell className="text-right">
                       <Button asChild variant="ghost" size="icon">
                         <Link
-                          href={`/dashboard/yonetici/ogrenciler/${student.studentId}`}
+                          href={`/dashboard/yonetici/ogrenciler/${student.studentId}${query}`}
                           aria-label={`${student.name} gelişimini aç`}
                         >
                           <ArrowRight />
@@ -191,4 +206,14 @@ export default async function ManagerStudentsPage({
 
 function isRiskLevel(value: string | undefined): value is ManagerRiskLevel {
   return value === "risk" || value === "watch" || value === "good" || value === "unmeasured";
+}
+
+function studentsFilterHref(
+  filter: "all" | ManagerRiskLevel,
+  scope: ManagerAnalyticsScope,
+): string {
+  const params = new URLSearchParams(managerScopeQuery(scope).slice(1));
+  if (filter !== "all") params.set("durum", filter);
+  const query = params.toString();
+  return `/dashboard/yonetici/ogrenciler${query ? `?${query}` : ""}`;
 }

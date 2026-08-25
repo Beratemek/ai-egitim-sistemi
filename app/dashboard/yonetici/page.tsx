@@ -16,6 +16,8 @@ import {
   ManagerClassroomChart,
   ManagerScoreTrendChart,
 } from "@/components/shared/manager-analytics-charts";
+import { ManagerAnalyticsFilter } from "@/components/shared/manager-analytics-filter";
+import { ManagerDataQualityNotice } from "@/components/shared/manager-data-quality-notice";
 import {
   ManagerRiskBadge,
   ManagerScore,
@@ -40,13 +42,23 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { MANAGER_WEAK_OUTCOME_SCORE } from "@/lib/manager-analytics";
 import { getManagerAnalytics } from "@/lib/manager-data";
+import {
+  managerScopeFromSearchParams,
+  managerScopeQuery,
+  type ManagerAnalyticsSearchParams,
+} from "@/lib/manager-filters";
 
 export const metadata: Metadata = { title: "Eğitim görünümü" };
 
-export default async function YoneticiPage() {
-  const analytics = await getManagerAnalytics();
+export default async function YoneticiPage({
+  searchParams,
+}: {
+  searchParams: Promise<ManagerAnalyticsSearchParams>;
+}) {
+  const scope = managerScopeFromSearchParams(await searchParams);
+  const query = managerScopeQuery(scope);
+  const analytics = await getManagerAnalytics(scope);
   const { overview } = analytics;
   const atRiskStudents = analytics.students
     .filter((student) => student.riskLevel === "risk")
@@ -54,8 +66,7 @@ export default async function YoneticiPage() {
   const weakOutcomes = analytics.outcomes
     .filter(
       (outcome) =>
-        outcome.averageScore !== null &&
-        outcome.averageScore < MANAGER_WEAK_OUTCOME_SCORE,
+        outcome.isActionableWeak,
     )
     .slice(0, 5);
 
@@ -66,13 +77,21 @@ export default async function YoneticiPage() {
         description="Sınıfların katılımını, değerlendirme akışını ve öğrenme çıktılarını tek bakışta izleyin."
         actions={
           <Button asChild variant="outline" size="sm">
-            <Link href="/dashboard/yonetici/siniflar">
+            <Link href={`/dashboard/yonetici/siniflar${query}`}>
               Sınıfları incele
               <ArrowRight />
             </Link>
           </Button>
         }
       />
+
+      <ManagerAnalyticsFilter
+        basePath="/dashboard/yonetici"
+        scope={scope}
+        options={analytics.filterOptions}
+      />
+
+      <ManagerDataQualityNotice overview={analytics.overview} />
 
       <div className="grid grid-cols-2 gap-2.5 sm:gap-4 xl:grid-cols-4">
         <StatCard
@@ -118,18 +137,18 @@ export default async function YoneticiPage() {
         </div>
         <div className="grid gap-3 md:grid-cols-3">
           <AttentionLink
-            href="/dashboard/yonetici/ogrenciler?durum=risk"
+            href={`/dashboard/yonetici/ogrenciler?durum=risk${query ? `&${query.slice(1)}` : ""}`}
             icon={Users}
             value={overview.atRiskStudentCount}
             label="Müdahale bekleyen öğrenci"
             detail="Eksik teslim, düşük ortalama veya belirgin puan kaybı"
           />
           <AttentionLink
-            href="/dashboard/yonetici/kazanimlar?durum=zayif"
+            href={`/dashboard/yonetici/kazanimlar?durum=zayif${query ? `&${query.slice(1)}` : ""}`}
             icon={Target}
             value={overview.weakOutcomeCount}
             label="Güçlendirilmesi gereken kazanım"
-            detail={`Onaylı puan ortalaması ${MANAGER_WEAK_OUTCOME_SCORE} altında`}
+            detail={`En az iki soru kanıtıyla başarı eşiği %${analytics.masteryThreshold} altında`}
           />
           <AttentionLink
             href="/dashboard/yonetici/siniflar"
@@ -156,7 +175,7 @@ export default async function YoneticiPage() {
               </CardDescription>
             </div>
             <Button asChild variant="ghost" size="sm">
-              <Link href="/dashboard/yonetici/ogrenciler">Tümünü gör</Link>
+              <Link href={`/dashboard/yonetici/ogrenciler${query}`}>Tümünü gör</Link>
             </Button>
           </CardHeader>
           <CardContent className="space-y-2">
@@ -166,7 +185,7 @@ export default async function YoneticiPage() {
               atRiskStudents.map((student) => (
                 <Link
                   key={student.studentId}
-                  href={`/dashboard/yonetici/ogrenciler/${student.studentId}`}
+                  href={`/dashboard/yonetici/ogrenciler/${student.studentId}${query}`}
                   className="group flex items-center gap-3 rounded-lg border p-3 transition-colors hover:bg-accent/50"
                 >
                   <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-xs font-semibold text-primary">
@@ -199,7 +218,7 @@ export default async function YoneticiPage() {
               </CardDescription>
             </div>
             <Button asChild variant="ghost" size="sm">
-              <Link href="/dashboard/yonetici/kazanimlar">Tümünü gör</Link>
+              <Link href={`/dashboard/yonetici/kazanimlar${query}`}>Tümünü gör</Link>
             </Button>
           </CardHeader>
           <CardContent className="space-y-4">

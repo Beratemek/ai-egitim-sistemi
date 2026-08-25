@@ -45,11 +45,15 @@ export interface OutcomeDiagnosticCell {
   examCount: number;
   evidenceLevel: OutcomeEvidenceLevel;
   isActionableWeak: boolean;
+  successfulCount: number;
+  needsWorkCount: number;
+  blankCount: number;
 }
 
 export interface OutcomeGroupDiagnostic extends OutcomeDiagnosticCell {
   groupId: string;
   label: string;
+  questions: OutcomeQuestionDiagnostic[];
 }
 
 export interface OutcomeDiagnostic extends OutcomeDiagnosticCell {
@@ -61,9 +65,6 @@ export interface OutcomeDiagnostic extends OutcomeDiagnosticCell {
   classroomCount: number;
   questionCount: number;
   linkedQuestionCount: number;
-  successfulCount: number;
-  needsWorkCount: number;
-  blankCount: number;
   latestEvidenceAt: string | null;
   questions: OutcomeQuestionDiagnostic[];
   classrooms: OutcomeGroupDiagnostic[];
@@ -101,9 +102,6 @@ type EvidenceEntry = {
 };
 
 type Aggregate = OutcomeDiagnosticCell & {
-  successfulCount: number;
-  needsWorkCount: number;
-  blankCount: number;
   latestEvidenceAt: string | null;
 };
 
@@ -203,7 +201,12 @@ export function buildOutcomeDiagnostics(
 
   const visibleOutcomes = source.outcomes.filter((outcome) => {
     if (options.outcomeIds && !options.outcomeIds.has(outcome.id)) return false;
-    return !options.subject || outcome.subject === options.subject;
+    return (
+      !options.subject ||
+      outcome.subject === options.subject ||
+      entriesByOutcome.has(outcome.id) ||
+      linkedQuestionIdsByOutcome.has(outcome.id)
+    );
   });
 
   return visibleOutcomes
@@ -349,6 +352,10 @@ function groupDiagnostics(
         examCount: aggregate.examCount,
         evidenceLevel: aggregate.evidenceLevel,
         isActionableWeak: aggregate.isActionableWeak,
+        successfulCount: aggregate.successfulCount,
+        needsWorkCount: aggregate.needsWorkCount,
+        blankCount: aggregate.blankCount,
+        questions: buildQuestionDiagnostics(groupEntries, threshold),
       };
     })
     .sort((a, b) => a.label.localeCompare(b.label, "tr"));

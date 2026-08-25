@@ -3,16 +3,29 @@ import Link from "next/link";
 import { ArrowRight, School, Users } from "lucide-react";
 
 import { ManagerScore } from "@/components/shared/manager-status";
+import { ManagerAnalyticsFilter } from "@/components/shared/manager-analytics-filter";
+import { ManagerDataQualityNotice } from "@/components/shared/manager-data-quality-notice";
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { getManagerAnalytics } from "@/lib/manager-data";
+import {
+  managerScopeFromSearchParams,
+  managerScopeQuery,
+  type ManagerAnalyticsSearchParams,
+} from "@/lib/manager-filters";
 
 export const metadata: Metadata = { title: "Sınıflar" };
 
-export default async function ManagerClassroomsPage() {
-  const analytics = await getManagerAnalytics();
+export default async function ManagerClassroomsPage({
+  searchParams,
+}: {
+  searchParams: Promise<ManagerAnalyticsSearchParams>;
+}) {
+  const scope = managerScopeFromSearchParams(await searchParams);
+  const query = managerScopeQuery(scope);
+  const analytics = await getManagerAnalytics(scope);
 
   return (
     <>
@@ -21,6 +34,14 @@ export default async function ManagerClassroomsPage() {
         description="Her sınıfın sınav katılımını, sonuçlanma durumunu ve desteğe ihtiyaç duyan öğrencilerini karşılaştırın."
         actions={<Badge variant="soft">{analytics.classrooms.length} sınıf</Badge>}
       />
+
+      <ManagerAnalyticsFilter
+        basePath="/dashboard/yonetici/siniflar"
+        scope={scope}
+        options={analytics.filterOptions}
+      />
+
+      <ManagerDataQualityNotice overview={analytics.overview} />
 
       {analytics.classrooms.length === 0 ? (
         <Card>
@@ -41,7 +62,7 @@ export default async function ManagerClassroomsPage() {
           {analytics.classrooms.map((classroom, index) => (
             <Link
               key={classroom.name}
-              href={`/dashboard/yonetici/siniflar/${encodeURIComponent(classroom.name)}`}
+              href={`/dashboard/yonetici/siniflar/${encodeURIComponent(classroom.name)}${query}`}
               className="group rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <Card className="relative h-full overflow-hidden transition-[border-color,background-color,transform] duration-200 group-hover:-translate-y-0.5 group-hover:border-primary/40 group-hover:bg-accent/20">

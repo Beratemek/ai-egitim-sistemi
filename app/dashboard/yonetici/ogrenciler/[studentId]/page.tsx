@@ -10,6 +10,8 @@ import {
 } from "lucide-react";
 
 import { ManagerOutcomeRiskChart } from "@/components/shared/manager-analytics-charts";
+import { ManagerAnalyticsFilter } from "@/components/shared/manager-analytics-filter";
+import { ManagerDataQualityNotice } from "@/components/shared/manager-data-quality-notice";
 import {
   ManagerRiskBadge,
   ManagerScore,
@@ -39,16 +41,26 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { getManagerAnalytics } from "@/lib/manager-data";
+import {
+  managerScopeFromSearchParams,
+  managerScopeQuery,
+  type ManagerAnalyticsSearchParams,
+} from "@/lib/manager-filters";
+import type { OutcomeEvidenceLevel } from "@/lib/outcome-diagnostics";
 
 export const metadata: Metadata = { title: "Öğrenci gelişimi" };
 
 export default async function ManagerStudentDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ studentId: string }>;
+  searchParams: Promise<ManagerAnalyticsSearchParams>;
 }) {
   const { studentId } = await params;
-  const analytics = await getManagerAnalytics({ studentId });
+  const scope = managerScopeFromSearchParams(await searchParams);
+  const query = managerScopeQuery(scope);
+  const analytics = await getManagerAnalytics({ ...scope, studentId });
   const student = analytics.students[0];
 
   if (!student) notFound();
@@ -79,7 +91,7 @@ export default async function ManagerStudentDetailPage({
           <>
             <ManagerRiskBadge level={student.riskLevel} />
             <Button asChild variant="outline" size="sm">
-              <Link href="/dashboard/yonetici/ogrenciler">
+              <Link href={`/dashboard/yonetici/ogrenciler${query}`}>
                 <ArrowLeft />
                 Öğrenciler
               </Link>
@@ -87,6 +99,14 @@ export default async function ManagerStudentDetailPage({
           </>
         }
       />
+
+      <ManagerAnalyticsFilter
+        basePath={`/dashboard/yonetici/ogrenciler/${studentId}`}
+        scope={scope}
+        options={analytics.filterOptions}
+      />
+
+      <ManagerDataQualityNotice overview={analytics.overview} />
 
       <div className="grid grid-cols-2 gap-2.5 sm:gap-4 xl:grid-cols-4">
         <StatCard
@@ -111,9 +131,9 @@ export default async function ManagerStudentDetailPage({
           accent="cat3"
         />
         <StatCard
-          label="Zayıf kazanım"
+          label="Destek alanı"
           value={student.weakOutcomeCount}
-          hint="Onaylı yanıtlara göre"
+          hint="Yeterli kanıta sahip sonuçlara göre"
           icon={AlertTriangle}
           accent="cat4"
         />
@@ -146,6 +166,17 @@ export default async function ManagerStudentDetailPage({
                         {outcome.subject} · {outcome.answerCount} onaylı
                         {outcome.pendingCount > 0 ? ` · ${outcome.pendingCount} bekliyor` : ""}
                       </p>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        <EvidenceBadge level={outcome.evidenceLevel} />
+                        {outcome.blankCount > 0 ? (
+                          <Badge variant="outline">{outcome.blankCount} boş</Badge>
+                        ) : null}
+                        {outcome.questions[0]?.wrongAnswers[0] ? (
+                          <Badge variant="danger">
+                            Sık hata: {outcome.questions[0].wrongAnswers[0].answer}
+                          </Badge>
+                        ) : null}
+                      </div>
                     </div>
                     <ManagerScore score={outcome.averageScore} />
                   </div>
@@ -216,4 +247,11 @@ function formatDate(value: string) {
     month: "short",
     year: "numeric",
   }).format(new Date(value));
+}
+
+function EvidenceBadge({ level }: { level: OutcomeEvidenceLevel }) {
+  if (level === "strong") return <Badge variant="success">Güçlü kanıt</Badge>;
+  if (level === "supported") return <Badge variant="soft">Destekli bulgu</Badge>;
+  if (level === "early") return <Badge variant="warning">Erken sinyal</Badge>;
+  return <Badge variant="outline">Ölçülmedi</Badge>;
 }
