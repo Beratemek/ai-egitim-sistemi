@@ -14,6 +14,7 @@ import {
   ListChecks,
   ListTodo,
   MessageSquareText,
+  NotebookPen,
   School,
   Target,
   TrendingUp,
@@ -101,6 +102,12 @@ const BASE_NAV = {
       label: "Sonuçlarım",
       icon: Trophy,
       description: "Onaylanan puan ve geri bildirimler",
+    },
+    {
+      href: "/dashboard/ogrenci/yanlislarim",
+      label: "Yanlışlarım Defteri",
+      icon: NotebookPen,
+      description: "Yanlışlarını incele ve yeniden çalış",
     },
     {
       href: "/dashboard/ogrenci/gelisim",

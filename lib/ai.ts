@@ -249,6 +249,91 @@ const gradingResultSchema = z.object({
     .describe("Rubrik maddesi bazinda kirilim."),
 });
 
+const mistakeCoachSchema = z.object({
+  conceptSummary: z
+    .string()
+    .describe("Kazanımı yeniden kuran, öğrenciye doğrudan hitap eden 2-4 cümle."),
+  likelyMisconception: z
+    .string()
+    .describe("Kesin tanı iddiası taşımayan kısa olası yanılgı açıklaması."),
+  studySteps: z
+    .array(z.string())
+    .min(2)
+    .max(3)
+    .describe("Öğrencinin hemen uygulayabileceği iki veya üç kısa çalışma adımı."),
+  practiceQuestion: z
+    .string()
+    .describe("Orijinal soruyu kopyalamayan, aynı kazanımı çalıştıran tek yeni soru."),
+  hint: z
+    .string()
+    .describe("Alıştırmanın cevabını vermeyen, düşünme yönü sunan tek ipucu."),
+});
+
+export interface MistakeCoachInput {
+  subject: string;
+  topic: string;
+  outcomeText?: string | null;
+  questionText: string;
+  questionType: QuestionType;
+  studentAnswer: string;
+  approvedScore: number;
+  instructorNote?: string | null;
+}
+
+export type MistakeCoachResult = z.infer<typeof mistakeCoachSchema>;
+
+const examAiReviewSchema = z.object({
+  summary: z
+    .string()
+    .describe("Sınavın ölçme kalitesini özetleyen, 3-5 cümlelik dengeli değerlendirme."),
+  strengths: z
+    .array(z.string())
+    .min(1)
+    .max(4)
+    .describe("Sınavda korunması gereken güçlü yönler."),
+  risks: z
+    .array(
+      z.object({
+        severity: z.enum(["yuksek", "orta", "dusuk"]),
+        title: z.string(),
+        explanation: z.string(),
+        recommendation: z.string(),
+        questionNumbers: z.array(z.number().int().positive()).max(12),
+      }),
+    )
+    .max(8)
+    .describe("Belirsizlik, bilişsel seviye, kapsam ve ifade kalitesi riskleri."),
+  revisionPriorities: z
+    .array(z.string())
+    .min(1)
+    .max(5)
+    .describe("Eğitmenin yayından önce uygulayacağı öncelikli revizyon sırası."),
+});
+
+export interface ExamAiReviewQuestion {
+  position: number;
+  points: number;
+  text: string;
+  type: QuestionType;
+  options: Array<{ key: string; text: string }> | null;
+  correctAnswer: string | null;
+  rubric: string | null;
+  difficulty: string | null;
+  outcomeText: string | null;
+  subject: string;
+  topic: string;
+}
+
+export interface ExamAiReviewInput {
+  title: string;
+  description: string;
+  subject: string;
+  durationMinutes: number | null;
+  questions: readonly ExamAiReviewQuestion[];
+}
+
+export type ExamAiReviewResult = z.infer<typeof examAiReviewSchema>;
+
 /* -------------------------------------------------------------------------- */
 /*  generateQuestions                                                         */
 /* -------------------------------------------------------------------------- */
@@ -878,6 +963,143 @@ export async function gradeAnswer(
 }
 
 /* -------------------------------------------------------------------------- */
+/*  coachMistake                                                              */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Nihai sonucu açıklanmış düşük puanlı bir cevap için kısa çalışma üretir.
+ *
+ * Bu fonksiyon doğru cevap ya da rubrik almaz. Böylece çağıran katmanın gizli
+ * değerlendirme anahtarını istemciye veya modele taşıması gerekmeksizin,
+ * öğrencinin kendi cevabı ve ölçülen kazanım üzerinden öğretici destek verir.
+ */
+export async function coachMistake(
+  input: MistakeCoachInput,
+): Promise<MistakeCoachResult> {
+  const normalized: MistakeCoachInput = {
+    ...input,
+    subject: input.subject.trim().slice(0, 120),
+    topic: input.topic.trim().slice(0, 160),
+    outcomeText: input.outcomeText?.trim().slice(0, 500) || null,
+    questionText: input.questionText.trim().slice(0, 2_000),
+    studentAnswer: input.studentAnswer.trim().slice(0, 2_000) || "Cevap verilmedi.",
+    approvedScore: Math.min(100, Math.max(0, input.approvedScore)),
+    instructorNote: input.instructorNote?.trim().slice(0, 1_000) || null,
+  };
+
+  if (!normalized.questionText) {
+    throw new Error("[ai] coachMistake: soru metni bos olamaz.");
+  }
+
+  if (serverEnv.aiMockMode) return mockCoachMistake(normalized);
+
+  const { object } = await generateObject({
+    maxRetries: 0,
+    model: getModel(serverEnv.aiModelGeneration),
+    schema: mistakeCoachSchema,
+    system: [
+      "Sen sabırlı ve ölçme-değerlendirme konusunda deneyimli bir öğrenme koçusun.",
+      "Öğrencinin tamamladığı sınavdaki düşük puanlı cevabı, soruyu ve ölçülen kazanımı incelersin.",
+      "Amaç resmi sorunun cevabını açıklamak değil, eksik kavramı kısa biçimde yeniden kurmak ve yeni bir alıştırmayla çalıştırmaktır.",
+      "Yanılgıyı kesin tanı olarak sunma; 'olabilir', 'görünüyor' gibi ihtiyatlı dil kullan.",
+      "Orijinal soruyu, seçeneklerini veya olası cevap anahtarını tekrar etme.",
+      "Yeni alıştırmanın cevabını ve çözümünü verme; yalnızca ayrı bir ipucu üret.",
+      "Türkçe, yaşa uygun, yargılamayan ve somut bir dil kullan.",
+    ].join(" "),
+    prompt: [
+      `DERS: ${normalized.subject || "Belirtilmedi"}`,
+      `KONU: ${normalized.topic || "Belirtilmedi"}`,
+      normalized.outcomeText ? `KAZANIM: ${normalized.outcomeText}` : "",
+      `SORU TÜRÜ: ${normalized.questionType === "test" ? "Çoktan seçmeli" : "Açık uçlu"}`,
+      `SORU: ${normalized.questionText}`,
+      `ÖĞRENCİNİN CEVABI: ${normalized.studentAnswer}`,
+      `NİHAİ PUAN: ${normalized.approvedScore}/100`,
+      normalized.instructorNote ? `EĞİTMEN NOTU: ${normalized.instructorNote}` : "",
+      "GÖREV: Kısa kavram anlatımı, olası yanılgı, uygulanabilir çalışma adımları, yeni benzer alıştırma ve tek ipucu üret.",
+    ]
+      .filter(Boolean)
+      .join("\n\n"),
+  });
+
+  return {
+    conceptSummary: object.conceptSummary.trim(),
+    likelyMisconception: object.likelyMisconception.trim(),
+    studySteps: object.studySteps.map((step) => step.trim()).filter(Boolean).slice(0, 3),
+    practiceQuestion: object.practiceQuestion.trim(),
+    hint: object.hint.trim(),
+  };
+}
+
+/**
+ * Öğrenci verisi içermeyen sınav taslağını pedagojik açıdan inceler.
+ * Deterministik yayın engellerinin yerine geçmez; yalnızca insan kararını
+ * destekleyen nitel öneriler üretir.
+ */
+export async function reviewExamQuality(
+  input: ExamAiReviewInput,
+): Promise<ExamAiReviewResult> {
+  const normalized: ExamAiReviewInput = {
+    title: input.title.trim().slice(0, 200),
+    description: input.description.trim().slice(0, 1_000),
+    subject: input.subject.trim().slice(0, 120),
+    durationMinutes: input.durationMinutes,
+    questions: input.questions.slice(0, 100).map((question) => ({
+      ...question,
+      text: question.text.trim().slice(0, 2_000),
+      rubric: question.rubric?.trim().slice(0, 2_000) || null,
+      outcomeText: question.outcomeText?.trim().slice(0, 600) || null,
+      options: question.options?.slice(0, 8).map((option) => ({
+        key: option.key.slice(0, 20),
+        text: option.text.trim().slice(0, 500),
+      })) ?? null,
+    })),
+  };
+
+  if (serverEnv.aiMockMode) return mockReviewExamQuality(normalized);
+
+  const { object } = await generateObject({
+    maxRetries: 0,
+    model: getModel(serverEnv.aiModelGeneration),
+    schema: examAiReviewSchema,
+    system: [
+      "Sen deneyimli bir ölçme-değerlendirme ve eğitim programları uzmanısın.",
+      "Yayımlanmamış bir sınav taslağını öğrenci görmeden önce incelersin.",
+      "Deterministik biçim kontrolleri başka bir katmanda yapılır; sen kapsam geçerliği, bilişsel çeşitlilik, ifade açıklığı, çeldirici niteliği, olası ipucu/yanlılık ve süre uyumuna odaklan.",
+      "Sorunun doğru cevabını değiştirme veya yeni cevap anahtarı uydurma.",
+      "Bir risk belirli sorularla ilgiliyse soru numaralarını ver; tüm sınava aitse boş liste kullan.",
+      "Her öneriyi uygulanabilir ve kısa yaz. Kesin olmayan çıkarımları olasılık diliyle belirt.",
+      "Türkçe yanıt ver.",
+    ].join(" "),
+    prompt: [
+      `SINAV: ${normalized.title || "Başlıksız"}`,
+      `DERS: ${normalized.subject || "Belirtilmedi"}`,
+      normalized.description ? `AMAÇ/AÇIKLAMA: ${normalized.description}` : "",
+      `SÜRE: ${normalized.durationMinutes ?? "Belirtilmedi"} dakika`,
+      `SORULAR:\n${JSON.stringify(normalized.questions, null, 2)}`,
+      "GÖREV: Güçlü yönleri koruyarak riskleri ve yayından önceki öncelikli revizyonları belirle.",
+    ]
+      .filter(Boolean)
+      .join("\n\n"),
+  });
+
+  return {
+    summary: object.summary.trim(),
+    strengths: object.strengths.map((item) => item.trim()).filter(Boolean).slice(0, 4),
+    risks: object.risks.slice(0, 8).map((risk) => ({
+      ...risk,
+      title: risk.title.trim(),
+      explanation: risk.explanation.trim(),
+      recommendation: risk.recommendation.trim(),
+      questionNumbers: [...new Set(risk.questionNumbers)].sort((a, b) => a - b),
+    })),
+    revisionPriorities: object.revisionPriorities
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .slice(0, 5),
+  };
+}
+
+/* -------------------------------------------------------------------------- */
 /*  Normalizasyon                                                             */
 /* -------------------------------------------------------------------------- */
 
@@ -1067,6 +1289,54 @@ function mockGradeAnswer(
       max: Math.round(perCriterion),
       comment: "[MOCK] Ornek gerekce.",
     })),
+  };
+}
+
+function mockCoachMistake(input: MistakeCoachInput): MistakeCoachResult {
+  const outcome = input.outcomeText || input.topic || input.subject;
+  return {
+    conceptSummary: `[MOCK] ${outcome} kazanımında temel kavramları kendi cümlelerinle ilişkilendirerek yeniden kur. Tanımı ezberlemek yerine kavramın nedenini ve bir örneğini birlikte düşün.`,
+    likelyMisconception:
+      "[MOCK] Sorudaki iki yakın kavramı birbirinden ayıran ölçüt gözden kaçmış olabilir.",
+    studySteps: [
+      "Kavramı bir cümleyle tanımla ve anahtar iki özelliğini yaz.",
+      "Bir doğru örnek ile bir karşı örneği yan yana karşılaştır.",
+      "Benzer bir soruyu çözerken seçimini bu ölçütle gerekçelendir.",
+    ],
+    practiceQuestion: `[MOCK] ${input.topic || input.subject} konusunda aynı kazanımı farklı bir örnek üzerinde nasıl açıklarsın?`,
+    hint: "Tanımdaki ayırt edici özelliği önce bul, ardından örneğe uygula.",
+  };
+}
+
+function mockReviewExamQuality(input: ExamAiReviewInput): ExamAiReviewResult {
+  const outcomeCount = new Set(
+    input.questions.map((question) => question.outcomeText).filter(Boolean),
+  ).size;
+  return {
+    summary: `[MOCK] ${input.questions.length} soruluk taslak ${outcomeCount} farklı kazanımı ölçüyor. Soru kökleri ve ölçülen hedefler yayından önce birlikte gözden geçirilmelidir.`,
+    strengths: [
+      "Soru ve puan yapısı birlikte incelenebilecek biçimde hazırlanmış.",
+      "Kazanım bağlantıları ölçme kapsamını görünür kılıyor.",
+    ],
+    risks:
+      input.questions.length > 0
+        ? [
+            {
+              severity: "orta",
+              title: "Bilişsel çeşitliliği doğrulayın",
+              explanation:
+                "[MOCK] Soruların yalnız hatırlama değil, uygulama ve gerekçelendirme düzeylerini de kapsadığı kontrol edilmeli.",
+              recommendation:
+                "En az bir soruyu farklı bağlamda uygulama veya analiz gerektirecek biçimde gözden geçirin.",
+              questionNumbers: [],
+            },
+          ]
+        : [],
+    revisionPriorities: [
+      "Deterministik engelleri kapatın.",
+      "Kazanım ve zorluk dağılımını birlikte doğrulayın.",
+      "Soru köklerini öğrenci açısından son kez okuyun.",
+    ],
   };
 }
 
