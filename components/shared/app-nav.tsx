@@ -7,6 +7,7 @@ import {
   BookOpen,
   ClipboardCheck,
   ClipboardList,
+  ChartNoAxesColumnIncreasing,
   GraduationCap,
   LayoutDashboard,
   Library,
@@ -80,6 +81,12 @@ const BASE_NAV = {
       label: "Ders Geri Bildirimleri",
       icon: MessageSquareText,
       description: "Anonim öğrenci deneyimi özeti",
+    },
+    {
+      href: "/dashboard/egitmen/soru-analizi",
+      label: "Soru Analizi",
+      icon: ChartNoAxesColumnIncreasing,
+      description: "Başarı, çeldirici ve ayırt edicilik",
     },
   ],
   ogrenci: [

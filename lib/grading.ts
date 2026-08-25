@@ -10,6 +10,7 @@
 
 import { gradeAnswer } from "@/lib/ai";
 import type { GradingResult, Question, SubmissionStatus } from "@/lib/types";
+import { normalizeOptionKey } from "@/lib/answer-normalization";
 
 /** Puanlama icin gereken soru alanlari. */
 export type GradableQuestion = Pick<
@@ -31,12 +32,6 @@ export interface AutoGradeResult {
  * Turkce'ye ozel buyuk harf donusumu KULLANILMAZ; secenek anahtarlari A-D'dir ve
  * `toLocaleUpperCase("tr")` "i" harfini "I" yerine "İ" yapardi.
  */
-function normalizeOptionKey(value: string): string {
-  const trimmed = value.trim();
-  const leadingLetter = trimmed.match(/^[A-Za-z]/);
-  return (leadingLetter ? leadingLetter[0] : trimmed).toUpperCase();
-}
-
 /**
  * Ogrenci cevabina on puan uretir.
  *
