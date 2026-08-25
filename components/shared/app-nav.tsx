@@ -135,9 +135,9 @@ const BASE_NAV = {
     },
     {
       href: "/dashboard/yonetici/geri-bildirimler",
-      label: "Ders Geri Bildirimleri",
+      label: "Anonim Geri Bildirimler",
       icon: MessageSquareText,
-      description: "Ders ve eğitmen bazlı anonim rapor",
+      description: "Ders deneyimi ve iyileştirme analizi",
     },
   ],
 } satisfies Record<Exclude<UserRole, "admin">, readonly NavItem[]>;
