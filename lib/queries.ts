@@ -36,6 +36,7 @@ import type {
   Exam,
   ExamAssignment,
   ExamAttempt,
+  ExamQuestion,
   ExamStatistics,
   LearningOutcome,
   PreferenceStats,
@@ -152,6 +153,8 @@ export const getExams = cache(async function getExams(options: { onlyPublished?:
 
 export interface ExamDetail {
   exam: Exam;
+  /** Kopmuş bağlantıları da kalite kontrolünde görebilmek için ham bağlar. */
+  examQuestions: ExamQuestion[];
   /** Sinavdaki sorular, `position` sirasina gore. */
   questions: (Question & { points: number; position: number })[];
 }
@@ -163,6 +166,14 @@ export async function getExamDetail(examId: string): Promise<ExamDetail | null> 
 
     return {
       exam,
+      examQuestions: MOCK_QUESTIONS.filter((q) => q.status === "onayli").map(
+        (question, index) => ({
+          exam_id: examId,
+          question_id: question.id,
+          points: 10,
+          position: index,
+        }),
+      ),
       questions: MOCK_QUESTIONS.filter((q) => q.status === "onayli").map(
         (question, index) => ({ ...question, points: 10, position: index }),
       ),
@@ -177,7 +188,7 @@ export async function getExamDetail(examId: string): Promise<ExamDetail | null> 
     supabase.from("exams").select("*").eq("id", examId).maybeSingle(),
     supabase
       .from("exam_questions")
-      .select("question_id, position, points")
+      .select("exam_id, question_id, position, points")
       .eq("exam_id", examId)
       .order("position", { ascending: true }),
   ]);
@@ -185,7 +196,7 @@ export async function getExamDetail(examId: string): Promise<ExamDetail | null> 
   if (!exam) return null;
 
   const questionIds = (links ?? []).map((link) => link.question_id);
-  if (questionIds.length === 0) return { exam, questions: [] };
+  if (questionIds.length === 0) return { exam, examQuestions: [], questions: [] };
 
   const { data: questions } = await supabase
     .from("questions")
@@ -202,7 +213,7 @@ export async function getExamDetail(examId: string): Promise<ExamDetail | null> 
     })
     .filter((item): item is Question & { points: number; position: number } => item !== null);
 
-  return { exam, questions: ordered };
+  return { exam, examQuestions: links ?? [], questions: ordered };
 }
 
 /* -------------------------------------------------------------------------- */

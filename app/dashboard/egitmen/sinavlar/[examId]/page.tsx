@@ -7,11 +7,13 @@ import { ExamBuilder } from "@/components/shared/exam-builder";
 import { ExamClassroomAssign } from "@/components/shared/exam-classroom-assign";
 import { ExamDetailTabs } from "@/components/shared/exam-detail-tabs";
 import { ExamPaperPanel } from "@/components/shared/exam-paper-panel";
+import { ExamQualityPanel } from "@/components/shared/exam-quality-panel";
 import { ExamSettingsPanel } from "@/components/shared/exam-settings-panel";
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { isSupabaseConfigured } from "@/lib/env";
+import { evaluateExamQuality } from "@/lib/exam-quality";
 import {
   getExamAssignedStudentIds,
   getExamDetail,
@@ -77,6 +79,15 @@ export default async function SinavDetayPage({
     .map((classroom) => classroom.name);
 
   const totalPoints = detail.questions.reduce((sum, q) => sum + q.points, 0);
+  const qualityReport = evaluateExamQuality({
+    exam: detail.exam,
+    examQuestions: detail.examQuestions,
+    questions: detail.questions,
+    assignmentCount: assignedIds.length,
+  });
+  const qualityQuestionNumbers = Object.fromEntries(
+    detail.questions.map((question) => [question.id, question.position + 1]),
+  );
 
   return (
     <>
@@ -109,6 +120,9 @@ export default async function SinavDetayPage({
         questionCount={detail.questions.length}
         totalPoints={totalPoints}
         assignedCount={assignedIds.length}
+        qualityCanPublish={qualityReport.canPublish}
+        qualityBlockerCount={qualityReport.blockers.length}
+        qualityWarningCount={qualityReport.warnings.length}
         canPersist={isSupabaseConfigured}
         kurulum={
           <>
@@ -134,6 +148,14 @@ export default async function SinavDetayPage({
               canPersist={isSupabaseConfigured}
             />
           </>
+        }
+        kalite={
+          <ExamQualityPanel
+            examId={examId}
+            report={qualityReport}
+            questionNumbers={qualityQuestionNumbers}
+            canPersist={isSupabaseConfigured}
+          />
         }
         siniflar={
           <ExamClassroomAssign

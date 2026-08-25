@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { demoGuard, type ActionResult } from "@/app/actions/shared";
 import { isSupabaseConfigured } from "@/lib/env";
+import { loadExamQualityBundle } from "@/lib/exam-quality-data";
 import { getSubjectOptions } from "@/lib/queries";
 import { canonicalizeSubject } from "@/lib/subjects";
 import type { Exam } from "@/lib/types";
@@ -228,16 +229,34 @@ export async function setExamPublished(
   const supabase = await createServerSupabaseClient();
 
   if (isPublished) {
-    const { count, error: countError } = await supabase
-      .from("exam_questions")
-      .select("*", { count: "exact", head: true })
-      .eq("exam_id", examId);
-
-    if (countError) return { ok: false, error: countError.message };
-    if (!count) {
+    try {
+      const quality = await loadExamQualityBundle(supabase, examId);
+      if (!quality) {
+        return {
+          ok: false,
+          error: "Sınav bulunamadı veya bu sınav üzerinde yetkiniz yok.",
+        };
+      }
+      if (!quality.report.canPublish) {
+        const summary = quality.report.blockers
+          .slice(0, 3)
+          .map((issue) => issue.title)
+          .join("; ");
+        const remaining = Math.max(0, quality.report.blockers.length - 3);
+        return {
+          ok: false,
+          error: `Yayın öncesi kalite kontrolü tamamlanmadı: ${summary}${
+            remaining > 0 ? ` ve ${remaining} engel daha` : ""
+          }. Kalite Kontrolü sekmesini inceleyin.`,
+        };
+      }
+    } catch (caught) {
       return {
         ok: false,
-        error: "Sinavi yayina almak icin en az bir soru eklemelisiniz.",
+        error:
+          caught instanceof Error
+            ? caught.message
+            : "Yayın öncesi kalite kontrolü tamamlanamadı.",
       };
     }
   }
