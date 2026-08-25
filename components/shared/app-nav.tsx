@@ -4,7 +4,6 @@ import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  BarChart3,
   BookOpen,
   ClipboardCheck,
   ClipboardList,
@@ -13,6 +12,8 @@ import {
   Library,
   ListChecks,
   ListTodo,
+  School,
+  Target,
   TrendingUp,
   Trophy,
   UserCog,
@@ -103,9 +104,27 @@ const BASE_NAV = {
   egitim_yoneticisi: [
     {
       href: "/dashboard/yonetici",
-      label: "İstatistikler",
-      icon: BarChart3,
-      description: "Başarı ve katılım raporları",
+      label: "Genel Bakış",
+      icon: LayoutDashboard,
+      description: "Eğitim sürecinin kurum özeti",
+    },
+    {
+      href: "/dashboard/yonetici/siniflar",
+      label: "Sınıflar",
+      icon: School,
+      description: "Sınav, katılım ve sınıf gelişimi",
+    },
+    {
+      href: "/dashboard/yonetici/ogrenciler",
+      label: "Öğrenciler",
+      icon: Users,
+      description: "Bireysel gelişim ve erken uyarılar",
+    },
+    {
+      href: "/dashboard/yonetici/kazanimlar",
+      label: "Kazanımlar",
+      icon: Target,
+      description: "Öğrenme çıktısı başarı analizi",
     },
   ],
 } satisfies Record<Exclude<UserRole, "admin">, readonly NavItem[]>;
