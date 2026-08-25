@@ -151,7 +151,7 @@ function source(): ManagerAnalyticsSource {
     ],
     questions: [question()],
     outcomes: [outcome()],
-    examQuestions: [],
+    examQuestions: [examLink("e1", "q1", 100)],
   };
 }
 
@@ -238,6 +238,34 @@ test("tek soruluk düşük ölçüm erken sinyaldir, kesin zayıflık sayılmaz"
   assert.equal(result.outcomes[0]?.isActionableWeak, false);
   assert.equal(result.overview.weakOutcomeCount, 0);
   assert.equal(result.students.find((row) => row.studentId === "s1")?.weakOutcomeCount, 0);
+});
+
+test("taslak cevap onay bekleyen sayılmaz", () => {
+  const data = source();
+  data.submissions = [submission("sub1", "s1", "gonderildi", null)];
+
+  const [result] = buildManagerAnalytics(data, {}, NOW).outcomes;
+
+  assert.equal(result?.pendingCount, 0);
+  assert.equal(result?.draftCount, 1);
+});
+
+test("sonuçlanmamış attempt veya kopuk sınav-soru bağı sayısal kanıta girmez", () => {
+  const incomplete = source();
+  incomplete.attempts = [];
+  incomplete.submissions = [submission("sub1", "s1", "egitmen_onayli", 20)];
+
+  const orphan = source();
+  orphan.examQuestions = [];
+  orphan.submissions = [submission("sub1", "s1", "egitmen_onayli", 20)];
+
+  const incompleteOutcome = buildManagerAnalytics(incomplete, {}, NOW).outcomes[0];
+  const orphanOutcome = buildManagerAnalytics(orphan, {}, NOW).outcomes[0];
+
+  assert.equal(incompleteOutcome?.averageScore, null);
+  assert.equal(incompleteOutcome?.excludedEvidenceCount, 1);
+  assert.equal(orphanOutcome?.averageScore, null);
+  assert.equal(orphanOutcome?.excludedEvidenceCount, 1);
 });
 
 test("başarı eşiği rapor kapsamına göre değiştirilebilir", () => {

@@ -1,5 +1,6 @@
 import type {
   Exam,
+  ExamAttempt,
   ExamQuestion,
   LearningOutcome,
   Question,
@@ -38,6 +39,8 @@ export interface OutcomeDiagnosticCell {
   averageScore: number | null;
   answerCount: number;
   pendingCount: number;
+  draftCount: number;
+  excludedEvidenceCount: number;
   measuredQuestionCount: number;
   examCount: number;
   evidenceLevel: OutcomeEvidenceLevel;
@@ -72,6 +75,7 @@ export interface OutcomeDiagnosticsSource {
   questions: readonly Question[];
   examQuestions: readonly ExamQuestion[];
   submissions: readonly Submission[];
+  attempts: readonly ExamAttempt[];
   exams: readonly Exam[];
   students: readonly UserProfile[];
 }
@@ -89,6 +93,8 @@ type EvidenceEntry = {
   points: number;
   approvedScore: number | null;
   pending: boolean;
+  draft: boolean;
+  excludedEvidence: boolean;
   blank: boolean;
   successful: boolean;
   wrongAnswer: OutcomeWrongAnswerSummary | null;
@@ -108,6 +114,12 @@ export function buildOutcomeDiagnostics(
   const threshold = clampThreshold(options.threshold);
   const studentById = new Map(source.students.map((student) => [student.id, student]));
   const examById = new Map(source.exams.map((exam) => [exam.id, exam]));
+  const attemptByStudentExam = new Map(
+    source.attempts.map((attempt) => [
+      examStudentKey(attempt.exam_id, attempt.student_id),
+      attempt,
+    ]),
+  );
   const questionById = new Map(source.questions.map((question) => [question.id, question]));
   const outcomeByQuestion = new Map<string, string>();
   const poolQuestionCounts = new Map<string, number>();
@@ -148,13 +160,22 @@ export function buildOutcomeDiagnostics(
     if (options.subject && examById.get(submission.exam_id)?.subject !== options.subject) continue;
     if (options.outcomeIds && !options.outcomeIds.has(question.outcome_id)) continue;
 
-    const approved =
+    const instructorApproved =
       submission.status === "egitmen_onayli" &&
       submission.instructor_approved_score !== null;
-    const approvedScore = approved
+    const linkPoints = pointsByExamQuestion.get(
+      examQuestionKey(submission.exam_id, submission.question_id),
+    );
+    const attemptCompleted =
+      attemptByStudentExam.get(
+        examStudentKey(submission.exam_id, submission.student_id),
+      )?.status === "sonuclandi";
+    const eligibleEvidence =
+      instructorApproved && attemptCompleted && linkPoints !== undefined;
+    const approvedScore = eligibleEvidence
       ? clampScore(submission.instructor_approved_score as number)
       : null;
-    const blank = approved && isBlankAnswer(submission.answer_text);
+    const blank = eligibleEvidence && isBlankAnswer(submission.answer_text);
     const successful =
       approvedScore !== null &&
       !blank &&
@@ -166,12 +187,11 @@ export function buildOutcomeDiagnostics(
     const entry: EvidenceEntry = {
       submission,
       question,
-      points:
-        pointsByExamQuestion.get(
-          examQuestionKey(submission.exam_id, submission.question_id),
-        ) ?? 1,
+      points: linkPoints ?? 0,
       approvedScore,
-      pending: !approved,
+      pending: submission.status === "ai_degerlendirildi",
+      draft: submission.status === "gonderildi",
+      excludedEvidence: instructorApproved && !eligibleEvidence,
       blank,
       successful,
       wrongAnswer,
@@ -280,6 +300,8 @@ function aggregateEntries(
     averageScore,
     answerCount: approved.length,
     pendingCount: entries.filter((entry) => entry.pending).length,
+    draftCount: entries.filter((entry) => entry.draft).length,
+    excludedEvidenceCount: entries.filter((entry) => entry.excludedEvidence).length,
     measuredQuestionCount,
     examCount,
     evidenceLevel,
@@ -321,6 +343,8 @@ function groupDiagnostics(
         averageScore: aggregate.averageScore,
         answerCount: aggregate.answerCount,
         pendingCount: aggregate.pendingCount,
+        draftCount: aggregate.draftCount,
+        excludedEvidenceCount: aggregate.excludedEvidenceCount,
         measuredQuestionCount: aggregate.measuredQuestionCount,
         examCount: aggregate.examCount,
         evidenceLevel: aggregate.evidenceLevel,
@@ -422,6 +446,10 @@ function compareDiagnostics(a: OutcomeDiagnostic, b: OutcomeDiagnostic): number 
 
 function examQuestionKey(examId: string, questionId: string): string {
   return examId + KEY_SEPARATOR + questionId;
+}
+
+function examStudentKey(examId: string, studentId: string): string {
+  return examId + KEY_SEPARATOR + studentId;
 }
 
 function positivePoints(value: number): number {

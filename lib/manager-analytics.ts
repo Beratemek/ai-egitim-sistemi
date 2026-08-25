@@ -41,6 +41,8 @@ export interface ManagerOverview {
   atRiskStudentCount: number;
   weakOutcomeCount: number;
   pendingReviewCount: number;
+  draftAnswerCount: number;
+  excludedOutcomeEvidenceCount: number;
 }
 
 export type ManagerRiskLevel = "risk" | "watch" | "good" | "unmeasured";
@@ -193,6 +195,7 @@ export function buildManagerAnalytics(
       questions: source.questions,
       examQuestions: source.examQuestions,
       submissions,
+      attempts,
       exams: selectedExams,
       students,
     },
@@ -457,6 +460,13 @@ export function buildManagerAnalytics(
       ).length,
       weakOutcomeCount: outcomes.filter((outcome) => outcome.isActionableWeak).length,
       pendingReviewCount,
+      draftAnswerCount: submissions.filter(
+        (submission) => submission.status === "gonderildi",
+      ).length,
+      excludedOutcomeEvidenceCount: outcomes.reduce(
+        (total, outcome) => total + outcome.excludedEvidenceCount,
+        0,
+      ),
     },
     classrooms: classroomSummaries,
     students: studentSummaries.sort(compareStudents),
