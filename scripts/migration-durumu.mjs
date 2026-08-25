@@ -92,6 +92,10 @@ const ADIMLAR = [
   // kaybolur - sessiz ve bulunmasi zor bir hata.
   ["gorsel-ve-grafik", gorselKontrolu],
   ["varsayilan-rol", varsayilanRolKontrolu],
+  [
+    "sinav-yapisi-kilidi",
+    () => fonksiyon("is_exam_structure_locked", { target_exam: BOS_ID }),
+  ],
 ];
 
 /**

@@ -11,6 +11,7 @@
 import { gradeAnswer } from "@/lib/ai";
 import type { GradingResult, Question, SubmissionStatus } from "@/lib/types";
 import { normalizeOptionKey } from "@/lib/answer-normalization";
+import { buildTestFeedback } from "@/lib/assessment-feedback";
 
 /** Puanlama icin gereken soru alanlari. */
 export type GradableQuestion = Pick<
@@ -48,9 +49,10 @@ export async function autoGrade(
 
     return {
       score: isCorrect ? 100 : 0,
-      feedback: isCorrect
-        ? "Doğru cevap."
-        : `Yanlış cevap. Doğru şık: ${correctKey}.`,
+      // Doğru seçenek öğrenciye sınav sonuçlanmadan önce geri bildirim alanı
+      // üzerinden sızmamalı. Anahtar yalnızca yetkili eğitmen görünümünde
+      // kalır; öğrenciye sonuç güvenlik sözleşmesinin izin verdiği bilgi gider.
+      feedback: buildTestFeedback(isCorrect),
       criteria: [],
       status: "ai_degerlendirildi",
     };
