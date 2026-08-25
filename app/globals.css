@@ -1507,6 +1507,11 @@
     margin: 12mm;
   }
 
+  @page manager-analytics {
+    size: A4 landscape;
+    margin: 10mm;
+  }
+
   html,
   body {
     background: #fff;
@@ -1515,6 +1520,225 @@
   /* Koyu temada bile kagit beyaz kalir. */
   .exam-sheet {
     color-scheme: light;
+  }
+
+  /*
+   * Eğitim yöneticisi analiz raporları.
+   *
+   * Koyu tema açıkken dahi PDF, bağımsız ve yüksek kontrastlı bir rapor
+   * olarak çıkar. Yatay A4; ısı haritası ve karşılaştırma tabloları için
+   * okunabilir alan bırakır. Ekrandaki filtreler gizlenir, seçili kapsam
+   * bunun yerine rapor başlığında metin olarak sabitlenir.
+   */
+  .manager-report {
+    page: manager-analytics;
+    color-scheme: light;
+    --background: 42 36% 96%;
+    --foreground: 202 44% 13%;
+    --card: 40 50% 99%;
+    --card-foreground: 202 44% 13%;
+    --popover: 40 50% 99%;
+    --popover-foreground: 202 44% 13%;
+    --primary: 168 62% 26%;
+    --primary-foreground: 45 60% 98%;
+    --accent: 36 84% 92%;
+    --accent-foreground: 26 68% 24%;
+    --secondary: 42 26% 91%;
+    --secondary-foreground: 202 44% 16%;
+    --muted: 42 26% 92%;
+    --muted-foreground: 202 18% 38%;
+    --destructive: 358 62% 44%;
+    --destructive-foreground: 45 60% 98%;
+    --success: 158 66% 26%;
+    --success-foreground: 45 60% 98%;
+    --warning: 28 78% 38%;
+    --warning-foreground: 45 60% 98%;
+    --border: 40 22% 82%;
+    --input: 40 20% 80%;
+    --ring: 168 62% 32%;
+    --stat-1: 168 45% 42%;
+    --stat-2: 292 40% 43%;
+    --stat-3: 38 52% 43%;
+    --stat-4: 212 45% 44%;
+    width: 100%;
+    background: #fff;
+    color: hsl(var(--foreground));
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .manager-report-header {
+    break-after: avoid-page;
+    margin-bottom: 5mm;
+    border-bottom: 1.5px solid hsl(var(--primary));
+    padding-bottom: 4mm;
+  }
+
+  .manager-report-heading-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8mm;
+  }
+
+  .manager-report-brand {
+    color: hsl(var(--primary));
+    font-size: 7.5pt;
+    font-weight: 750;
+    letter-spacing: 0.13em;
+  }
+
+  .manager-report-type {
+    margin-top: 1mm;
+    color: hsl(var(--muted-foreground));
+    font-size: 9pt;
+    font-weight: 600;
+  }
+
+  .manager-report-date {
+    text-align: right;
+  }
+
+  .manager-report-date span,
+  .manager-report-date strong {
+    display: block;
+  }
+
+  .manager-report-date span {
+    color: hsl(var(--muted-foreground));
+    font-size: 7pt;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .manager-report-date strong {
+    margin-top: 1mm;
+    font-size: 8.5pt;
+  }
+
+  .manager-report-header h1 {
+    margin-top: 3mm;
+    font-family: var(--font-display), Georgia, serif;
+    font-size: 22pt;
+    line-height: 1.05;
+  }
+
+  .manager-report-filters {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 2mm;
+    margin-top: 4mm;
+  }
+
+  .manager-report-filters > div {
+    min-width: 0;
+    border: 1px solid hsl(var(--border));
+    border-radius: 2mm;
+    background: hsl(var(--muted) / 0.45);
+    padding: 2mm 2.5mm;
+  }
+
+  .manager-report-filters dt {
+    color: hsl(var(--muted-foreground));
+    font-size: 6.5pt;
+    font-weight: 650;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .manager-report-filters dd {
+    margin-top: 0.8mm;
+    font-size: 8pt;
+    font-weight: 650;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+  }
+
+  .manager-report-stats {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 3mm !important;
+  }
+
+  .manager-report-chart-grid,
+  .manager-report-insights {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 4mm !important;
+  }
+
+  .manager-report .print-report-keep,
+  .manager-report [data-chart] {
+    break-inside: avoid-page;
+  }
+
+  .manager-report [data-chart] {
+    height: 58mm !important;
+  }
+
+  .manager-report > *,
+  .manager-report .print-report-table,
+  .manager-report tr {
+    page-break-inside: avoid;
+  }
+
+  .manager-report .print-report-table {
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+
+  .manager-report .print-report-table tr {
+    break-inside: avoid-page;
+  }
+
+  .manager-report .print-report-table thead {
+    display: table-header-group;
+  }
+
+  .manager-report .print-report-table tfoot {
+    display: table-footer-group;
+  }
+
+  .manager-report .overflow-x-auto,
+  .manager-report .overflow-hidden {
+    overflow: visible !important;
+  }
+
+  .manager-report a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .manager-report .manager-outcome-heatmap {
+    break-before: page;
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+
+  .manager-report .manager-outcome-heatmap table {
+    width: 100%;
+    min-width: 0 !important;
+    table-layout: fixed;
+    font-size: 6.5pt;
+  }
+
+  .manager-report .manager-outcome-heatmap th {
+    position: static !important;
+    width: auto !important;
+    min-width: 0 !important;
+  }
+
+  .manager-report .manager-outcome-heatmap th:first-child {
+    width: 27mm !important;
+  }
+
+  .manager-report .manager-outcome-heatmap button {
+    width: 100% !important;
+    height: 9mm !important;
+    font-size: 7pt;
+  }
+
+  .manager-report .manager-outcome-heatmap tr,
+  .manager-report .manager-outcome-heatmap [class*="grid"] {
+    break-inside: avoid-page;
   }
 }
 

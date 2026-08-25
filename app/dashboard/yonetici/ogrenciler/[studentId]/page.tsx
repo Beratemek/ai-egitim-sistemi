@@ -12,11 +12,13 @@ import {
 import { ManagerOutcomeRiskChart } from "@/components/shared/manager-analytics-charts";
 import { ManagerAnalyticsFilter } from "@/components/shared/manager-analytics-filter";
 import { ManagerDataQualityNotice } from "@/components/shared/manager-data-quality-notice";
+import { ManagerReportHeader } from "@/components/shared/manager-report-header";
 import {
   ManagerRiskBadge,
   ManagerScore,
 } from "@/components/shared/manager-status";
 import { PageHeader } from "@/components/shared/page-header";
+import { PrintReportButton } from "@/components/shared/print-report-button";
 import {
   StudentGrowthChart,
   type StudentGrowthPoint,
@@ -83,13 +85,23 @@ export default async function ManagerStudentDetailPage({
   );
 
   return (
-    <>
+    <section className="manager-report space-y-4 sm:space-y-6 print:space-y-4">
+      <ManagerReportHeader
+        reportType="Öğrenci gelişim raporu"
+        entityName={student.name}
+        scope={scope}
+        masteryThreshold={analytics.masteryThreshold}
+        exams={analytics.filterOptions.exams}
+      />
+
       <PageHeader
         title={student.name}
         description={`${student.classroom} · Bireysel sınav, gelişim ve kazanım görünümü.`}
+        className="print:hidden"
         actions={
           <>
             <ManagerRiskBadge level={student.riskLevel} />
+            <PrintReportButton />
             <Button asChild variant="outline" size="sm">
               <Link href={`/dashboard/yonetici/ogrenciler${query}`}>
                 <ArrowLeft />
@@ -108,7 +120,7 @@ export default async function ManagerStudentDetailPage({
 
       <ManagerDataQualityNotice overview={analytics.overview} />
 
-      <div className="grid grid-cols-2 gap-2.5 sm:gap-4 xl:grid-cols-4">
+      <div className="manager-report-stats print-report-keep grid grid-cols-2 gap-2.5 sm:gap-4 xl:grid-cols-4">
         <StatCard
           label="Atanan sınav"
           value={student.assignedCount}
@@ -139,9 +151,11 @@ export default async function ManagerStudentDetailPage({
         />
       </div>
 
-      <StudentGrowthChart points={growthPoints} />
+      <div className="print-report-keep">
+        <StudentGrowthChart points={growthPoints} />
+      </div>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,.95fr)]">
+      <div className="manager-report-insights print-report-keep grid gap-6 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,.95fr)]">
         <ManagerOutcomeRiskChart outcomes={analytics.outcomes} />
 
         <Card>
@@ -188,7 +202,7 @@ export default async function ManagerStudentDetailPage({
         </Card>
       </div>
 
-      <Card>
+      <Card className="print-report-table">
         <CardHeader>
           <CardTitle>Sınav geçmişi</CardTitle>
           <CardDescription>
@@ -231,7 +245,7 @@ export default async function ManagerStudentDetailPage({
           </Table>
         </CardContent>
       </Card>
-    </>
+    </section>
   );
 }
 

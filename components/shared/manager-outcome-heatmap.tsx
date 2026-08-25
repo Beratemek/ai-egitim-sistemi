@@ -61,7 +61,7 @@ export function ManagerOutcomeHeatmap({
     findSelection(visibleOutcomes, mode, firstSelection);
 
   return (
-    <Card className="overflow-hidden">
+    <Card className="manager-outcome-heatmap overflow-hidden">
       <CardHeader className="gap-2">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
