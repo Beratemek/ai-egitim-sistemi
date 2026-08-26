@@ -214,7 +214,7 @@ export function AnswerForm({
         {existing ? (
           <p className="whitespace-pre-wrap rounded-lg bg-background px-3 py-2 text-foreground">
             {chosen
-              ? `${chosen.key}) ${chosen.text}`
+              ? `${chosen.label ?? chosen.key}) ${chosen.text}`
               : existing.answer_text}
           </p>
         ) : null}
@@ -260,7 +260,7 @@ export function AnswerForm({
                         : "border-input text-muted-foreground",
                     )}
                   >
-                    {option.key}
+                    {option.label ?? option.key}
                   </span>
                   <span className="min-w-0 flex-1">
                     {option.text}
@@ -406,7 +406,7 @@ function AnsweredView({
         </div>
 
         <p className="whitespace-pre-wrap text-sm leading-relaxed">
-          {chosen ? `${chosen.key}) ${chosen.text}` : submission.answer_text}
+          {chosen ? `${chosen.label ?? chosen.key}) ${chosen.text}` : submission.answer_text}
         </p>
       </div>
 

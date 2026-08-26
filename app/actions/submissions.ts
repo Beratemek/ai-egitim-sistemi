@@ -6,6 +6,10 @@ import { demoGuard, type ActionResult } from "@/app/actions/shared";
 import { isSupabaseConfigured, serverEnv } from "@/lib/env";
 import { autoGrade } from "@/lib/grading";
 import { MOCK_QUESTIONS } from "@/lib/mock-data";
+// Bucuklu puan yasagi burada duruyor cunku hem onay diyalogu hem listedeki
+// hizli "Onayla" dugmesi bu aksiyondan geciyor; arayuze birakilsaydi kural
+// yalnizca diyalog icin gecerli olurdu.
+import { tamPuanaOturt } from "@/lib/score-scale";
 import {
   createAdminSupabaseClient,
   createServerSupabaseClient,
@@ -13,6 +17,24 @@ import {
   type TypedServerClient,
 } from "@/lib/supabase-server";
 import type { GradingResult, Submission } from "@/lib/types";
+
+/** `exam_id|question_id` -> sorunun O SINAVDAKI puani. */
+async function soruPuanlari(
+  supabase: TypedServerClient,
+  rows: readonly { exam_id: string; question_id: string | null }[],
+): Promise<Map<string, number>> {
+  const examIds = [...new Set(rows.map((row) => row.exam_id))];
+  if (examIds.length === 0) return new Map();
+
+  const { data } = await supabase
+    .from("exam_questions")
+    .select("exam_id, question_id, points")
+    .in("exam_id", examIds);
+
+  return new Map(
+    (data ?? []).map((row) => [`${row.exam_id}|${row.question_id}`, row.points]),
+  );
+}
 
 async function getOwnExamSubmissions(
   supabase: TypedServerClient,
@@ -557,11 +579,17 @@ export async function approveSubmission(
 
   const { data: submission } = await supabase
     .from("submissions")
-    .select("exam_id, student_id")
+    .select("exam_id, student_id, question_id")
     .eq("id", input.submissionId)
     .maybeSingle();
 
   if (!submission) return { ok: false, error: "Cevap bulunamadi." };
+
+  const puanlar = await soruPuanlari(supabase, [submission]);
+  const kaydedilecek = tamPuanaOturt(
+    input.score,
+    puanlar.get(`${submission.exam_id}|${submission.question_id}`),
+  );
 
   // `.select()` sart: RLS bir satirla eslesmezse PostgREST HATA DONDURMEZ,
   // sessizce 0 satir gunceller. Yalnizca `error` kontrol edilirse egitmen
@@ -569,7 +597,7 @@ export async function approveSubmission(
   const { data: updated, error } = await supabase
     .from("submissions")
     .update({
-      instructor_approved_score: Math.round(input.score * 100) / 100,
+      instructor_approved_score: kaydedilecek,
       instructor_note: input.note?.trim() || null,
       status: "egitmen_onayli",
       reviewed_by: current.user.id,
@@ -654,7 +682,7 @@ export async function approveSubmissions(
   // AI puanina geri cekmek egitmenin duzeltmesini silerdi.
   const { data: pending, error: readError } = await supabase
     .from("submissions")
-    .select("id, exam_id, student_id, ai_score")
+    .select("id, exam_id, student_id, question_id, ai_score")
     .in("id", ids)
     .eq("status", "ai_degerlendirildi");
 
@@ -664,6 +692,7 @@ export async function approveSubmissions(
     return { ok: false, error: "Secilen cevaplar arasinda onay bekleyen yok." };
   }
 
+  const puanlar = await soruPuanlari(supabase, pending);
   const byScore = new Map<number, string[]>();
   let skipped = 0;
 
@@ -673,7 +702,10 @@ export async function approveSubmissions(
       skipped += 1;
       continue;
     }
-    const score = Math.round(row.ai_score * 100) / 100;
+    const score = tamPuanaOturt(
+      row.ai_score,
+      puanlar.get(`${row.exam_id}|${row.question_id}`),
+    );
     const bucket = byScore.get(score) ?? [];
     bucket.push(row.id);
     byScore.set(score, bucket);

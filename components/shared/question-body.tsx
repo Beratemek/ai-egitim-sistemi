@@ -157,7 +157,7 @@ export function QuestionBody({
                           : "border-input text-muted-foreground",
                     )}
                   >
-                    {option.key}
+                    {option.label ?? option.key}
                   </span>
 
                   <span className="min-w-0 flex-1 leading-relaxed">

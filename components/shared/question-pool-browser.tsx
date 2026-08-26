@@ -165,19 +165,6 @@ export function QuestionPoolBrowser({
     [openSubject, activeTopic],
   );
 
-  /**
-   * GERCEK ders adlari: "Ders atanmamis" yer tutucusu disarida.
-   * Sinav kurma pencerelerine yalnizca bunlar gecer - gerekcesi asagida,
-   * pencerelerin cizildigi yerde.
-   */
-  const realSubjectNames = React.useMemo(
-    () =>
-      allSubjects
-        .map((group) => group.subject)
-        .filter((subject) => subject !== UNASSIGNED_SUBJECT),
-    [allSubjects],
-  );
-
   const realDefaultSubject =
     openSubject && openSubject.subject !== UNASSIGNED_SUBJECT
       ? openSubject.subject
@@ -347,8 +334,6 @@ export function QuestionPoolBrowser({
             open={manualOpen}
             onOpenChange={setManualOpen}
             questions={selectedQuestions}
-            subjectOptions={realSubjectNames}
-            defaultSubject={realDefaultSubject}
             canPersist={canPersist}
             onCreated={() => setSelectedIds(new Set())}
           />

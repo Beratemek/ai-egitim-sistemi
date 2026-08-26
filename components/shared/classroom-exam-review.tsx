@@ -18,6 +18,7 @@ import {
   StudentAnswerBlock,
 } from "@/components/shared/question-body";
 import { SubmissionReviewDialog } from "@/components/shared/submission-review-dialog";
+import { puanMetni } from "@/lib/score-scale";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -216,25 +217,10 @@ export function ClassroomExamReview({
 
 /* -------------------------------------------------------------------------- */
 
-/**
- * Yuzdeyi sorunun puanina cevirir: %85 x 20 puan -> "17 / 20 puan".
- *
- * Sorunun puani bilinmiyorsa (havuzdan silinmis soru) yuzde olarak birakir;
- * uydurma bir payda yazmaktansa ham degeri gostermek dogru.
+/*
+ * Puan gosterimi lib/score-scale.ts'e tasindi: ayni cevrim artik onay
+ * diyalogunda da kullaniliyor ve iki kopya birbirinden ayri yuvarlaniyordu.
  */
-function puanla(yuzde: number | null, soruPuani: number | undefined): string {
-  if (yuzde === null) return "—";
-  if (soruPuani === undefined) return "%" + Math.round(yuzde);
-
-  const kazanilan = (yuzde / 100) * soruPuani;
-  // Ondalik yalnizca gerekiyorsa: 17 kalsin, 16.5 gorunsun.
-  const gosterim =
-    Math.abs(kazanilan - Math.round(kazanilan)) < 0.05
-      ? String(Math.round(kazanilan))
-      : kazanilan.toFixed(1);
-
-  return gosterim + " / " + soruPuani + " puan";
-}
 
 function Summary({
   label,
@@ -510,13 +496,13 @@ function AnswerCard({
           <span className="shrink-0 text-xs text-muted-foreground">
             AI:{" "}
             <span className="font-semibold tabular-nums">
-              {puanla(submission.ai_score, question?.points)}
+              {puanMetni(submission.ai_score, question?.points)}
             </span>
             {approved !== null ? (
               <>
                 {" · "}Onaylı:{" "}
                 <span className="font-semibold tabular-nums text-foreground">
-                  {puanla(approved, question?.points)}
+                  {puanMetni(approved, question?.points)}
                 </span>
               </>
             ) : null}
@@ -568,6 +554,7 @@ function AnswerCard({
             submission={submission}
             studentName={studentName}
             question={question}
+            maxPoints={question?.points}
             canPersist={canPersist}
           />
         </div>
