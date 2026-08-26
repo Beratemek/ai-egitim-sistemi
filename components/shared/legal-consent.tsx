@@ -163,7 +163,7 @@ export function LegalConsent({ value, onChange, disabled = false }: LegalConsent
         }}
       >
         {document ? (
-          <DialogContent className="max-h-[86vh] overflow-y-auto sm:max-w-2xl">
+          <DialogContent className="max-h-[86svh] overflow-y-auto sm:max-w-2xl">
             <DialogHeader>
               <DialogTitle className="font-display text-2xl">{document.title}</DialogTitle>
               <DialogDescription>{document.description}</DialogDescription>

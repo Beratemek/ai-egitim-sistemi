@@ -190,7 +190,7 @@ export function QuestionReviseDialog({
         </Button>
       </DialogTrigger>
 
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+      <DialogContent className="max-h-[90svh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{index + 1}. soruyu düzenle</DialogTitle>
           <DialogDescription>

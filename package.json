@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -p 8080",
+    "dev": "next dev --turbopack -p 8080",
     "build": "next build",
     "build:kontrol": "next build",
     "start": "next start -p 8080",
@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit",
     "seed": "node scripts/test-verisi.mjs",
     "seed:sorular": "node scripts/soru-havuzu.mjs",
+    "seed:demo": "node scripts/demo-verisi.mjs",
     "migration:durum": "node scripts/migration-durumu.mjs",
     "app:sync": "npx cap sync",
     "app:android": "npx cap open android",

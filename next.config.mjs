@@ -32,6 +32,38 @@ const createNextConfig = (phase) => {
     outputFileTracingRoot: projectRoot,
 
   /**
+   * Istemci yonlendirici onbellegi (App Router "Router Cache").
+   *
+   * Next.js 15'te dinamik sayfalarin onbellek suresi VARSAYILAN OLARAK 0'dir:
+   * geri/ileri gidildiginde ya da az once acilmis bir sayfaya donuldugunde
+   * sunucuya yeniden gidilir. Bu panelde her istek middleware'de bir Supabase
+   * auth dogrulamasi + layout'ta profil sorgusu demek - yani uzak Supabase
+   * ornegimizde her geciste birkac yuz milisaniye.
+   *
+   * 30 saniye, "ayni oturumda menude gezinirken aninda acilsin" ile "veri cok
+   * bayatlamasin" arasindaki denge. Sayfa verisi degistiginde zaten
+   * `revalidatePath` cagriliyor, o onbellegi acikca temizler.
+   */
+    experimental: {
+      staleTimes: {
+        dynamic: 30,
+        static: 180,
+      },
+
+      /**
+       * Barrel (tek kapi) paketlerinde yalnizca KULLANILAN ikon/bilesen
+       * derlenir. `lucide-react` ve `recharts` binlerce modul disa acar;
+       * onlar olmadan gelistirme derlemesi her sayfada bu agaci bastan
+       * yurumek zorunda kalir.
+       */
+      optimizePackageImports: [
+        "lucide-react",
+        "recharts",
+        "@solar-icons/react",
+      ],
+    },
+
+  /**
    * `next dev` ve `next build` varsayilan olarak ayni `.next` klasorunu kullanir.
    * Dev sunucusu acikken build alinirsa dev'in chunk'lari ezilir ve tarayici
    * "ChunkLoadError: Loading chunk ... failed" verir.

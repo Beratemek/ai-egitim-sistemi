@@ -64,7 +64,7 @@ export function MistakeCoachDialog({
           AI ile çalış
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-2xl">
+      <DialogContent className="max-h-[92svh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <div className="mb-1 flex items-center gap-2">
             <Badge variant="soft">{subject}</Badge>

@@ -50,7 +50,7 @@ export default async function DogrulamaBekleniyorPage() {
                 E-posta adresinizi dogrulayin
               </h1>
               <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                <span className="font-medium text-foreground">{user.email}</span>{" "}
+                <span className="break-all font-medium text-foreground">{user.email}</span>{" "}
                 adresine bir dogrulama baglantisi gonderdik. Hesabınız, baglantiya
                 tiklanana kadar etkinlesmez.
               </p>

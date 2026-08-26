@@ -202,7 +202,7 @@ export function ExamManualDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-4xl">
+      <DialogContent className="max-h-[92svh] overflow-y-auto sm:max-w-4xl">
         <DialogHeader>
           <DialogTitle className="font-display text-xl">Yeni sınav</DialogTitle>
           <DialogDescription>
@@ -335,7 +335,7 @@ export function ExamManualDialog({
               </span>
             </div>
 
-            <ol className="kaydirma-ince max-h-[46vh] space-y-1.5 overflow-y-auto rounded-lg border p-2">
+            <ol className="kaydirma-ince max-h-[46svh] space-y-1.5 overflow-y-auto rounded-lg border p-2">
               {questions.map((question, index) => (
                 <li
                   key={question.id}

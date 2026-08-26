@@ -324,7 +324,7 @@ export function ExamComposeDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-4xl">
+      <DialogContent className="max-h-[92svh] overflow-y-auto sm:max-w-4xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 font-display text-xl">
             <Sparkles className="h-5 w-5 text-primary" />
@@ -387,7 +387,7 @@ export function ExamComposeDialog({
                   edemiyordu. Liste kisa oldugu icin dogrudan acik duruyor,
                   bir tiklama daha eksiliyor.
                 */}
-                <div className="kaydirma-ince max-h-[26vh] space-y-0.5 overflow-y-auto rounded-lg border p-2">
+                <div className="kaydirma-ince max-h-[26svh] space-y-0.5 overflow-y-auto rounded-lg border p-2">
                   {subjects.map((group) => {
                     const sayim = countTopicsByType(group.topics);
                     const id = `compose-ders-${group.subject}`;
@@ -473,7 +473,7 @@ export function ExamComposeDialog({
                     ) : null}
                   </div>
 
-                  <div className="kaydirma-ince max-h-[38vh] space-y-0.5 overflow-y-auto rounded-lg border p-2">
+                  <div className="kaydirma-ince max-h-[38svh] space-y-0.5 overflow-y-auto rounded-lg border p-2">
                     {secilenDersler.flatMap((group, dersIndex) => [
                       /*
                         Ders basligi yalnizca BIRDEN FAZLA ders seciliyken

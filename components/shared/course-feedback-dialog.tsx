@@ -128,7 +128,7 @@ export function CourseFeedbackDialog({
         </Button>
       </DialogTrigger>
 
-      <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-2xl">
+      <DialogContent className="max-h-[92svh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle className="font-display text-xl">
             Ders deneyimini değerlendir
