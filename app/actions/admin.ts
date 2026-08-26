@@ -29,6 +29,15 @@ function revalidateUserPaths(): void {
   revalidatePath("/dashboard/sistem/kullanicilar");
   revalidatePath("/dashboard/yonetici");
   revalidatePath("/dashboard/egitmen");
+  revalidatePath("/dashboard/veli");
+}
+
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function normalizedUuid(value: string | null | undefined): string | null {
+  const normalized = value?.trim() ?? "";
+  return normalized && UUID_PATTERN.test(normalized) ? normalized : null;
 }
 
 /** Bekleyen bir rol talebini onaylar veya reddeder. */
@@ -222,4 +231,59 @@ export async function setInstructorSubjects(
   revalidateUserPaths();
 
   return { ok: true, data: { subjects: (data as string[] | null) ?? cleaned } };
+}
+
+/**
+ * Bir öğrenciyi tek bir veli hesabına bağlar; `guardianId` boşsa bağlantıyı
+ * kaldırır. Veli birden fazla öğrenciye bağlanabilir.
+ *
+ * Asıl yetki ve rol doğrulaması SECURITY DEFINER `set_student_guardian`
+ * fonksiyonundadır. Böylece istemci bu aksiyonu doğrudan çağırsa bile yalnızca
+ * sistem yöneticisi, onaylı öğrenci ve onaylı veli arasında işlem yapabilir.
+ */
+export async function setStudentGuardian(
+  studentId: string,
+  guardianId: string | null,
+): Promise<ActionResult<{ studentId: string; guardianId: string | null }>> {
+  if (!isSupabaseConfigured) return demoGuard();
+
+  const normalizedStudentId = normalizedUuid(studentId);
+  const normalizedGuardianId = normalizedUuid(guardianId);
+
+  if (!normalizedStudentId) {
+    return { ok: false, error: "Geçerli bir öğrenci seçilmedi." };
+  }
+  if (guardianId?.trim() && !normalizedGuardianId) {
+    return { ok: false, error: "Geçerli bir veli seçilmedi." };
+  }
+
+  const current = await getCurrentUser();
+  if (!current) return { ok: false, error: "Oturum açmanız gerekiyor." };
+
+  const supabase = await createServerSupabaseClient();
+  const { error } = await supabase.rpc("set_student_guardian", {
+    target_student: normalizedStudentId,
+    target_guardian: normalizedGuardianId,
+  });
+
+  if (error) {
+    if (error.code === "42501") {
+      return {
+        ok: false,
+        error: "Veli ataması için sistem yöneticisi olmanız gerekiyor.",
+      };
+    }
+    return { ok: false, error: error.message };
+  }
+
+  revalidateUserPaths();
+  revalidatePath(`/dashboard/veli/ogrenciler/${normalizedStudentId}`);
+
+  return {
+    ok: true,
+    data: {
+      studentId: normalizedStudentId,
+      guardianId: normalizedGuardianId,
+    },
+  };
 }

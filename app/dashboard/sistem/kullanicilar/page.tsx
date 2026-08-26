@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowLeft, GraduationCap, ShieldCheck, Users } from "lucide-react";
 
 import { PageHeader } from "@/components/shared/page-header";
+import { GuardianAssignmentPanel } from "@/components/shared/guardian-assignment-panel";
 import { StatCard } from "@/components/shared/stat-card";
 import { UserAdminTable } from "@/components/shared/user-admin-table";
 import { Button } from "@/components/ui/button";
@@ -22,6 +23,7 @@ import {
 } from "@/lib/queries";
 import { getCurrentUser } from "@/lib/supabase-server";
 import { grantedRoles } from "@/lib/roles";
+import { getGuardianAdminData } from "@/lib/guardian-admin-data";
 
 export const metadata: Metadata = { title: "Kullanıcılar" };
 
@@ -32,7 +34,15 @@ export const metadata: Metadata = { title: "Kullanıcılar" };
  * sayfada (`/dashboard/sistem`); bkz. oradaki not.
  */
 export default async function KullanicilarPage() {
-  const [users, roleRequests, classrooms, current, subjectOptions, subjectsByUser] =
+  const [
+    users,
+    roleRequests,
+    classrooms,
+    current,
+    subjectOptions,
+    subjectsByUser,
+    guardianAdminData,
+  ] =
     await Promise.all([
       getUsers(),
       getRoleRequests(),
@@ -40,6 +50,7 @@ export default async function KullanicilarPage() {
       getCurrentUser(),
       getSubjectOptions(),
       getInstructorSubjectMap(),
+      getGuardianAdminData(),
     ]);
 
   /*
@@ -112,6 +123,12 @@ export default async function KullanicilarPage() {
           />
         </CardContent>
       </Card>
+
+      <GuardianAssignmentPanel
+        users={users}
+        links={guardianAdminData.links}
+        loadError={guardianAdminData.loadError}
+      />
     </>
   );
 }
