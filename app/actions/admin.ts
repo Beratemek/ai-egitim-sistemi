@@ -12,6 +12,7 @@ import {
   createServerSupabaseClient,
   getCurrentUser,
 } from "@/lib/supabase-server";
+import { grantedRoles } from "@/lib/roles";
 import { isRoleStatus, type RoleStatus, type UserRole } from "@/lib/types";
 
 /**
@@ -130,6 +131,141 @@ export async function setUserRoles(
 
   revalidateUserPaths();
   return { ok: true, data: { roles: (data as UserRole[]) ?? [...roles] } };
+}
+
+/**
+ * Bir kullaniciyi silmenin NE GOTURECEGI.
+ *
+ * Diyalog acilinca cagrilir; onay ekraninin somut sayilar gosterebilmesi
+ * icin. Onceden hesaplamiyoruz: kullanici listesi her acilista bu sorgulari
+ * herkes icin calistirmak zorunda kalirdi, oysa silme nadir bir islem.
+ */
+export async function getUserDeletionImpact(
+  userId: string,
+): Promise<
+  ActionResult<{ examCount: number; submissionCount: number; isSelf: boolean }>
+> {
+  if (!isSupabaseConfigured) return demoGuard();
+
+  const targetId = normalizedUuid(userId);
+  if (!targetId) return { ok: false, error: "Kullanıcı seçilmedi." };
+
+  const current = await getCurrentUser();
+  if (!current) return { ok: false, error: "Oturum açmanız gerekiyor." };
+  if (!grantedRoles(current.profile).includes("admin")) {
+    return { ok: false, error: "Bu işlem için sistem yöneticisi olmalısınız." };
+  }
+
+  /*
+    Servis anahtari yoksa `createAdminSupabaseClient()` FIRLATIR. Onceden
+    burada kontrol yoktu: anahtar eksik olan bir kurulumda etki hesabi
+    sessizce patliyor, diyalog "hesaplaniyor..." halinde donup kaliyor ve
+    silme dugmesi hic aktiflesmiyordu - sebebi ekranda yazmadan.
+  */
+  if (!serverEnv.supabaseServiceRoleKey) {
+    return {
+      ok: false,
+      error:
+        "SUPABASE_SERVICE_ROLE_KEY tanimli degil; silme ve etki hesabi calismaz.",
+    };
+  }
+
+  const admin = createAdminSupabaseClient();
+
+  const [exams, submissions] = await Promise.all([
+    admin
+      .from("exams")
+      .select("id", { count: "exact", head: true })
+      .eq("instructor_id", targetId),
+    admin
+      .from("submissions")
+      .select("id", { count: "exact", head: true })
+      .eq("student_id", targetId),
+  ]);
+
+  return {
+    ok: true,
+    data: {
+      examCount: exams.count ?? 0,
+      submissionCount: submissions.count ?? 0,
+      isSelf: targetId === current.user.id,
+    },
+  };
+}
+
+/**
+ * Kullaniciyi KALICI olarak siler.
+ *
+ * Silme `auth.users` uzerinden yapilir; `public.users.id` oraya
+ * `on delete cascade` ile bagli oldugu icin profil de birlikte gider.
+ * Yalnizca profili silmek hesabi ortada birakirdi: kisi giris yapmaya devam
+ * eder, `handle_new_user` tetiklenmedigi icin profili olusmaz ve panel
+ * her acilista cokerdi.
+ *
+ * NE GIDER: kisinin cevaplari, sinav denemeleri, atamalari, calisma plani ve
+ * - EGITMENSE - actigi TUM SINAVLAR. Sinavlar giderken onlara bagli baska
+ * ogrencilerin teslimleri ve sonuclari da gider (exams.instructor_id
+ * `on delete cascade`). Bu yuzden onay ekrani sinav sayisini ayrica soyler.
+ *
+ * NE KALIR: kisinin YAZDIGI SORULAR ve kazanimlar. Onlarda bag
+ * `created_by ... on delete set null`, yani havuz zarar gormez - yalnizca
+ * yazari bilinmez olur. Bilincli bir tercih: bir egitmen ayrildi diye ortak
+ * soru havuzunun budanmasi istenmez.
+ *
+ * Servis anahtari GEREKIR: `auth.users` uzerinde silme yetkisi yalnizca
+ * service_role'da. Anahtar tanimli degilse islem baslamadan reddedilir.
+ */
+export async function deleteUser(
+  userId: string,
+): Promise<ActionResult<{ deletedId: string }>> {
+  if (!isSupabaseConfigured) return demoGuard();
+
+  const targetId = normalizedUuid(userId);
+  if (!targetId) return { ok: false, error: "Kullanıcı seçilmedi." };
+
+  const current = await getCurrentUser();
+  if (!current) return { ok: false, error: "Oturum açmanız gerekiyor." };
+
+  /*
+    Yetki BURADA dogrulanir.
+
+    Diger islemler yetkisini veritabanindaki SECURITY DEFINER fonksiyonlarina
+    birakiyor, ama silme `auth.users`a gidiyor ve orada RLS yok - servis
+    anahtari her seyi yapar. Bu yuzden kapiyi burada tutmak zorundayiz.
+  */
+  if (!grantedRoles(current.profile).includes("admin")) {
+    return { ok: false, error: "Bu işlem için sistem yöneticisi olmalısınız." };
+  }
+
+  /*
+    Kendini silme.
+
+    Teknik olarak calisirdi ama sonucu: oturum acik kalir, profil yoktur,
+    panel coker ve geriye sistem yoneticisi olmayan bir kurulum kalabilir.
+    Baska bir yoneticinin yapmasi gereken bir is.
+  */
+  if (targetId === current.user.id) {
+    return {
+      ok: false,
+      error: "Kendi hesabınızı silemezsiniz; bunu başka bir sistem yöneticisi yapmalı.",
+    };
+  }
+
+  if (!serverEnv.supabaseServiceRoleKey) {
+    return {
+      ok: false,
+      error:
+        "Silme icin SUPABASE_SERVICE_ROLE_KEY tanimli olmali; sunucu ortamina ekleyin.",
+    };
+  }
+
+  const admin = createAdminSupabaseClient();
+  const { error } = await admin.auth.admin.deleteUser(targetId);
+
+  if (error) return { ok: false, error: error.message };
+
+  revalidateUserPaths();
+  return { ok: true, data: { deletedId: targetId } };
 }
 
 /**

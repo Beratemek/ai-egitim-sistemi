@@ -20,6 +20,7 @@ import {
   setExamSubject,
   updateExamSettings,
 } from "@/app/actions/exams";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -32,6 +33,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SubjectCombobox } from "@/components/shared/subject-combobox";
+import { subjectLabel } from "@/lib/subjects";
 import { cn } from "@/lib/utils";
 
 /**
@@ -57,6 +59,14 @@ export interface ExamSettingsPanelProps {
   endsAt?: string | null;
   /** Secilebilir ders adlari; soru havuzundan turetilir. */
   subjectOptions?: readonly string[];
+  /**
+   * Sinavin sorularindan TURETILEN dersler.
+   *
+   * Sinav birden fazla derse ait olabilir ve gorunurluk kararini bu kume
+   * verir (bkz. exam_subjects / teaches_exam_subjects). Doluysa `subject`
+   * alani hicbir sey yapmaz - o yalnizca sorusu olmayan sinavin yedegidir.
+   */
+  derivedSubjects?: readonly string[];
   /** Sinavdaki toplam puan; sure alaninin yaninda ozet olarak gosterilir. */
   totalPoints?: number;
   questionCount?: number;
@@ -76,6 +86,7 @@ export function ExamSettingsPanel({
   startsAt = null,
   endsAt = null,
   subjectOptions = [],
+  derivedSubjects = [],
   totalPoints = 0,
   questionCount = 0,
   pointsAuto = true,
@@ -88,6 +99,9 @@ export function ExamSettingsPanel({
     durationMinutes === null ? "" : String(durationMinutes),
   );
   const [ders, setDers] = React.useState(subject ?? "");
+
+  /** Sorusu olan sinavta dersler turetilir; yedek alan okunmaz. */
+  const dersTuretildi = derivedSubjects.length > 0;
   const [pending, setPending] = React.useState<string | null>(null);
 
   /*
@@ -295,46 +309,101 @@ export function ExamSettingsPanel({
 
       <CardContent className="space-y-5">
         <div className="grid gap-5 md:grid-cols-2">
-          {/* ---------- Ders ---------- */}
+          {/* ---------- Ders(ler) ---------- */}
           <div className="space-y-2">
-            <Label htmlFor="ayar-ders" className="flex items-center gap-1.5">
+            {/*
+              Turetilmis modda `htmlFor` YOK: ortada odaklanacak bir alan
+              kalmiyor, bos bir hedefe isaret eden etiket ekran okuyucuyu
+              yaniltir.
+            */}
+            <Label
+              {...(dersTuretildi ? {} : { htmlFor: "ayar-ders" })}
+              className="flex items-center gap-1.5"
+            >
               <BookMarked className="h-3.5 w-3.5 text-muted-foreground" />
-              Ders
+              {dersTuretildi ? "Dersler" : "Ders"}
             </Label>
 
-            <div className="flex gap-1.5">
-              {/*
-                Native <datalist> yerine SubjectCombobox: eslesme Turkce
-                kurallariyla yapiliyor ("matematik" -> "MATEMATİK"), liste
-                uygulamanin temasiyla ciziliyor ve klavyeyle gezilebiliyor.
-                Serbest metin hala serbest - listede olmayan ders yazilabilir.
-              */}
-              <SubjectCombobox
-                id="ayar-ders"
-                value={ders}
-                onChange={setDers}
-                options={subjectOptions}
-                placeholder="Biyoloji"
-                disabled={pending !== null}
-                onEnter={() => {
-                  if (dersDirty) void dersiKaydet();
-                }}
-              />
+            {/*
+              Sinavin dersi TEK degil.
 
-              <KaydetDugmesi
-                dirty={dersDirty}
-                busy={pending === "ders"}
-                disabled={pending !== null}
-                onClick={() => void dersiKaydet()}
-                label="Dersi kaydet"
-              />
-            </div>
+              Sorusu olan bir sinavin dersleri sorularindan turetilir ve
+              gorunurluk kararini o kume verir. Burada tek secimli bir kutu
+              gostermek iki bakimdan yanlisti: sinav "Yapay Zeka + Robotik +
+              4 ders" oldugu halde kutu bos gorunuyor ve "dersi yok" izlenimi
+              veriyordu; ustelik o kutuya bir sey yazmak hicbir sey de
+              degistirmiyordu (yedek alan yalnizca sorusuz sinavda okunur).
 
-            <p className="text-xs leading-relaxed text-muted-foreground">
-              {subject
-                ? "Sınavı yalnızca bu derse yetkili eğitmenler ve sınav sahibi görür."
-                : "Ders atanmadığı için sınav tüm eğitmenlere açık."}
-            </p>
+              Bu yuzden sorusu olan sinavta dersler ROZET olarak, oldugu gibi
+              gosteriliyor. Elle secim yalnizca yedegin gercekten okundugu
+              durumda - sinavin hic sorusu yokken - aciliyor.
+            */}
+            {dersTuretildi ? (
+              <>
+                <div className="flex flex-wrap gap-1.5">
+                  {derivedSubjects.map((ad) => (
+                    <Badge key={ad} variant="soft" className="font-normal">
+                      {subjectLabel(ad)}
+                    </Badge>
+                  ))}
+                </div>
+
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  {derivedSubjects.length === 1
+                    ? "Ders sınavın sorularından belirlendi."
+                    : `Sınav ${derivedSubjects.length} derse ait; dersler sorularından belirlendi.`}{" "}
+                  Soru ekleyip çıkardıkça kendiliğinden güncellenir. Sınavı bu
+                  derslerden <strong>herhangi birine</strong> yetkili eğitmenler
+                  ve sınav sahibi görür.
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="flex gap-1.5">
+                  {/*
+                    Native <datalist> yerine SubjectCombobox: eslesme Turkce
+                    kurallariyla yapiliyor ("matematik" -> "MATEMATİK"), liste
+                    uygulamanin temasiyla ciziliyor ve klavyeyle gezilebiliyor.
+                    Serbest metin hala serbest - listede olmayan ders yazilabilir.
+                  */}
+                  <SubjectCombobox
+                    id="ayar-ders"
+                    value={ders}
+                    onChange={setDers}
+                    options={subjectOptions}
+                    placeholder="Biyoloji"
+                    disabled={pending !== null}
+                    onEnter={() => {
+                      if (dersDirty) void dersiKaydet();
+                    }}
+                  />
+
+                  <KaydetDugmesi
+                    dirty={dersDirty}
+                    busy={pending === "ders"}
+                    disabled={pending !== null}
+                    onClick={() => void dersiKaydet()}
+                    label="Dersi kaydet"
+                  />
+                </div>
+
+                {/*
+                  Iki ayri "ders turetilemedi" hali var ve ayni cumle ikisini
+                  birden anlatamaz: sinavin hic sorusu olmamasi ile sorulari
+                  olup hicbirinde ders YAZMAMASI. Ikincisinde "henuz sorusu
+                  yok" demek egitmeni yanlis yere bakmaya gonderirdi - cozum
+                  soru eklemek degil, sorularin dersini doldurmak.
+                */}
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  {subject
+                    ? "Şimdilik yalnızca bu derse yetkili eğitmenler ve sınav sahibi görür."
+                    : "Ders atanmadığı için sınav tüm eğitmenlere açık."}{" "}
+                  {questionCount === 0
+                    ? "Soru eklendiğinde dersler sorulardan belirlenir."
+                    : "Sınavın sorularında ders bilgisi yok; soru havuzunda derslerini doldurduğunuzda burası kendiliğinden güncellenir."}
+                </p>
+              </>
+            )}
           </div>
 
           {/* ---------- Süre ---------- */}

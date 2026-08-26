@@ -6,7 +6,7 @@ import {
 } from "@/lib/auth-cookies";
 import { DEV_ROLE_COOKIE, isDevRoleSwitchEnabled } from "@/lib/dev-mode";
 import { isSupabaseConfigured, publicEnv } from "@/lib/env";
-import { dashboardPathFor, roleForPath } from "@/lib/roles";
+import { dashboardPathFor, landingRole, roleForPath } from "@/lib/roles";
 import {
   SESSION_ACTIVITY_COOKIE,
   isSessionIdle,
@@ -181,16 +181,26 @@ export async function middleware(request: NextRequest) {
       ? devRole
       : actualRole;
 
+  /**
+   * Yonlendirmelerin gittigi panel.
+   *
+   * Admin rolu verilmis hesap her zaman Sistem Yoneticisi panelinde acilir;
+   * ust cubukta rol degistirici de o hesapta gosterilmedigi icin ikisi ayni
+   * kurali (lib/roles.ts) okumak zorunda - yoksa hesap baska bir panelde
+   * acilip cikis yolu olmadan orada kalirdi.
+   */
+  const acilisRolu = landingRole(roles, role);
+
   // Oturum acikken /login'e gidilirse kendi paneline gonder.
   if (isLogin) {
-    return NextResponse.redirect(new URL(dashboardPathFor(role), request.url));
+    return NextResponse.redirect(new URL(dashboardPathFor(acilisRolu), request.url));
   }
 
   const requiredRole = roleForPath(pathname);
 
   // /dashboard kok yolu -> role gore dagit
   if (pathname === "/dashboard") {
-    return NextResponse.redirect(new URL(dashboardPathFor(role), request.url));
+    return NextResponse.redirect(new URL(dashboardPathFor(acilisRolu), request.url));
   }
 
   /**
@@ -205,7 +215,7 @@ export async function middleware(request: NextRequest) {
    * degistirici yalnizca varsayilan paneli secer, bir kapi degildir.
    */
   if (requiredRole && !roles.includes(requiredRole)) {
-    return NextResponse.redirect(new URL(dashboardPathFor(role), request.url));
+    return NextResponse.redirect(new URL(dashboardPathFor(acilisRolu), request.url));
   }
 
   return response;

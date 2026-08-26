@@ -3,7 +3,12 @@ import { redirect } from "next/navigation";
 
 import { DashboardShell } from "@/components/shared/dashboard-shell";
 import { isSupabaseConfigured } from "@/lib/env";
-import { dashboardPathFor, grantedRoles, roleForPath } from "@/lib/roles";
+import {
+  dashboardPathFor,
+  grantedRoles,
+  landingRole,
+  roleForPath,
+} from "@/lib/roles";
 import { getCurrentUser } from "@/lib/supabase-server";
 import type { UserRole } from "@/lib/types";
 
@@ -29,7 +34,11 @@ export default async function DashboardLayout({
   if (!current) redirect("/login");
 
   /** Kullaniciya VERILMIS roller. Yetkinin tek kaynagi budur. */
-  const granted: UserRole[] = grantedRoles(current.profile);
+  // Tip ANOTASYONU YOK: `grantedRoles` bilerek bos olmayan bir demet
+  // ([UserRole, ...UserRole[]]) donuyor ki cagiranlar `granted[0]` okurken
+  // undefined kontrolu yapmak zorunda kalmasin. `UserRole[]` diye yazmak o
+  // bilgiyi cope atiyordu.
+  const granted = grantedRoles(current.profile);
 
   /**
    * Icinde bulunulan panel.
@@ -50,9 +59,10 @@ export default async function DashboardLayout({
    * olabilir. Boyle bir rol DashboardShell'e gecerse ROLE_DEFINITIONS'ta
    * aranirken `undefined` doner ve panel acilmadan coker.
    */
-  const safeRole = granted.includes(current.profile.role)
-    ? current.profile.role
-    : granted[0];
+  const safeRole = landingRole(
+    granted,
+    granted.includes(current.profile.role) ? current.profile.role : granted[0],
+  );
 
   // Middleware ana korumadir; layout da ayni kurali uygular. Boylece istemci
   // gecisi, onbellek veya middleware yapilandirma hatasi baska rolun sayfa

@@ -22,6 +22,7 @@ import {
 import { RoleBadge, RoleCountBadge } from "@/components/shared/status-badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { UserDeleteButton } from "@/components/shared/user-delete-button";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -69,6 +70,14 @@ export interface UserAdminTableProps {
   subjectOptions?: readonly string[];
   /** Kullanici kimligi -> yetkili oldugu dersler. */
   subjectsByUser?: Record<string, string[]>;
+  /**
+   * Silme sunulsun mu?
+   *
+   * Yalnizca sistem yoneticisi silebilir. Bu bayrak sunucudan gelir; dugmeyi
+   * gizlemek bir GUVENLIK onlemi degil, arayuzu dogru tutmak icin - yetki
+   * kontrolu her halukarda `deleteUser` aksiyonunun icinde yapilir.
+   */
+  canDelete?: boolean;
 }
 
 export function UserAdminTable({
@@ -76,6 +85,7 @@ export function UserAdminTable({
   currentUserId,
   subjectOptions = [],
   subjectsByUser = {},
+  canDelete = false,
 }: UserAdminTableProps) {
   const router = useRouter();
   const [search, setSearch] = React.useState("");
@@ -284,7 +294,7 @@ export function UserAdminTable({
               */}
               <TableHead className="w-[150px]">Sınıf</TableHead>
               <TableHead className="min-w-[170px]">Alan</TableHead>
-              <TableHead className="w-[130px] text-right">Düzenle</TableHead>
+              <TableHead className="w-[170px] text-right">Düzenle</TableHead>
             </TableRow>
           </TableHeader>
 
@@ -382,6 +392,7 @@ export function UserAdminTable({
 
                     {/* ---------- Duzenle ---------- */}
                     <TableCell className="py-2.5 text-right">
+                      <div className="flex items-center justify-end gap-1">
                       <Button
                         variant={open ? "secondary" : "ghost"}
                         size="sm"
@@ -402,6 +413,21 @@ export function UserAdminTable({
                           )}
                         />
                       </Button>
+
+                      {/*
+                        Kendi satirinda silme sunulmaz: aksiyon zaten
+                        reddediyor, ama tiklanabilir bir dugme gostermek
+                        yapilabilir bir sey vaat etmek olurdu.
+                      */}
+                      {canDelete && !isSelf ? (
+                        <UserDeleteButton
+                          userId={user.id}
+                          displayName={
+                            user.full_name?.trim() || user.email || "Bu kullanıcı"
+                          }
+                        />
+                      ) : null}
+                      </div>
                     </TableCell>
                   </TableRow>
 

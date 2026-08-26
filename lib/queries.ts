@@ -1499,6 +1499,16 @@ export async function getClassroomExamDetail(
   // satirinda 1., 2., 3. soru ayni yerde olsun.
   const orderOf = new Map(detail.questions.map((q, index) => [q.id, index]));
 
+  /**
+   * Sorunun sinav icindeki agirligi (puan degeri).
+   *
+   * Onizleme puani, `recalculate_exam_attempt_result` fonksiyonunun
+   * hesapladigi NIHAI notla ayni formulu kullanmali; aksi halde egitmen
+   * onaydan once 83, onaydan sonra 85 goruyor ve hangisinin dogru oldugunu
+   * bilemiyor.
+   */
+  const pointsOf = new Map(detail.questions.map((q) => [q.id, q.points]));
+
   // Sinavi alan herkes listelenir: atanmis olanlar + atama silinmis olsa da
   // cevabi/denemesi bulunanlar.
   const relevant = new Set([
@@ -1517,12 +1527,22 @@ export async function getClassroomExamDetail(
       );
 
       const aiScores = submissions
-        .map((submission) => submission.ai_score)
-        .filter((score): score is number => score !== null);
+        .map((submission) => ({
+          score: submission.ai_score,
+          points: pointsOf.get(submission.question_id ?? "") ?? 0,
+        }))
+        .filter((entry): entry is { score: number; points: number } =>
+          entry.score !== null,
+        );
 
       const approvedScores = submissions
-        .map((submission) => submission.instructor_approved_score)
-        .filter((score): score is number => score !== null);
+        .map((submission) => ({
+          score: submission.instructor_approved_score,
+          points: pointsOf.get(submission.question_id ?? "") ?? 0,
+        }))
+        .filter((entry): entry is { score: number; points: number } =>
+          entry.score !== null,
+        );
 
       return {
         studentId: user.id,
@@ -1532,8 +1552,8 @@ export async function getClassroomExamDetail(
         pendingCount: submissions.filter(
           (submission) => submission.status === "ai_degerlendirildi",
         ).length,
-        aiAverage: average(aiScores),
-        approvedAverage: average(approvedScores),
+        aiAverage: studentScore(aiScores),
+        approvedAverage: studentScore(approvedScores),
       };
     })
     .sort(
@@ -1551,11 +1571,42 @@ export async function getClassroomExamDetail(
   };
 }
 
-/** Bos diziyi 0 yerine null sayar - "hic puan yok" ile "0 puan" ayri seyler. */
-function average(values: readonly number[]): number | null {
-  if (values.length === 0) return null;
-  const total = values.reduce((sum, value) => sum + value, 0);
-  return Math.round((total / values.length) * 10) / 10;
+/**
+ * Tek bir ogrencinin sinav puani: soru puanlariyla AGIRLIKLI, TAM SAYI.
+ *
+ * Iki kural birden:
+ *
+ * 1. AGIRLIKLI. Duz ortalama, 40 puanlik bir acik uclu soruyla 5 puanlik bir
+ *    coktan secmeliyi esit sayardi. Veritabanindaki
+ *    `recalculate_exam_attempt_result` her zaman agirlikli hesapliyor; bu
+ *    onizleme ondan farkli bir sayi gosterirse egitmen onaydan once ve sonra
+ *    iki ayri not gorur.
+ *
+ * 2. TAM SAYI. Ogrencinin bireysel notu ondalikli olmamali - 83.33 bir sey
+ *    anlatmiyor. Yuvarlama yarim degerlerde ogrencinin lehinedir ve tam puani
+ *    ERISILEBILIR birakir: kusursuz cevaplanmis bir sinav 100 doner.
+ *
+ * Tum sorularin puani 0 ise (veri hatasi) duz ortalamaya dusulur; boylece
+ * egitmen bos ekran yerine yine de bir sayi gorur.
+ */
+function studentScore(
+  entries: readonly { score: number; points: number }[],
+): number | null {
+  if (entries.length === 0) return null;
+
+  const totalPoints = entries.reduce((sum, entry) => sum + entry.points, 0);
+
+  if (totalPoints <= 0) {
+    const total = entries.reduce((sum, entry) => sum + entry.score, 0);
+    return Math.round(total / entries.length);
+  }
+
+  const earned = entries.reduce(
+    (sum, entry) => sum + entry.score * entry.points,
+    0,
+  );
+
+  return Math.round(earned / totalPoints);
 }
 
 /* -------------------------------------------------------------------------- */

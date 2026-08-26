@@ -13,6 +13,7 @@
     "seed": "node scripts/test-verisi.mjs",
     "seed:sorular": "node scripts/soru-havuzu.mjs",
     "seed:demo": "node scripts/demo-verisi.mjs",
+    "vercel:env": "node scripts/vercel-env.mjs",
     "migration:durum": "node scripts/migration-durumu.mjs",
     "app:sync": "npx cap sync",
     "app:android": "npx cap open android",
