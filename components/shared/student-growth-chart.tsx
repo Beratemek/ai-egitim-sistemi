@@ -150,7 +150,11 @@ export function StudentGrowthChart({ points }: { points: StudentGrowthPoint[] })
               </div>
             </div>
 
-            <div className="h-72 w-full" aria-label="Sınav puanlarının zaman grafiği">
+            <div
+              className="h-72 w-full"
+              role="img"
+              aria-label="Sınav puanlarının zaman içindeki değişim grafiği"
+            >
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={visible} margin={{ top: 12, right: 12, left: -20, bottom: 4 }}>
                   <CartesianGrid strokeDasharray="3 5" vertical={false} opacity={0.35} />
@@ -181,6 +185,16 @@ export function StudentGrowthChart({ points }: { points: StudentGrowthPoint[] })
                   />
                 </LineChart>
               </ResponsiveContainer>
+            </div>
+            <div className="sr-only">
+              <p>Grafikteki sınav sonuçları:</p>
+              <ul>
+                {visible.map((point) => (
+                  <li key={point.attemptId}>
+                    {point.dateLabel}, {point.title}: {scoreFormatter.format(point.score)} / 100
+                  </li>
+                ))}
+              </ul>
             </div>
           </div>
         )}

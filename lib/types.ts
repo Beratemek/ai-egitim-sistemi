@@ -13,6 +13,7 @@ export const USER_ROLES = [
   "icerik_uzmani",
   "egitmen",
   "ogrenci",
+  "veli",
   "egitim_yoneticisi",
   /**
    * Sistem yoneticisi. GIZLI roldur: kayit ve rol secim ekranlarinda
@@ -31,8 +32,8 @@ export function isUserRole(value: unknown): value is UserRole {
 /**
  * Rol onay durumu.
  *
- * Ogrenci disindaki roller egitim yoneticisi onayi ister; onaya kadar etkin
- * rol 'ogrenci' kalir ve kullanici bekleme ekranina alinir.
+ * Kayit ekranindaki tum roller sistem yoneticisi onayi ister; onaya kadar
+ * teknik bootstrap rol 'ogrenci' kalir ve kullanici bekleme ekranina alinir.
  */
 export const ROLE_STATUSES = [
   "secilmedi",
@@ -239,6 +240,63 @@ export type ExamAssignment = {
   assigned_by: string | null;
   assigned_at: string;
   due_at: string | null;
+};
+
+/** Sistem yöneticisinin kurduğu tek veli -> çok öğrenci bağlantısı. */
+export type GuardianStudentLink = {
+  student_id: string;
+  guardian_id: string;
+  linked_by: string | null;
+  linked_at: string;
+};
+
+/** Veli panelindeki güvenli öğrenci kimlik özeti. */
+export type GuardianStudentSummary = {
+  guardian_id: string;
+  guardian_name: string;
+  student_id: string;
+  student_name: string;
+  classroom: string | null;
+  assigned_exam_count: number;
+  completed_exam_count: number;
+  overdue_exam_count: number;
+  average_score: number | null;
+  latest_score: number | null;
+  latest_completed_at: string | null;
+};
+
+/** Veliye açılan, soru ve cevap içermeyen sınav durumu/sonuç satırı. */
+export type GuardianExamProgressStatus =
+  | "baslanmadi"
+  | "devam_ediyor"
+  | "degerlendiriliyor"
+  | "sonuclandi";
+
+export type GuardianStudentExamRow = {
+  exam_id: string;
+  title: string;
+  subject: string;
+  due_at: string | null;
+  progress_status: GuardianExamProgressStatus;
+  started_at: string | null;
+  submitted_at: string | null;
+  completed_at: string | null;
+  final_score: number | null;
+};
+
+/** Yalnız nihai, eğitmen onaylı kanıttan üretilen kazanım özeti. */
+export type GuardianStudentOutcomeRow = {
+  outcome_id: string;
+  outcome_text: string;
+  subject: string;
+  topic: string;
+  average_score: number | null;
+  approved_answer_count: number;
+  measured_question_count: number;
+  exam_count: number;
+  evidence_level: "early" | "supported" | "strong";
+  is_actionable_weak: boolean;
+  latest_evidence_at: string | null;
 };
 
 export type ExamAttempt = {
@@ -584,6 +642,10 @@ export interface Database {
         ExamAssignment,
         Insertable<ExamAssignment, "id" | "assigned_at" | "assigned_by" | "due_at">
       >;
+      guardian_student_links: TableDefinition<
+        GuardianStudentLink,
+        Insertable<GuardianStudentLink, "linked_at" | "linked_by">
+      >;
       instructor_subjects: TableDefinition<
         InstructorSubject,
         Insertable<InstructorSubject, "granted_by" | "granted_at">
@@ -785,6 +847,22 @@ export interface Database {
       get_my_submissions: {
         Args: { target_exam?: string | null };
         Returns: Submission[];
+      };
+      set_student_guardian: {
+        Args: { target_student: string; target_guardian: string | null };
+        Returns: string | null;
+      };
+      get_guardian_students: {
+        Args: Record<string, never>;
+        Returns: GuardianStudentSummary[];
+      };
+      get_guardian_student_exams: {
+        Args: { target_student: string };
+        Returns: GuardianStudentExamRow[];
+      };
+      get_guardian_student_outcomes: {
+        Args: { target_student: string };
+        Returns: GuardianStudentOutcomeRow[];
       };
     };
     Enums: {

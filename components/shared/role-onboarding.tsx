@@ -23,7 +23,7 @@ import { cn } from "@/lib/utils";
  * kagidinda ve egitmenin cevap listesinde kullanicinin gorunen kimligi budur;
  * e-posta ise kimlik hesabindan gelir ve degistirilemez.
  *
- * DORT ROL de sistem yoneticisi onayindan gecer - ogrenci dahil. Onaya kadar
+ * Kayit ekranindaki tum roller sistem yoneticisi onayindan gecer. Onaya kadar
  * kullanicinin etkin rolu "ogrenci" kalir, yani bekleme ekranindayken
  * yetkili alanlara zaten erisemez.
  */

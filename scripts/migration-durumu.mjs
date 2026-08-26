@@ -96,6 +96,18 @@ const ADIMLAR = [
     "sinav-yapisi-kilidi",
     () => fonksiyon("is_exam_structure_locked", { target_exam: BOS_ID }),
   ],
+  [
+    "veli-baglantilari",
+    async () =>
+      (await sutun("guardian_student_links", "student_id")) &&
+      (await fonksiyon("get_guardian_students")) &&
+      (await fonksiyon("get_guardian_student_exams", {
+        target_student: BOS_ID,
+      })) &&
+      (await fonksiyon("get_guardian_student_outcomes", {
+        target_student: BOS_ID,
+      })),
+  ],
 ];
 
 /**

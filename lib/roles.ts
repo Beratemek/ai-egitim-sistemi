@@ -48,6 +48,13 @@ export const ROLE_DEFINITIONS: Record<UserRole, RoleDefinition> = {
     path: "/dashboard/ogrenci",
     book: 2, // hardal
   },
+  veli: {
+    role: "veli",
+    label: "Veli",
+    description: "Kendisine tanımlanan öğrencilerin sınav ve kazanım gelişimini izler.",
+    path: "/dashboard/veli",
+    book: 5,
+  },
   egitim_yoneticisi: {
     role: "egitim_yoneticisi",
     label: "Eğitim Yöneticisi",

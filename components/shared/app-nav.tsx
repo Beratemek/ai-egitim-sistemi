@@ -9,6 +9,7 @@ import {
   ClipboardList,
   ChartNoAxesColumnIncreasing,
   GraduationCap,
+  HeartHandshake,
   LayoutDashboard,
   Library,
   ListChecks,
@@ -120,6 +121,14 @@ const BASE_NAV = {
       label: "Çalışma Planım",
       icon: ListTodo,
       description: "Kazanımlarını planla ve tamamla",
+    },
+  ],
+  veli: [
+    {
+      href: "/dashboard/veli",
+      label: "Çocuklarım",
+      icon: HeartHandshake,
+      description: "Sınav ve kazanım gelişimini izle",
     },
   ],
   egitim_yoneticisi: [

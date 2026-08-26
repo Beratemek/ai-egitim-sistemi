@@ -15,7 +15,7 @@ import { isRoleStatus, type RoleStatus, type UserRole } from "@/lib/types";
  * Rol alanlari uygulamadan DOGRUDAN yazilmaz; veritabanindaki iki
  * SECURITY DEFINER fonksiyonu uzerinden gecer (bkz. supabase/schema.sql):
  *   * request_role()        - kullanici kendi adina rol talep eder
- *   * review_role_request() - yalnizca egitim yoneticisi karar verir
+ *   * review_role_request() - yalnizca sistem yoneticisi karar verir
  *
  * Boylece "kendi satirimi guncelleyip yonetici olurum" yolu kapalidir; tablo
  * uzerindeki tetikleyici dogrudan yazmayi zaten reddeder.
@@ -43,6 +43,18 @@ export async function requestRole(
 
   const current = await getCurrentUser();
   if (!current) return { ok: false, error: "Oturum acmaniz gerekiyor." };
+  if (target === "admin") {
+    return { ok: false, error: "Sistem yoneticisi rolu talep edilemez." };
+  }
+  if (
+    current.profile.role_status !== "secilmedi" &&
+    current.profile.role_status !== "reddedildi"
+  ) {
+    return {
+      ok: false,
+      error: "Ek roller yalnizca sistem yoneticisi tarafindan verilir.",
+    };
+  }
 
   const supabase = await createServerSupabaseClient();
   const { data, error } = await supabase.rpc("request_role", { target });

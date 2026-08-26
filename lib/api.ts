@@ -5,6 +5,7 @@
 import { NextResponse } from "next/server";
 
 import { isSupabaseConfigured } from "@/lib/env";
+import { grantedRoles } from "@/lib/roles";
 import { getCurrentUser, type AuthenticatedUser } from "@/lib/supabase-server";
 import type { ApiResponse, UserRole } from "@/lib/types";
 
@@ -46,7 +47,8 @@ export async function requireRole(allowed: readonly UserRole[]): Promise<GuardRe
   // `admin` gizli sistem rolu: her uc noktaya erisir. Rol listelerine tek tek
   // eklemek yerine burada bir kez gecilir, boylece yeni bir uc nokta
   // eklendiginde admin'i eklemeyi unutmak mumkun olmaz.
-  if (current.profile.role !== "admin" && !allowed.includes(current.profile.role)) {
+  const roles = grantedRoles(current.profile);
+  if (!roles.includes("admin") && !roles.some((role) => allowed.includes(role))) {
     return {
       ok: false,
       response: jsonError("Bu islem icin yetkiniz yok.", 403),
