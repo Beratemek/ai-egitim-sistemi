@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 
 import { ExamCreateDialog } from "@/components/shared/exam-create-dialog";
+import { ExamDeleteButton } from "@/components/shared/exam-delete-button";
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -67,18 +68,28 @@ export default async function SinavlarPage() {
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 sm:gap-4">
           {exams.map((exam) => (
-            <Link
-              key={exam.id}
-              href={`/dashboard/egitmen/sinavlar/${exam.id}`}
-              className="group"
-            >
+            /*
+              Kart eskiden bastan sona bir <Link>'ti. Silme dugmesi eklenince
+              bu gecersiz HTML olurdu (<a> icinde <button>) ve dugmeye tiklamak
+              sinav detayina giderdi. Baglanti karti ORTUYEN bir katmana alindi;
+              dugme z-10 ile onun ustunde durur, kartin geri kalani yine bastan
+              sona tiklanabilir.
+            */
+            <div key={exam.id} className="group relative">
               <Card className="h-full transition-all group-hover:border-primary/50 group-hover:shadow-md">
                 <CardHeader>
                   <div className="flex items-start justify-between gap-2">
                     <CardTitle className="leading-snug">{exam.title}</CardTitle>
-                    <Badge variant={exam.is_published ? "success" : "soft"}>
-                      {exam.is_published ? "Yayında" : "Taslak"}
-                    </Badge>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <Badge variant={exam.is_published ? "success" : "soft"}>
+                        {exam.is_published ? "Yayında" : "Taslak"}
+                      </Badge>
+                      <ExamDeleteButton
+                        examId={exam.id}
+                        examTitle={exam.title}
+                        submissionCount={exam.submissionCount}
+                      />
+                    </div>
                   </div>
                   {exam.description ? (
                     <CardDescription>{exam.description}</CardDescription>
@@ -125,7 +136,14 @@ export default async function SinavlarPage() {
                   </div>
                 </CardContent>
               </Card>
-            </Link>
+
+              <Link
+                href={`/dashboard/egitmen/sinavlar/${exam.id}`}
+                className="absolute inset-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <span className="sr-only">{exam.title} sınavını aç</span>
+              </Link>
+            </div>
           ))}
         </div>
       )}

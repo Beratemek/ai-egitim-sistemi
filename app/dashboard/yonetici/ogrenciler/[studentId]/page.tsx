@@ -15,6 +15,7 @@ import {
   ManagerScore,
 } from "@/components/shared/manager-status";
 import { PageHeader } from "@/components/shared/page-header";
+import { StudentExamDataDelete } from "@/components/shared/student-exam-data-delete";
 import {
   StudentGrowthChart,
   type StudentGrowthPoint,
@@ -172,12 +173,18 @@ export default async function ManagerStudentDetailPage({
                 <TableHead>Durum</TableHead>
                 <TableHead>Tarih</TableHead>
                 <TableHead className="text-right">Puan</TableHead>
+                {/*
+                  Basliksiz sutun: icindeki silme dugmesi zaten kendi
+                  aria-label'ini tasiyor, "Islem" yazmak ekran okuyucuya bir
+                  sey katmadan tabloyu kalabaliklastirirdi.
+                */}
+                <TableHead className="w-10" />
               </TableRow>
             </TableHeader>
             <TableBody>
               {student.history.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="h-28 text-center text-muted-foreground">
+                  <TableCell colSpan={5} className="h-28 text-center text-muted-foreground">
                     Henüz başlatılmış sınav bulunmuyor.
                   </TableCell>
                 </TableRow>
@@ -193,6 +200,14 @@ export default async function ManagerStudentDetailPage({
                       {formatDate(result.completedAt ?? result.startedAt)}
                     </TableCell>
                     <TableCell className="text-right"><ManagerScore score={result.score} /></TableCell>
+                    <TableCell className="text-right">
+                      <StudentExamDataDelete
+                        examId={result.examId}
+                        examTitle={result.title}
+                        studentId={student.studentId}
+                        studentName={student.name}
+                      />
+                    </TableCell>
                   </TableRow>
                 ))
               )}

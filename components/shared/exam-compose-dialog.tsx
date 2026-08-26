@@ -73,6 +73,17 @@ export interface ExamComposeDialogProps {
   onCreated?: () => void;
 }
 
+/**
+ * Konu secimlerinin anahtari: `ders|konu`.
+ *
+ * Duz konu adi yetmez - iki farkli derste ayni adli konu bulunabilir
+ * ("Fonksiyonlar" hem Matematik hem Yazilim Teknolojileri'nde) ve duz adla
+ * tutulsaydi birini isaretlemek digerini de isaretlerdi.
+ */
+function konuAnahtari(subject: string, topic: string): string {
+  return `${subject}|${topic}`;
+}
+
 export function ExamComposeDialog({
   open,
   onOpenChange,
@@ -84,7 +95,15 @@ export function ExamComposeDialog({
   const router = useRouter();
 
   const [baslik, setBaslik] = React.useState("");
-  const [ders, setDers] = React.useState<string>("");
+  /*
+    Sinav birden fazla derse ait olabilir.
+
+    Onceden tek bir ders seciliyordu; oysa "Biyoloji & Cografya" gibi ortak
+    yazililar gercek bir ihtiyac. Konu anahtarlari da bu yuzden BILESIK
+    (`ders|konu`): iki farkli derste ayni adli konu bulunabilir ve duz konu
+    adiyla tutulsaydi birini isaretlemek digerini de isaretlerdi.
+  */
+  const [dersler, setDersler] = React.useState<ReadonlySet<string>>(new Set());
   const [konular, setKonular] = React.useState<ReadonlySet<string>>(new Set());
   const [testSayisi, setTestSayisi] = React.useState("10");
   const [klasikSayisi, setKlasikSayisi] = React.useState("5");
@@ -112,12 +131,15 @@ export function ExamComposeDialog({
     setBaslik("");
     setKonular(new Set());
     setZorluk("orta");
-    setDers(defaultSubject ?? subjects[0]?.subject ?? "");
+    // Bulunulan ders on secili gelir; yoksa listenin ilki. Egitmen ustune
+    // baska dersler ekleyebilir.
+    const baslangic = defaultSubject ?? subjects[0]?.subject ?? "";
+    setDersler(baslangic ? new Set([baslangic]) : new Set());
   }, [open, defaultSubject, subjects]);
 
-  const acikDers = React.useMemo(
-    () => subjects.find((group) => group.subject === ders) ?? null,
-    [subjects, ders],
+  const secilenDersler = React.useMemo(
+    () => subjects.filter((group) => dersler.has(group.subject)),
+    [subjects, dersler],
   );
 
   /**
@@ -128,11 +150,21 @@ export function ExamComposeDialog({
    * "zor sinav" = "havuzdaki zor sorulardan kur".
    */
   const kapsam = React.useMemo(() => {
-    if (!acikDers) return [];
-    const konuyaGore =
+    if (secilenDersler.length === 0) return [];
+
+    // Secilen derslerin konulari tek listede toplanir; konu secimi varsa
+    // yalnizca isaretlenenler kalir.
+    const tumKonular = secilenDersler.flatMap((group) =>
+      group.topics.map((topic) => ({ group, topic })),
+    );
+
+    const konuyaGore = (
       konular.size === 0
-        ? acikDers.topics
-        : acikDers.topics.filter((topic) => konular.has(topic.topic));
+        ? tumKonular
+        : tumKonular.filter(({ group, topic }) =>
+            konular.has(konuAnahtari(group.subject, topic.topic)),
+          )
+    ).map(({ topic }) => topic);
 
     if (zorluk === "hepsi") return konuyaGore;
 
@@ -144,7 +176,7 @@ export function ExamComposeDialog({
         ),
       }))
       .filter((topic) => topic.questions.length > 0);
-  }, [acikDers, konular, zorluk]);
+  }, [secilenDersler, konular, zorluk]);
 
   const mevcut = React.useMemo(() => {
     let test = 0;
@@ -166,14 +198,39 @@ export function ExamComposeDialog({
 
   const gecerli =
     baslik.trim().length > 0 &&
-    Boolean(acikDers) &&
+    secilenDersler.length > 0 &&
     toplamIstenen > 0;
 
-  function konuDegistir(konu: string) {
+  function konuDegistir(anahtar: string) {
     setKonular((mevcut) => {
       const next = new Set(mevcut);
-      if (next.has(konu)) next.delete(konu);
-      else next.add(konu);
+      if (next.has(anahtar)) next.delete(anahtar);
+      else next.add(anahtar);
+      return next;
+    });
+  }
+
+  /**
+   * Dersi ekler/cikarir.
+   *
+   * Ders cikarilirken O DERSE AIT konu secimleri de temizlenir: kalsalardi
+   * gorunmeyen ama kapsami daraltan gizli bir secim olurlardi.
+   */
+  function dersDegistir(subject: string) {
+    setDersler((mevcut) => {
+      const next = new Set(mevcut);
+      if (next.has(subject)) {
+        next.delete(subject);
+        setKonular((konu) => {
+          const kalan = new Set(konu);
+          for (const anahtar of konu) {
+            if (anahtar.startsWith(`${subject}|`)) kalan.delete(anahtar);
+          }
+          return kalan;
+        });
+      } else {
+        next.add(subject);
+      }
       return next;
     });
   }
@@ -221,16 +278,27 @@ export function ExamComposeDialog({
       `getSubjectOptions` uzerinden ders listesine sizip ders YETKI
       sisteminde var olmayan bir ders gibi davranmaya baslardi.
     */
-    const gecerliDers = ders === UNASSIGNED_SUBJECT ? "" : ders;
+    /*
+      `exams.subject` TEK bir metin tutuyor; cok dersli sinavda ucunden
+      birini secmek digerlerini gizlemek olurdu, o yuzden bos birakilir.
+      Gorunurluk zaten bu sutundan degil sinavin SORULARINDAN hesaplaniyor
+      (bkz. uygulandi/2026-08-26-cok-dersli-sinav.sql, exam_subjects), dolayisiyla bos
+      kalmasi yetkiyi gevsetmez.
+    */
+    const adlar = secilenDersler
+      .map((group) => group.subject)
+      .filter((ad) => ad !== UNASSIGNED_SUBJECT);
+    const gecerliDers = adlar.length === 1 ? (adlar[0] ?? "") : "";
 
     setPending(true);
 
     try {
       const result = await createExamWithQuestions({
         title: baslik,
-        description: gecerliDers
-          ? `${gecerliDers} dersinden hazırlandı.`
-          : "Soru havuzundan hazırlandı.",
+        description:
+          adlar.length > 0
+            ? `${adlar.join(", ")} dersinden hazırlandı.`
+            : "Soru havuzundan hazırlandı.",
         ...(gecerliDers ? { subject: gecerliDers } : {}),
         ...(Number.isFinite(dakika) ? { durationMinutes: dakika } : {}),
         questionIds: ids,
@@ -313,30 +381,47 @@ export function ExamComposeDialog({
               {/* ---------- Ders ---------- */}
               <div className="space-y-2">
                 <Label htmlFor="compose-ders">Ders</Label>
-                <Select
-                  value={ders}
-                  onValueChange={(value) => {
-                    setDers(value);
-                    // Ders degisince onceki konu secimi anlamsiz kalir.
-                    setKonular(new Set());
-                  }}
-                >
-                  <SelectTrigger id="compose-ders">
-                    <SelectValue placeholder="Ders seçin" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {subjects.map((group) => {
-                      const sayim = countTopicsByType(group.topics);
+                {/*
+                  Acilir kutu yerine ONAY KUTULU liste: sinav birden fazla
+                  derse ait olabiliyor ve tek secimli bir kutu bunu ifade
+                  edemiyordu. Liste kisa oldugu icin dogrudan acik duruyor,
+                  bir tiklama daha eksiliyor.
+                */}
+                <div className="kaydirma-ince max-h-[26vh] space-y-0.5 overflow-y-auto rounded-lg border p-2">
+                  {subjects.map((group) => {
+                    const sayim = countTopicsByType(group.topics);
+                    const id = `compose-ders-${group.subject}`;
+                    const secili = dersler.has(group.subject);
 
-                      return (
-                        <SelectItem key={group.subject} value={group.subject}>
-                          {group.subject} · {sayim.test} test · {sayim.acikUclu}{" "}
-                          klasik
-                        </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
+                    return (
+                      <label
+                        key={group.subject}
+                        htmlFor={id}
+                        className={cn(
+                          "flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 transition-colors",
+                          secili ? "bg-primary/5" : "hover:bg-accent/60",
+                        )}
+                      >
+                        <Checkbox
+                          id={id}
+                          checked={secili}
+                          onChange={() => dersDegistir(group.subject)}
+                        />
+                        <span className="min-w-0 flex-1 text-sm">
+                          {group.subject}
+                        </span>
+                        <span className="shrink-0 text-[11px] text-muted-foreground">
+                          {sayim.test} test · {sayim.acikUclu} klasik
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  {dersler.size > 1
+                    ? `${dersler.size} ders seçildi; sınav bu derslerden karışık kurulur.`
+                    : "Birden fazla ders seçerek ortak sınav kurabilirsiniz."}
+                </p>
               </div>
 
               {/* ---------- Zorluk ---------- */}
@@ -366,7 +451,7 @@ export function ExamComposeDialog({
               </div>
 
               {/* ---------- Konular (istege bagli, coklu) ---------- */}
-              {acikDers ? (
+              {secilenDersler.length > 0 ? (
                 <div className="space-y-2">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <Label>
@@ -388,15 +473,35 @@ export function ExamComposeDialog({
                     ) : null}
                   </div>
 
-                  <div className="max-h-[38vh] space-y-0.5 overflow-y-auto rounded-lg border p-2">
-                    {acikDers.topics.map((topic) => {
-                      const id = `konu-${topic.topic}`;
-                      const secili = konular.has(topic.topic);
+                  <div className="kaydirma-ince max-h-[38vh] space-y-0.5 overflow-y-auto rounded-lg border p-2">
+                    {secilenDersler.flatMap((group, dersIndex) => [
+                      /*
+                        Ders basligi yalnizca BIRDEN FAZLA ders seciliyken
+                        cikar: tek derste gereksiz bir satir olurdu. Konular
+                        hangi derse ait oldugu belli olmadan listelenirse
+                        ayni adli iki konu ayirt edilemez.
+                      */
+                      secilenDersler.length > 1 ? (
+                        <p
+                          key={`baslik-${group.subject}`}
+                          className={cn(
+                            "px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground",
+                            dersIndex > 0 && "mt-1 border-t pt-2",
+                          )}
+                        >
+                          {group.subject}
+                        </p>
+                      ) : null,
+
+                      ...group.topics.map((topic) => {
+                      const anahtar = konuAnahtari(group.subject, topic.topic);
+                      const id = `konu-${anahtar}`;
+                      const secili = konular.has(anahtar);
                       const sayim = countByType(topic.questions);
 
                       return (
                         <label
-                          key={topic.topic}
+                          key={anahtar}
                           htmlFor={id}
                           className={cn(
                             "flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 transition-colors",
@@ -406,7 +511,7 @@ export function ExamComposeDialog({
                           <Checkbox
                             id={id}
                             checked={secili}
-                            onChange={() => konuDegistir(topic.topic)}
+                            onChange={() => konuDegistir(anahtar)}
                           />
                           <span className="min-w-0 flex-1 text-sm">{topic.topic}</span>
 
@@ -426,12 +531,15 @@ export function ExamComposeDialog({
                           </span>
                         </label>
                       );
-                    })}
+                      }),
+                    ])}
                   </div>
 
                   <p className="text-xs leading-relaxed text-muted-foreground">
                     {konular.size === 0
-                      ? `Konu seçmezseniz ${acikDers.subject} dersinin tüm konuları kapsama girer.`
+                      ? secilenDersler.length === 1
+                        ? `Konu seçmezseniz ${secilenDersler[0]?.subject} dersinin tüm konuları kapsama girer.`
+                        : "Konu seçmezseniz seçili derslerin tüm konuları kapsama girer."
                       : `${konular.size} konu seçildi.`}
                   </p>
                 </div>
@@ -495,9 +603,11 @@ export function ExamComposeDialog({
               {toplamIstenen} soru
             </Badge>
             <Badge variant="soft">{sure || "60"} dk</Badge>
-            {ders ? (
-              <Badge variant="soft">{ders}</Badge>
-            ) : null}
+            {secilenDersler.map((group) => (
+              <Badge key={group.subject} variant="soft">
+                {group.subject}
+              </Badge>
+            ))}
             {zorluk === "hepsi" ? null : (
               <Badge variant="soft">{DIFFICULTY_LABELS[zorluk]}</Badge>
             )}

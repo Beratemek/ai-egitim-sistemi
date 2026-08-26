@@ -52,10 +52,6 @@ export interface ExamManualDialogProps {
   onOpenChange: (open: boolean) => void;
   /** Isaretlenen sorular; pencerede tek tek listelenir. */
   questions: readonly Question[];
-  /** Secilebilir ders adlari. */
-  subjectOptions?: readonly string[];
-  /** On secili ders; bulunulan kademeden gelir. */
-  defaultSubject?: string | null;
   /** Tanitim modunda kayit yapilmaz; dugme kapatilir. */
   canPersist?: boolean;
   onCreated?: () => void;
@@ -67,15 +63,35 @@ export function ExamManualDialog({
   open,
   onOpenChange,
   questions,
-  subjectOptions = [],
-  defaultSubject = null,
   canPersist = true,
   onCreated,
 }: ExamManualDialogProps) {
   const router = useRouter();
 
   const [baslik, setBaslik] = React.useState("");
-  const [ders, setDers] = React.useState("");
+
+  /*
+    Dersler SECILMEZ, secilen sorulardan TURETILIR.
+
+    Onceden burada tek bir ders kutusu vardi; oysa egitmen havuzdan uc ayri
+    dersten soru isaretleyip bu pencereye gelebiliyor ve tek ders secmek
+    zorunda kaliyordu. Sinavin dersi zaten sorularinin dersidir - iki ayri
+    gercek tutmanin anlami yok.
+
+    Yetki tarafi da ayni kaynagi kullanir: uygulandi/2026-08-26-cok-dersli-sinav.sql
+    ile gorunurluk `exam_subjects()` uzerinden, yani yine sorulardan
+    hesaplanir.
+  */
+  const dersler = React.useMemo(() => {
+    const kume = new Set<string>();
+    for (const question of questions) {
+      const ad = question.subject?.trim();
+      // "Ders atanmamis" bir ders ADI DEGIL, dersi girilmemis sorularin
+      // toplandigi yer tutucudur (bkz. lib/question-pool.ts).
+      if (ad && ad !== UNASSIGNED_SUBJECT) kume.add(ad);
+    }
+    return [...kume].sort((a, b) => a.localeCompare(b, "tr"));
+  }, [questions]);
   const [sure, setSure] = React.useState("60");
   const [kamera, setKamera] = React.useState(false);
   const [puanModu, setPuanModu] = React.useState<PuanModu>("esit");
@@ -85,7 +101,7 @@ export function ExamManualDialog({
   React.useEffect(() => {
     if (!open) return;
     setBaslik("");
-    setDers(defaultSubject ?? "");
+    // Ders artik sifirlanmiyor: secilmiyor, sorulardan turetiliyor.
     setSure("60");
     setKamera(false);
     setPuanModu("esit");
@@ -104,7 +120,7 @@ export function ExamManualDialog({
       });
       setPuanlar(baslangic);
     }
-  }, [open, defaultSubject, questions]);
+  }, [open, questions]);
 
   const testAdedi = questions.filter((q) => q.type === "test").length;
   const klasikAdedi = questions.length - testAdedi;
@@ -143,12 +159,15 @@ export function ExamManualDialog({
         : undefined;
 
     /*
-      "Ders atanmamis" bir ders ADI DEGIL, dersi girilmemis sorularin
-      toplandigi yer tutucudur (bkz. lib/question-pool.ts). Yer tutucu
-      kaydedilseydi ders YETKI sisteminde var olmayan bir ders gibi
-      davranmaya baslardi.
+      `exams.subject` yalnizca TEK dersli sinavda yazilir.
+
+      Cok dersliyken bos birakilir: sutun tek bir metin tutuyor ve ucunden
+      birini secmek digerlerini gizlemek olurdu. Gorunurluk zaten sutundan
+      degil sorulardan hesaplaniyor (bkz. exam_subjects), dolayisiyla bos
+      kalmasi yetkiyi gevsetmez - sutun burada yalnizca rozet/suzgec gibi
+      gorsel isler icin duruyor.
     */
-    const gecerliDers = ders.trim() === UNASSIGNED_SUBJECT ? "" : ders.trim();
+    const gecerliDers = dersler.length === 1 ? (dersler[0] ?? "") : "";
 
     setPending(true);
 
@@ -207,27 +226,31 @@ export function ExamManualDialog({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="manual-ders" className="flex items-center gap-1.5">
+              <span className="flex items-center gap-1.5 text-sm font-medium">
                 <BookMarked className="h-3.5 w-3.5 text-muted-foreground" />
-                Ders
-              </Label>
-              <Input
-                id="manual-ders"
-                list="manual-ders-secenekleri"
-                value={ders}
-                onChange={(event) => setDers(event.target.value)}
-                placeholder="Biyoloji"
-                autoComplete="off"
-              />
-              <datalist id="manual-ders-secenekleri">
-                {subjectOptions.map((option) => (
-                  <option key={option} value={option} />
-                ))}
-              </datalist>
+                {dersler.length > 1 ? "Dersler" : "Ders"}
+              </span>
+
+              {dersler.length === 0 ? (
+                <p className="rounded-lg border border-dashed px-3 py-2.5 text-sm text-muted-foreground">
+                  Seçilen soruların dersi belirtilmemiş.
+                </p>
+              ) : (
+                <div className="flex flex-wrap gap-1.5 rounded-lg border bg-muted/40 px-3 py-2.5">
+                  {dersler.map((ad) => (
+                    <Badge key={ad} variant="soft">
+                      {ad}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+
               <p className="text-xs leading-relaxed text-muted-foreground">
-                {ders.trim()
-                  ? "Sınavı yalnızca bu derse yetkili eğitmenler görür."
-                  : "Boş bırakırsanız sınav tüm eğitmenlere açık kalır."}
+                {dersler.length === 0
+                  ? "Sınav tüm eğitmenlere açık kalır."
+                  : dersler.length === 1
+                    ? "Seçtiğiniz soruların dersinden alındı. Sınavı yalnızca bu derse yetkili eğitmenler görür."
+                    : "Seçtiğiniz soruların derslerinden alındı. Sınavı bu derslerden herhangi birine yetkili eğitmenler görür."}
               </p>
             </div>
 
@@ -239,11 +262,12 @@ export function ExamManualDialog({
               <Input
                 id="manual-sure"
                 type="number"
+                inputMode="numeric"
                 min={1}
                 max={600}
                 value={sure}
                 onChange={(event) => setSure(event.target.value)}
-                className="w-32"
+                className="sayi-oksuz w-32"
               />
               <p className="text-xs leading-relaxed text-muted-foreground">
                 Her öğrenci sınava başladığı andan itibaren bu süreyi alır.
@@ -311,7 +335,7 @@ export function ExamManualDialog({
               </span>
             </div>
 
-            <ol className="max-h-[46vh] space-y-1.5 overflow-y-auto rounded-lg border p-2">
+            <ol className="kaydirma-ince max-h-[46vh] space-y-1.5 overflow-y-auto rounded-lg border p-2">
               {questions.map((question, index) => (
                 <li
                   key={question.id}
@@ -340,6 +364,7 @@ export function ExamManualDialog({
                   <span className="flex shrink-0 items-center gap-1">
                     <Input
                       type="number"
+                      inputMode="numeric"
                       min={1}
                       max={100}
                       value={
@@ -355,7 +380,7 @@ export function ExamManualDialog({
                         }))
                       }
                       aria-label={`${index + 1}. sorunun puanı`}
-                      className="h-9 w-16 text-center"
+                      className="sayi-oksuz h-9 w-16 text-center"
                     />
                     <span className="text-xs text-muted-foreground">puan</span>
                   </span>

@@ -4,7 +4,11 @@
  * middleware, login ekrani ve navigasyon hep buradan okur.
  */
 
-import type { UserProfile, UserRole } from "@/lib/types";
+// Goreli yol bilerek: bu modul `tests/roles.test.ts` tarafindan dogrudan
+// calistiriliyor ve test kosucusu (node --experimental-strip-types) `@/`
+// takma adini cozemez. Tipler silinip gittigi icin `@/` type-only importlarda
+// sorun cikarmaz, ama `isUserRole` bir DEGER; calisma zamaninda cozulmeli.
+import { isUserRole, type UserProfile, type UserRole } from "./types.ts";
 
 export interface RoleDefinition {
   role: UserRole;
@@ -108,13 +112,27 @@ type RoleBearer = Pick<UserProfile, "role" | "roles">;
  *
  * `roles` kolonu eklenmeden once olusmus kayitlarda kume bos olabilir; o
  * durumda aktif rol tek eleman olarak kabul edilir ki listeler bos gorunmesin.
+ *
+ * TANINMAYAN ROLLER ELENIR. `users.roles` bir Postgres enum dizisidir ve enum
+ * veritabani tarafinda arayuzden once buyuyebilir; oyle bir deger (or. enum'a
+ * elle eklenen 'veli') suzulmeden gecerse ROLE_DEFINITIONS[rol] `undefined`
+ * doner ve rolu ekrana basan her yer - rol degistirici, kullanici yonetim
+ * tablosu, rol rozeti - calisma zamaninda cokup tum paneli birlikte goturur.
  */
 export function grantedRoles(user: RoleBearer): [UserRole, ...UserRole[]] {
   // Donus tipi BOS OLMAYAN dizi: `defaultRole` ve cagiranlar `[0]` okurken
   // `undefined` kontrolu yapmak zorunda kalmasin. Bos kume zaten aktif role
   // duşurulduğu icin bu her zaman dogru.
-  const [first, ...rest] = user.roles ?? [];
-  return first ? [first, ...rest] : [user.role];
+  //
+  // Suzgec middleware.ts ile ayni: orada `(profile?.roles ?? []).filter(
+  // isUserRole)` zaten uygulaniyordu, yetkinin TEK KAYNAGI olmasi gereken bu
+  // fonksiyon ise ham diziyi geciriyordu. Iki taraf artik ayni kurali isletir.
+  const [first, ...rest] = (user.roles ?? []).filter(isUserRole);
+  if (first) return [first, ...rest];
+
+  // Kume bos kaldiysa aktif role duselim; o da taninmiyorsa en dar yetkili
+  // role - yine middleware.ts ile ayni varsayilan.
+  return [isUserRole(user.role) ? user.role : "ogrenci"];
 }
 
 /**

@@ -12,6 +12,7 @@ import {
   courseFeedbackPeriodKey,
   courseFeedbackScopeKey,
 } from "@/lib/course-feedback";
+import { bookletOptions, bookletQuestionOrder, isBooklet } from "@/lib/booklet";
 import { isSupabaseConfigured } from "@/lib/env";
 import { ALL_SUBJECTS, subjectKey } from "@/lib/subjects";
 import { selectStyleScope, type StyleScopeInput } from "@/lib/style-scope";
@@ -136,7 +137,11 @@ export const getQuestions = cache(async function getQuestions(filters: QuestionF
 /*  Sinavlar                                                                  */
 /* -------------------------------------------------------------------------- */
 
-export const getExams = cache(async function getExams(options: { onlyPublished?: boolean } = {}): Promise<Exam[]> {
+export const getExams = cache(async function getExams(options: {
+  onlyPublished?: boolean;
+  /** Arsivlenmis sinavlar da dahil edilsin mi? Varsayilan: hayir. */
+  includeArchived?: boolean;
+} = {}): Promise<Exam[]> {
   if (!isSupabaseConfigured) {
     return MOCK_EXAMS.filter((exam) => !options.onlyPublished || exam.is_published);
   }
@@ -147,7 +152,18 @@ export const getExams = cache(async function getExams(options: { onlyPublished?:
   if (options.onlyPublished) query = query.eq("is_published", true);
 
   const { data } = await query;
-  return data ?? [];
+  const exams = data ?? [];
+
+  /*
+   * Arsiv suzgeci SQL'de DEGIL burada.
+   *
+   * `.is("archived_at", null)` yazilsaydi, uygulandi/2026-08-26-sinav-arsivi.sql
+   * uygulanmadan once sutun olmadigi icin PostgREST 400 doner ve sinav
+   * listesi tamamen bosalirdi. Sutun yoksa alan `undefined` gelir, hicbir
+   * sinav elenmez; yani migration beklerken davranis aynen korunur.
+   */
+  if (options.includeArchived) return exams;
+  return exams.filter((exam) => !exam.archived_at);
 })
 
 export interface ExamDetail {
@@ -380,6 +396,12 @@ export async function getStudentExams(): Promise<StudentExamCard[]> {
  */
 export interface StudentQuestion {
   id: string;
+  /**
+   * Sorunun dersi. Kitapcik karistirmasi bu grubun ICINDE kalir: bir sinav
+   * birden fazla dersten soru tasiyabilir ve ogrenci hala "once Biyoloji,
+   * sonra Robotik" gormelidir.
+   */
+  subject: string;
   topic: string;
   text: string;
   type: QuestionType;
@@ -418,6 +440,7 @@ export async function getStudentExamDetail(
       questions: MOCK_QUESTIONS.filter((q) => q.status === "onayli").map(
         (question, index) => ({
           id: question.id,
+          subject: question.subject,
           topic: question.topic,
           text: question.text,
           type: question.type,
@@ -512,7 +535,7 @@ export async function getStudentExamDetail(
   const legacyQuestionsResult = safeQuestionsResult.error
     ? await supabase
         .from("questions")
-        .select("id, topic, text, type, options_json, visual_json")
+        .select("id, subject, topic, text, type, options_json, visual_json")
         .in("id", questionIds)
     : null;
   const questions = safeQuestionsResult.error
@@ -527,6 +550,10 @@ export async function getStudentExamDetail(
       if (!question) return null;
       return {
         id: question.id,
+        // Guvenli RPC `subject` alanini zaten donduruyordu, arayuze
+        // tasinmiyordu; kitapcik karistirmasinin ders sinirini bilmesi icin
+        // gerekli.
+        subject: question.subject ?? "",
         topic: question.topic,
         text: question.text,
         type: question.type,
@@ -538,9 +565,30 @@ export async function getStudentExamDetail(
     })
     .filter((item): item is StudentQuestion => item !== null);
 
+  /*
+    KITAPCIK.
+
+    Ogrenciye atanmis harf (`exam_assignments.booklet`) varsa sorular ve
+    siklar ona gore karistirilir. Karistirma BURADA yapiliyor cunku ogrenci
+    sinavini okuyan tek yol bu fonksiyon - sayfa da, cevap formu da ayni
+    diziyi goruyor ve sira hicbir yerde ikinci kez hesaplanmiyor.
+
+    Harf yoksa (uygulandi/2026-08-26-kitapcik.sql henuz uygulanmamis ya da eski bir
+    atama) hicbir sey karistirilmaz: sinav bugunku gibi calisir.
+  */
+  const booklet = assignmentResult.data?.booklet;
+  const sorular = isBooklet(booklet)
+    ? bookletQuestionOrder(ordered, examId, booklet).map((question) => ({
+        ...question,
+        options_json: question.options_json
+          ? bookletOptions(question.options_json, examId, question.id, booklet)
+          : null,
+      }))
+    : ordered;
+
   return {
     exam: effectiveExam,
-    questions: ordered,
+    questions: sorular,
     submissions,
     questionCount: questionIds.length,
     totalPoints,
@@ -1237,7 +1285,13 @@ export async function getClassroomExamReviews(): Promise<ClassroomExamReview[]> 
 
   const supabase = await createServerSupabaseClient();
 
-  const [exams, users] = await Promise.all([getExams(), getUsers()]);
+  // Kontrol sayfasi ARSIVLENMISLERI DE gorur: egitmen sinavi listesinden
+  // kaldirdiginda cevaplar burada durmaya devam etmeli, yoksa "silinen sinav"
+  // ogrencinin verisini de goz onunden kaldirirdi.
+  const [exams, users] = await Promise.all([
+    getExams({ includeArchived: true }),
+    getUsers(),
+  ]);
   if (exams.length === 0) return [];
 
   const examById = new Map(exams.map((exam) => [exam.id, exam]));
