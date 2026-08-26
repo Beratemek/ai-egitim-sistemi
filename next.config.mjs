@@ -1,18 +1,84 @@
-/** @type {import('next').NextConfig} */
-const nextConfig = {
-  reactStrictMode: true,
-  typescript: { ignoreBuildErrors: false },
-  eslint: { ignoreDuringBuilds: false },
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { PHASE_DEVELOPMENT_SERVER } from "next/constants.js";
+
+const projectRoot = path.dirname(fileURLToPath(import.meta.url));
+
+/** @param {string} phase */
+const createNextConfig = (phase) => {
+  /** @type {import('next').NextConfig} */
+  const nextConfig = {
+    reactStrictMode: true,
+    typescript: { ignoreBuildErrors: false },
+    eslint: { ignoreDuringBuilds: false },
+
+  /**
+   * Dosya izlemesinin KOKU: bu proje klasoru.
+   *
+   * Next.js kokü kendisi tahmin eder ve tahmini "en ustteki lockfile"dir.
+   * Bu makinede `C:\Users\emexb\package-lock.json` diye kazara olusmus bir
+   * dosya var (icinde tek bir paket); Next onu gorup KULLANICI KLASORUNUN
+   * TAMAMINI kok sayiyordu. Sonuc: her build, izleme agacini OneDrive,
+   * Belgeler, Indirilenler ve AppData uzerinden yurumeye calisiyordu -
+   * uyari olarak da soyluyordu:
+   *
+   *   "Next.js inferred your workspace root, but it may not be correct.
+   *    We detected multiple lockfiles and selected the directory of
+   *    C:\Users\emexb\package-lock.json as the root directory."
+   *
+   * Kok acikca yazilinca tahmin devre disi kalir; disaridaki lockfile
+   * durmaya devam etse bile bu projeyi etkilemez.
+   */
+    outputFileTracingRoot: projectRoot,
+
+  /**
+   * Istemci yonlendirici onbellegi (App Router "Router Cache").
+   *
+   * Next.js 15'te dinamik sayfalarin onbellek suresi VARSAYILAN OLARAK 0'dir:
+   * geri/ileri gidildiginde ya da az once acilmis bir sayfaya donuldugunde
+   * sunucuya yeniden gidilir. Bu panelde her istek middleware'de bir Supabase
+   * auth dogrulamasi + layout'ta profil sorgusu demek - yani uzak Supabase
+   * ornegimizde her geciste birkac yuz milisaniye.
+   *
+   * 30 saniye, "ayni oturumda menude gezinirken aninda acilsin" ile "veri cok
+   * bayatlamasin" arasindaki denge. Sayfa verisi degistiginde zaten
+   * `revalidatePath` cagriliyor, o onbellegi acikca temizler.
+   */
+    experimental: {
+      staleTimes: {
+        dynamic: 30,
+        static: 180,
+      },
+
+      /**
+       * Barrel (tek kapi) paketlerinde yalnizca KULLANILAN ikon/bilesen
+       * derlenir. `lucide-react` ve `recharts` binlerce modul disa acar;
+       * onlar olmadan gelistirme derlemesi her sayfada bu agaci bastan
+       * yurumek zorunda kalir.
+       */
+      optimizePackageImports: [
+        "lucide-react",
+        "recharts",
+        "@solar-icons/react",
+      ],
+    },
 
   /**
    * `next dev` ve `next build` varsayilan olarak ayni `.next` klasorunu kullanir.
    * Dev sunucusu acikken build alinirsa dev'in chunk'lari ezilir ve tarayici
    * "ChunkLoadError: Loading chunk ... failed" verir.
    *
-   * NEXT_DIST_DIR ile dogrulama build'i ayri bir klasore alinabilir:
-   *   NEXT_DIST_DIR=.next-verify npx next build
+   * Next.js 15'te dev ve build ciktilari kendiliginden ayrilmaz. Bu nedenle
+   * gelistirme sunucusu `.next`, build/start ise `.next-prod` kullanir.
+   * NEXT_DIST_DIR yalnizca ozel bir dogrulama klasoru gerektiginde bu secimi
+   * gecersiz kilabilir.
    */
-  distDir: process.env.NEXT_DIST_DIR || ".next",
+    distDir:
+      process.env.NEXT_DIST_DIR ||
+      (phase === PHASE_DEVELOPMENT_SERVER ? ".next" : ".next-prod"),
+  };
+
+  return nextConfig;
 };
 
-export default nextConfig;
+export default createNextConfig;

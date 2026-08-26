@@ -1,11 +1,93 @@
 "use server";
 
+import { cookies } from "next/headers";
+
+import { SESSION_SCOPED_COOKIES } from "@/lib/auth-cookies";
 import { publicEnv } from "@/lib/env";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
+import {
+  SESSION_ACTIVITY_COOKIE,
+  SESSION_ACTIVITY_COOKIE_MAX_AGE,
+} from "@/lib/session-activity";
 
 export type AuthActionResult =
   | { ok: true; message: string }
-  | { ok: false; error: string };
+  | { ok: false; error: string; code?: string };
+
+export type SignInInput = {
+  email: string;
+  password: string;
+};
+
+function signInErrorMessage(message: string): string {
+  if (/invalid login credentials/i.test(message)) {
+    return "E-posta adresi veya parola hatalı.";
+  }
+  if (/email not confirmed/i.test(message)) {
+    return "E-posta adresiniz henüz doğrulanmamış.";
+  }
+  if (/rate limit|too many requests/i.test(message)) {
+    return "Çok fazla deneme yapıldı. Lütfen kısa bir süre sonra tekrar deneyin.";
+  }
+  if (/fetch failed/i.test(message)) {
+    return "Kimlik doğrulama sunucusuna ulaşılamadı. Lütfen tekrar deneyin.";
+  }
+  return "Giriş yapılamadı. Bilgilerinizi kontrol edip tekrar deneyin.";
+}
+
+/**
+ * Parola ile girisi sunucuda yapar ve ilk etkinlik zamanini yerel cereze yazar.
+ */
+export async function signInWithPassword(
+  input: SignInInput,
+): Promise<AuthActionResult> {
+  const email = input.email.trim().toLocaleLowerCase("en-US");
+
+  if (!email || !input.password) {
+    return { ok: false, error: "E-posta adresi ve parola zorunludur." };
+  }
+
+  const supabase = await createServerSupabaseClient({ resilientAuthFetch: true });
+  let error: Awaited<ReturnType<typeof supabase.auth.signInWithPassword>>["error"];
+
+  try {
+    ({ error } = await supabase.auth.signInWithPassword({
+      email,
+      password: input.password,
+    }));
+  } catch (caught) {
+    const message = caught instanceof Error ? caught.message : "fetch failed";
+    return { ok: false, error: signInErrorMessage(message) };
+  }
+
+  if (error) {
+    if (/fetch failed/i.test(error.message)) {
+      console.error("[auth] Supabase parola isteği ağ hatası", {
+        name: error.name,
+        status: error.status,
+        code: error.code,
+      });
+    }
+    return {
+      ok: false,
+      error: signInErrorMessage(error.message),
+      code: error.code,
+    };
+  }
+
+  const cookieStore = await cookies();
+  cookieStore.set(SESSION_ACTIVITY_COOKIE, String(Date.now()), {
+    // Yetki kaynagi degildir; middleware'in bosta kalma suresini ilk istekte
+    // de denetleyebilmesi icin tarayici tarafindan yenilenebilir.
+    httpOnly: false,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: SESSION_ACTIVITY_COOKIE_MAX_AGE,
+  });
+
+  return { ok: true, message: "Giriş başarılı." };
+}
 
 /**
  * Dogrulama e-postasini yeniden gonderir.
@@ -43,4 +125,7 @@ export async function resendConfirmationEmail(
 export async function signOut(): Promise<void> {
   const supabase = await createServerSupabaseClient();
   await supabase.auth.signOut();
+
+  const cookieStore = await cookies();
+  for (const name of SESSION_SCOPED_COOKIES) cookieStore.delete(name);
 }

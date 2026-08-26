@@ -7,11 +7,11 @@ import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 
 /**
- * Acik/koyu tema anahtari.
+ * Açık/koyu tema anahtarı.
  *
- * Tema yalnizca tarayicida bilinir; sunucu ciktisi her zaman "acik" varsayar.
+ * Tema yalnızca tarayicida bilinir; sunucu ciktisi her zaman "acik" varsayar.
  * Bu yuzden ikon VE aria-label mount sonrasina kadar sabit tutulur - aksi
- * halde hidrasyon uyusmazligi olusur.
+ * halde hidrasyon uyusmazligi oluşur.
  */
 export function ThemeToggle() {
   const { resolvedTheme, setTheme } = useTheme();
@@ -25,7 +25,7 @@ export function ThemeToggle() {
     <Button
       variant="ghost"
       size="icon"
-      aria-label={mounted ? (isDark ? "Acik temaya gec" : "Koyu temaya gec") : "Tema"}
+      aria-label={mounted ? (isDark ? "Açık temaya geç" : "Koyu temaya geç") : "Tema"}
       onClick={() => setTheme(isDark ? "light" : "dark")}
       disabled={!mounted}
     >

@@ -1,17 +1,11 @@
 /**
- * Sinav kagidi duzeni ve havuz kirilimi - saf yardimcilar (React'ten bagimsiz).
+ * Sinav kagidi duzeni - saf yardimcilar (React'ten bagimsiz, test edilebilir).
  *
- * Kagit olcusu klasik lise sinav kagidindan alindi: bir A4 yaprakta iki sutun,
+ * Olcu klasik lise sinav kagidindan alindi: bir A4 yaprakta iki sutun,
  * her sutunda bes soru. 20 soruluk bir sinav boylece tam iki yuze oturur:
  * on yuzde 5 + 5, arka yuzde 5 + 5.
- *
- * Havuz kirilimi "atolye dali -> ders -> konu -> soru" seklindedir. Dal kimligi
- * `lib/deneyap.ts` icindeki DENEYAP enum'u, ders ise `questions.subject`
- * serbest metnidir - icerik uzmani soruyu uretirken ikisini de belirler.
  */
 
-import { categoryLabel } from "@/lib/deneyap";
-import type { DeneyapCategory } from "@/lib/deneyap";
 import type { Question } from "@/lib/types";
 
 export const QUESTIONS_PER_COLUMN = 5;
@@ -59,11 +53,8 @@ function byTypeThenDate(a: Question, b: Question): number {
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Ders bazli gruplama                                                       */
+/*  Ders bazli gruplama (havuzun ust kirilimi)                                */
 /* -------------------------------------------------------------------------- */
-
-/** Ders bilgisi girilmemis sorularin toplandigi kutu. */
-export const UNASSIGNED_SUBJECT = "Ders atanmamis";
 
 export interface SubjectGroup {
   subject: string;
@@ -72,7 +63,20 @@ export interface SubjectGroup {
   questionCount: number;
 }
 
-function groupBySubject(questions: readonly Question[]): SubjectGroup[] {
+/**
+ * Ders bilgisi girilmemis sorularin toplandigi kutu.
+ *
+ * Bilerek "Genel" gibi gecerli bir ders adi degil: tek basina duran boyle bir
+ * kutu, hiyerarside ders kademesi yokmus izlenimi veriyordu. Adin kendisi
+ * "burada eksik veri var" demeli.
+ */
+export const UNASSIGNED_SUBJECT = "Ders atanmamis";
+
+/**
+ * Havuzu "ders -> konu -> soru" olarak kirar. Dersler ve altlarindaki konular
+ * Turkce alfabetige gore sirali gelir.
+ */
+export function groupBySubject(questions: readonly Question[]): SubjectGroup[] {
   const buckets = new Map<string, Question[]>();
 
   for (const question of questions) {
@@ -88,66 +92,7 @@ function groupBySubject(questions: readonly Question[]): SubjectGroup[] {
       topics: groupByTopic(items),
       questionCount: items.length,
     }))
-    .sort((a, b) => {
-      // Dersi atanmamislar her zaman en sonda dursun.
-      if (a.subject === UNASSIGNED_SUBJECT) return 1;
-      if (b.subject === UNASSIGNED_SUBJECT) return -1;
-      return collator.compare(a.subject, b.subject);
-    });
-}
-
-/* -------------------------------------------------------------------------- */
-/*  Atolye dali bazli gruplama (havuzun ust kirilimi)                         */
-/* -------------------------------------------------------------------------- */
-
-export interface CategoryGroup {
-  /** Eski kayitlarda dal atanmamis olabilir. */
-  category: DeneyapCategory | null;
-  /** Arayuzde gosterilen dal adi; dal yoksa "Kategori yok". */
-  label: string;
-  subjects: SubjectGroup[];
-  /** Dal altindaki toplam konu sayisi - kartta gostermek icin. */
-  topicCount: number;
-  questionCount: number;
-}
-
-/**
- * Havuzu "atolye dali -> ders -> konu -> soru" olarak kirar.
- *
- * Gruplar sorulardan TURETILIR: altinda sorusu olmayan bir dal, ders ya da
- * konu hic olusmaz; son sorusu kalkarsa grup kendiliginden kaybolur. Dali ya
- * da dersi atanmamis sorular kendi kademelerinin sonunda tek bir kutuda
- * toplanir.
- */
-export function groupByCategory(questions: readonly Question[]): CategoryGroup[] {
-  const buckets = new Map<string, Question[]>();
-
-  for (const question of questions) {
-    const key = question.category ?? "";
-    const bucket = buckets.get(key);
-    if (bucket) bucket.push(question);
-    else buckets.set(key, [question]);
-  }
-
-  return [...buckets.entries()]
-    .map(([key, items]) => {
-      const category = (key || null) as DeneyapCategory | null;
-      const subjects = groupBySubject(items);
-
-      return {
-        category,
-        label: categoryLabel(category),
-        subjects,
-        topicCount: subjects.reduce((total, group) => total + group.topics.length, 0),
-        questionCount: items.length,
-      };
-    })
-    .sort((a, b) => {
-      // Dali atanmamislar her zaman en sonda dursun.
-      if (a.category === null) return 1;
-      if (b.category === null) return -1;
-      return collator.compare(a.label, b.label);
-    });
+    .sort((a, b) => collator.compare(a.subject, b.subject));
 }
 
 /* -------------------------------------------------------------------------- */
@@ -185,6 +130,25 @@ export function pickBalanced(groups: readonly TopicGroup[], count: number): stri
 }
 
 /* -------------------------------------------------------------------------- */
+/*  Puanlama                                                                  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Toplam puani sorulara tam sayi olarak paylastirir; artan puan bastaki
+ * sorulara birer birer eklenir. 20 soru -> 5'er puan, 3 soru -> 34/33/33.
+ */
+export function distributePoints(count: number, total = 100): number[] {
+  if (count <= 0) return [];
+
+  const base = Math.floor(total / count);
+  const remainder = total - base * count;
+
+  return Array.from({ length: count }, (_, index) =>
+    index < remainder ? base + 1 : base,
+  );
+}
+
+/* -------------------------------------------------------------------------- */
 /*  Kagit duzeni                                                              */
 /* -------------------------------------------------------------------------- */
 
@@ -198,19 +162,17 @@ export interface PaperPage {
   columns: NumberedQuestion[][];
 }
 
-/**
- * Sinavdaki sorulara sira numarasi isler.
- *
- * Puan uydurulmaz: `exam_questions.points` ne diyorsa kagitta o yazar,
- * boylece ogrencinin gordugu puan ile sistemin puanladigi deger ayrismaz.
- */
-export function numberExamQuestions(
-  questions: readonly (Question & { points: number })[],
+/** Siralanmis sorulara numara ve puan isler. */
+export function numberQuestions(
+  questions: readonly Question[],
+  totalPoints = 100,
 ): NumberedQuestion[] {
+  const points = distributePoints(questions.length, totalPoints);
+
   return questions.map((question, index) => ({
     ...question,
     number: index + 1,
-    points: question.points,
+    points: points[index] ?? 0,
   }));
 }
 
@@ -241,9 +203,28 @@ export function paginate(questions: readonly NumberedQuestion[]): PaperPage[] {
 export function toFileName(title: string, fallback = "sinav"): string {
   const cleaned = title
     .trim()
-    .replace(/[\\/:*?"<>|]+/g, "")
+    .replace(/[\/:*?"<>|]+/g, "")
     .replace(/\s+/g, "-")
     .toLocaleLowerCase("tr");
 
   return cleaned.length > 0 ? cleaned : fallback;
+}
+
+/**
+ * Kayitli bir sinavin sorularina KENDI puanlariyla sira numarasi isler.
+ *
+ * `numberQuestions` puanlari 100 uzerinden yeniden dagitir; bu, havuzdan
+ * derlenen taze bir kagit icin dogru ama KAYITLI bir sinav icin yanlistir.
+ * O sinavin puanlari `exam_questions` tablosunda zaten belli ve ogrencinin
+ * ekraninda gordugu puanla basilan kagittaki puan AYNI olmak zorunda -
+ * aksi halde ayni sinavin iki farkli puan cetveli dolasima girer.
+ */
+export function withNumbers(
+  questions: readonly (Question & { points: number })[],
+): NumberedQuestion[] {
+  return questions.map((question, index) => ({
+    ...question,
+    number: index + 1,
+    points: question.points,
+  }));
 }

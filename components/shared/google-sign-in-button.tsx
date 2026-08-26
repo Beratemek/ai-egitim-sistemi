@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { publicEnv } from "@/lib/env";
 import { createClient } from "@/lib/supabase";
 
-/** Google'in marka kilavuzuna uygun cok renkli "G" logosu (inline SVG). */
+/** Google'in marka kilavuzuna uygun çok renkli "G" logosu (inline SVG). */
 function GoogleLogo({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 18 18" aria-hidden focusable="false">
@@ -32,12 +32,12 @@ function GoogleLogo({ className }: { className?: string }) {
 }
 
 /**
- * Google ile giris.
+ * Google ile giriş.
  *
- * Supabase OAuth akisini baslatir; kullanici Google'da onay verdikten sonra
+ * Supabase OAuth akisini baslatir; kullanıcı Google'da onay verdikten sonra
  * /auth/callback adresine `?code=` ile doner ve orada oturuma cevrilir.
  *
- * Calismasi icin Supabase panelinde Google saglayicisinin acik ve Client ID /
+ * Calismasi için Supabase panelinde Google saglayicisinin açık ve Client ID /
  * Secret'in girilmis olmasi gerekir.
  */
 export function GoogleSignInButton({ disabled = false }: { disabled?: boolean }) {
@@ -58,13 +58,13 @@ export function GoogleSignInButton({ disabled = false }: { disabled?: boolean })
         },
       });
 
-      // Basarili olursa tarayici Google'a yonlenir; buraya donulmez.
+      // Başarılı olursa tarayici Google'a yonlenir; buraya donulmez.
       if (oauthError) throw oauthError;
     } catch (caught) {
       setError(
         caught instanceof Error
           ? caught.message
-          : "Google ile giris baslatilamadi.",
+          : "Google ile giriş başlatılamadı.",
       );
       setPending(false);
     }

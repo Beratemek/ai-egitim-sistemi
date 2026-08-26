@@ -1,8 +1,16 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, CalendarClock, FileText, Library } from "lucide-react";
+import {
+  ArrowRight,
+  BookMarked,
+  CalendarClock,
+  Camera,
+  FileText,
+  Library,
+} from "lucide-react";
 
 import { ExamCreateDialog } from "@/components/shared/exam-create-dialog";
+import { ExamDeleteButton } from "@/components/shared/exam-delete-button";
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -13,59 +21,75 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { isSupabaseConfigured } from "@/lib/env";
-import { getExamSummaries } from "@/lib/queries";
+import { getExamSummaries, getSubjectOptions } from "@/lib/queries";
 import { formatDateTime } from "@/lib/utils";
 
-export const metadata: Metadata = { title: "Sinavlar" };
+export const metadata: Metadata = { title: "Sınavlar" };
 
 /**
- * Egitmenin sinav listesi.
- * Sinav olusturma -> soru ekleme -> yayina alma akisinin giris noktasi.
+ * Eğitmenin sınav listesi.
+ * Sınav oluşturma -> soru ekleme -> yayına alma akisinin giriş noktasi.
  */
 export default async function SinavlarPage() {
-  const exams = await getExamSummaries();
+  const [exams, subjectOptions] = await Promise.all([
+    getExamSummaries(),
+    getSubjectOptions(),
+  ]);
 
   return (
     <>
       <PageHeader
-        title="Sinavlar"
-        description="Havuzdaki onayli sorulardan sinav seti olusturun ve yayina alin."
+        title="Sınavlar"
+        description="Havuzdaki onaylı sorulardan sınav seti oluşturun ve yayına alın."
         actions={
           <div className="flex items-center gap-2">
             {isSupabaseConfigured ? null : (
-              <Badge variant="warning">Demo — kayit yapilamaz</Badge>
+              <Badge variant="warning">Tanıtım modu</Badge>
             )}
-            <ExamCreateDialog canPersist={isSupabaseConfigured} />
+            <ExamCreateDialog
+              canPersist={isSupabaseConfigured}
+              subjectOptions={subjectOptions}
+            />
           </div>
         }
       />
 
       {exams.length === 0 ? (
         <Card className="border-dashed">
-          <CardContent className="flex flex-col items-center justify-center gap-2 py-16 text-center">
+          <CardContent className="flex flex-col items-center justify-center gap-2 py-16 text-center min-h-[240px]">
             <Library className="h-8 w-8 text-muted-foreground/50" />
-            <p className="font-medium">Henuz sinav olusturulmadi</p>
+            <p className="font-medium">Henüz sınav oluşturulmadı</p>
             <p className="max-w-sm text-sm text-muted-foreground">
-              &ldquo;Yeni sinav&rdquo; ile baslayin; ardindan soru havuzundan onayli
-              sorulari secerek sinav setini kurun.
+              &ldquo;Yeni sınav&rdquo; ile başlayın; ardından soru havuzundan onaylı
+              soruları seçerek sınav setini kurun.
             </p>
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-2 sm:gap-4">
           {exams.map((exam) => (
-            <Link
-              key={exam.id}
-              href={`/dashboard/egitmen/sinavlar/${exam.id}`}
-              className="group"
-            >
+            /*
+              Kart eskiden bastan sona bir <Link>'ti. Silme dugmesi eklenince
+              bu gecersiz HTML olurdu (<a> icinde <button>) ve dugmeye tiklamak
+              sinav detayina giderdi. Baglanti karti ORTUYEN bir katmana alindi;
+              dugme z-10 ile onun ustunde durur, kartin geri kalani yine bastan
+              sona tiklanabilir.
+            */
+            <div key={exam.id} className="group relative">
               <Card className="h-full transition-all group-hover:border-primary/50 group-hover:shadow-md">
                 <CardHeader>
                   <div className="flex items-start justify-between gap-2">
                     <CardTitle className="leading-snug">{exam.title}</CardTitle>
-                    <Badge variant={exam.is_published ? "success" : "soft"}>
-                      {exam.is_published ? "Yayinda" : "Taslak"}
-                    </Badge>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <Badge variant={exam.is_published ? "success" : "soft"}>
+                        {exam.is_published ? "Yayında" : "Taslak"}
+                      </Badge>
+                      <ExamDeleteButton
+                        examId={exam.id}
+                        examTitle={exam.title}
+                        submissionCount={exam.submissionCount}
+                      />
+                    </div>
                   </div>
                   {exam.description ? (
                     <CardDescription>{exam.description}</CardDescription>
@@ -74,6 +98,18 @@ export default async function SinavlarPage() {
 
                 <CardContent className="space-y-3">
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
+                    {exam.subject ? (
+                      <span className="flex items-center gap-1.5">
+                        <BookMarked className="h-3.5 w-3.5" />
+                        {exam.subject}
+                      </span>
+                    ) : null}
+                    {exam.proctored ? (
+                      <span className="flex items-center gap-1.5 text-amber-600 dark:text-amber-500">
+                        <Camera className="h-3.5 w-3.5" />
+                        Kamera zorunlu
+                      </span>
+                    ) : null}
                     <span className="flex items-center gap-1.5">
                       <Library className="h-3.5 w-3.5" />
                       {exam.questionCount} soru
@@ -85,20 +121,47 @@ export default async function SinavlarPage() {
                   </div>
 
                   <div className="flex items-center justify-between gap-2">
+                    {/*
+                      Once yalnizca baslangic yaziliyordu; tarih verilmemis
+                      sinavlar da "Tarih belirlenmedi" diyordu ve bu bir
+                      EKSIKLIK gibi okunuyordu. Oysa tarihsiz sinav gecerli
+                      bir durum: yayinda oldugu surece acik kalir. Artik
+                      pencerenin iki ucu birden ve dogru ifadeyle yaziliyor.
+                    */}
                     <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <CalendarClock className="h-3.5 w-3.5" />
-                      {exam.starts_at
-                        ? formatDateTime(exam.starts_at)
-                        : "Tarih belirlenmedi"}
+                      <CalendarClock className="h-3.5 w-3.5 shrink-0" />
+                      {examWindowLabel(exam.starts_at, exam.ends_at)}
                     </span>
                     <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
                   </div>
                 </CardContent>
               </Card>
-            </Link>
+
+              <Link
+                href={`/dashboard/egitmen/sinavlar/${exam.id}`}
+                className="absolute inset-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <span className="sr-only">{exam.title} sınavını aç</span>
+              </Link>
+            </div>
           ))}
         </div>
       )}
     </>
   );
+}
+
+/**
+ * Sinav penceresini tek satirda anlatir.
+ *
+ * Tarihsiz sinav bir eksiklik DEGIL: yayinda oldugu surece acik kalir.
+ * "Tarih belirlenmedi" ifadesi bunu bir bosluk gibi gosteriyordu.
+ */
+function examWindowLabel(startsAt: string | null, endsAt: string | null): string {
+  if (!startsAt && !endsAt) return "Tarih sınırı yok";
+  if (startsAt && endsAt) {
+    return `${formatDateTime(startsAt)} → ${formatDateTime(endsAt)}`;
+  }
+  if (startsAt) return `${formatDateTime(startsAt)} sonrası`;
+  return `${formatDateTime(endsAt)} öncesi`;
 }

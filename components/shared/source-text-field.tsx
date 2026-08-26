@@ -17,14 +17,14 @@ export interface SourceTextFieldProps {
 }
 
 /**
- * Kaynak metin alani: iki yol, tek deger.
+ * Kaynak metin alanı: iki yol, tek deger.
  *
- * "Metni yapistir" sekmesinde duz bir metin alani, "Dosya yukle" sekmesinde
- * PDF/Word/TXT yukleyici gosterilir. Iki sekme AYNI degeri paylasir; dosya
- * yukleyip sekme degistirirseniz cikarilan metni gorup duzenleyebilirsiniz.
+ * "Metni yapıştır" sekmesinde duz bir metin alanı, "Dosya yükle" sekmesinde
+ * PDF/Word/TXT yukleyici gösterilir. İki sekme AYNI degeri paylasir; dosya
+ * yukleyip sekme degistirirseniz cikarilan metni gorup düzenleyebilirsiniz.
  *
- * Dosya sekmesinde buyuk metin alani BILINCLI OLARAK gosterilmez - yuklenen
- * dosyanin ozeti yeterlidir, metni gormek isteyen "Metni goster"e basar.
+ * Dosya sekmesinde büyük metin alanı BILINCLI Olarak gosterilmez - yüklenen
+ * dosyanin ozeti yeterlidir, metni gormek isteyen "Metni göster"e basar.
  */
 export function SourceTextField({
   value,
@@ -41,11 +41,11 @@ export function SourceTextField({
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="yapistir" className="gap-1.5">
             <Type className="h-3.5 w-3.5" />
-            Metni yapistir
+            Metni yapıştır
           </TabsTrigger>
           <TabsTrigger value="dosya" className="gap-1.5">
             <FileUp className="h-3.5 w-3.5" />
-            Dosya yukle
+            Dosya yükle
           </TabsTrigger>
         </TabsList>
       </Tabs>
@@ -57,12 +57,12 @@ export function SourceTextField({
             rows={8}
             value={value}
             onChange={(event) => onChange(event.target.value)}
-            placeholder="Sorularin uretilecegi ders metnini buraya yapistirin..."
+            placeholder="Soruların üretileceği ders metnini buraya yapıştırın..."
             className="resize-y"
             disabled={disabled}
           />
           <p className="text-xs text-muted-foreground">
-            En az 20 karakter. Model yalnizca bu metinden dogrulanabilir sorular uretir.
+            En az 20 karakter. Model yalnızca bu metinden dogrulanabilir sorular üretir.
           </p>
         </>
       ) : (

@@ -6,7 +6,9 @@ import { toast } from "sonner";
 
 import { recordPreference } from "@/app/actions/questions";
 import { QuestionTypeBadge } from "@/components/shared/status-badge";
+import { QuestionVisual } from "@/components/shared/question-visual";
 import { Badge } from "@/components/ui/badge";
+import { QuestionReviseDialog } from "@/components/shared/question-revise-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -24,29 +26,52 @@ const DIFFICULTY_VARIANT: Record<
 
 export interface GeneratedQuestionCardProps {
   question: GeneratedQuestion;
-  /** Secili DENEYAP atolye dali adi; rozet olarak gosterilir. */
-  categoryName?: string;
+  /** Düzenleme/revizyon diyalogu için ek baglam. */
+  kazanim?: string;
+  context?: string;
+  /** Elle düzenleme veya AI revizyonu sonucu; taslağı yerinde degistirir. */
+  onReplace?: (question: GeneratedQuestion) => void;
   index: number;
-  /** Havuza gonderilmek uzere secili mi? */
+  /** Havuza gonderilmek uzere seçili mi? */
   selected: boolean;
   onToggleSelected: (selected: boolean) => void;
   outcomeId?: string;
+  /**
+   * Geri bildirimin yazilacagi ders.
+   *
+   * Tarz hafizasi ders bazinda okunuyor; bu alan bos gecerse begeni/red
+   * kaydi yalnizca "genel" havuzda kalir ve bu dersin uretimini
+   * hedefli olarak etkilemez.
+   */
+  subject?: string;
+  /**
+   * Karta eklenecek ekstra sinif; ozellikle `.exam-paper` icin.
+   *
+   * Karti karanlik temada bile beyaz/kagit zeminde gostermek icin
+   * cagiran bunu geciyor. Bu bilesenin kendisi zemin kararini vermiyor -
+   * baglama gore (taslak listesi, havuz onizlemesi vb.) degisebilir.
+   */
+  cardClassName?: string;
 }
 
 /**
- * Tek bir AI taslagi.
+ * Tek bir AI taslağı.
  *
- * Begen / begenme dugmeleri taslagi tercih hafizasina yazar; bir sonraki
- * uretimde model bu ornekleri gorur. Begenmedigi taslaga uzman kisa bir
- * gerekce de yazabilir - o gerekce de modele gider.
+ * Begen / begenme dugmeleri taslağı tercih hafizasina yazar; bir sonraki
+ * üretimde model bu ornekleri gorur. Begenmedigi taslaga uzman kısa bir
+ * gerekçe de yazabilir - o gerekçe de modele gider.
  */
 export function GeneratedQuestionCard({
   question,
-  categoryName,
+  kazanim,
+  context,
+  onReplace,
   index,
   selected,
   onToggleSelected,
   outcomeId,
+  subject,
+  cardClassName,
 }: GeneratedQuestionCardProps) {
   const [verdict, setVerdict] = React.useState<PreferenceVerdict | null>(null);
   const [pending, setPending] = React.useState<PreferenceVerdict | null>(null);
@@ -61,6 +86,9 @@ export function GeneratedQuestionCard({
       verdict: next,
       ...(withNote ? { note: withNote } : {}),
       ...(outcomeId ? { outcomeId } : {}),
+      // Ders kayda yaziliyor: sonraki uretimde tarz hafizasi bu kapsamdan
+      // okunacak.
+      ...(subject ? { subject } : {}),
     });
 
     setPending(null);
@@ -76,8 +104,8 @@ export function GeneratedQuestionCard({
     if (next === "begendi") {
       // Begenilen soru dogal olarak havuza da aday.
       onToggleSelected(true);
-      toast.success("Begeni kaydedildi", {
-        description: "AI bir sonraki uretimde bu tarzi daha cok kullanacak.",
+      toast.success("Beğeni kaydedildi", {
+        description: "AI bir sonraki üretimde bu tarzı daha çok kullanacak.",
       });
     } else {
       onToggleSelected(false);
@@ -91,35 +119,45 @@ export function GeneratedQuestionCard({
     <Card
       className={cn(
         "transition-colors",
+        cardClassName,
         verdict === "begendi" && "border-success/40 bg-success/[0.03]",
         verdict === "begenmedi" && "border-destructive/30 opacity-70",
       )}
     >
-      <CardContent className="space-y-3 p-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={selected}
-              onChange={(event) => onToggleSelected(event.target.checked)}
-              className="h-4 w-4 rounded border-input accent-[hsl(var(--primary))]"
-              aria-label={`${index + 1}. soruyu havuza gonder`}
-            />
-            <span className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/10 text-xs font-semibold text-primary">
-              {index + 1}
-            </span>
-          </label>
+      {/*
+        Duzen: SABIT GENISLIKTE bir oluk (secim kutusu + sira numarasi) ve
+        yaninda tek bir icerik sutunu.
 
+        Onceki surumde secim kutusu, sira, tip, zorluk ve konu TEK bir
+        `flex-wrap` icindeydi. Dar kolonda her kart farkli yerden sariyordu:
+        birinde konu ikinci satira duşuyor, otekinde rozetlerin yaninda
+        kaliyordu. Soru metinleri de karttan karta farkli soldan basliyordu,
+        goz asagi tararken tutunacak bir hiza bulamiyordu.
+
+        Simdi her kartta soru metni AYNI x konumundan basliyor ve kunye
+        kendi satirinda duruyor.
+      */}
+      <CardContent className="flex gap-3 p-4">
+        {/* Oluk: secim + sira. Genislik sabit ki icerik sutunu hizalansin. */}
+        <div className="flex w-7 shrink-0 flex-col items-center gap-2">
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={(event) => onToggleSelected(event.target.checked)}
+            className="h-4 w-4 rounded border-input accent-[hsl(var(--primary))]"
+            aria-label={`${index + 1}. soruyu havuza gönder`}
+          />
+          <span className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/10 text-xs font-semibold text-primary">
+            {index + 1}
+          </span>
+        </div>
+
+        <div className="min-w-0 flex-1 space-y-3">
+        <div className="flex flex-wrap items-center gap-1.5">
           <QuestionTypeBadge type={question.type} />
           <Badge variant={DIFFICULTY_VARIANT[question.difficulty]}>
             {question.difficulty}
           </Badge>
-          {categoryName ? (
-            <Badge variant="soft" className="font-normal">
-              {categoryName}
-            </Badge>
-          ) : null}
-          <span className="text-xs text-muted-foreground">{question.topic}</span>
 
           {verdict ? (
             <Badge
@@ -131,12 +169,24 @@ export function GeneratedQuestionCard({
               ) : (
                 <ThumbsDown className="h-3 w-3" />
               )}
-              {verdict === "begendi" ? "Begenildi" : "Begenilmedi"}
+              {verdict === "begendi" ? "Beğenildi" : "Beğenilmedi"}
             </Badge>
           ) : null}
         </div>
 
-        <p className="font-medium leading-relaxed">{question.text}</p>
+        {/* Konu kendi satirinda: rozetlerin arasinda kaybolmasin. */}
+        {question.topic ? (
+          <p className="text-xs text-muted-foreground">{question.topic}</p>
+        ) : null}
+
+        {/*
+          Onceden ozel bir boyut sinifi yoktu, taban text-base (16px)
+          kullaniliyordu. Kartlar iki sutuna gecince bu buyuk durdu; text-sm
+          diger yerlerdeki (secenekler, rozetler) boyutla da tutarli.
+        */}
+        <p className="text-sm font-medium leading-relaxed">{question.text}</p>
+
+        {question.visual ? <QuestionVisual visual={question.visual} /> : null}
 
         {question.type === "test" ? (
           <ul className="space-y-1">
@@ -154,7 +204,16 @@ export function GeneratedQuestionCard({
                   )}
                 >
                   <span className="font-mono text-xs opacity-70">{option.key})</span>
-                  {option.text}
+                  <span className="min-w-0 flex-1">
+                    {option.text}
+                    {option.visual ? (
+                      <QuestionVisual
+                        visual={option.visual}
+                        compact
+                        className="mt-1.5"
+                      />
+                    ) : null}
+                  </span>
                   {isCorrect ? <Check className="ml-auto h-4 w-4 shrink-0" /> : null}
                 </li>
               );
@@ -201,6 +260,16 @@ export function GeneratedQuestionCard({
             Begenmedim
           </Button>
 
+          {onReplace ? (
+            <QuestionReviseDialog
+              question={question}
+              index={index}
+              onSave={onReplace}
+              {...(kazanim ? { kazanim } : {})}
+              {...(context ? { context } : {})}
+            />
+          ) : null}
+
           <span className="ml-auto text-xs text-muted-foreground">
             Geri bildirim AI&apos;in bir sonraki uretimini sekillendirir
           </span>
@@ -211,7 +280,7 @@ export function GeneratedQuestionCard({
             <Input
               value={note}
               onChange={(event) => setNote(event.target.value)}
-              placeholder="Nesi eksik? (ornek: celdiriciler zayif, cok kolay)"
+              placeholder="Nesi eksik? (örnek: çeldiriciler zayıf, çok kolay)"
               className="flex-1"
             />
             <Button
@@ -224,10 +293,11 @@ export function GeneratedQuestionCard({
               {pending === "begenmedi" ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : null}
-              Gonder
+              Gönder
             </Button>
           </div>
         ) : null}
+        </div>
       </CardContent>
     </Card>
   );

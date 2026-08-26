@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
 
+import { safeNextPath } from "@/lib/auth-cookies";
 import { dashboardPathFor } from "@/lib/roles";
+import {
+  SESSION_ACTIVITY_COOKIE,
+  SESSION_ACTIVITY_COOKIE_MAX_AGE,
+} from "@/lib/session-activity";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { isUserRole } from "@/lib/types";
 
@@ -19,18 +24,6 @@ const OTP_TYPES: readonly EmailOtpType[] = [
 
 function isOtpType(value: string | null): value is EmailOtpType {
   return value !== null && (OTP_TYPES as readonly string[]).includes(value);
-}
-
-/**
- * `next` parametresi yalnizca kendi sitemizde bir YOL olabilir.
- * "//evil.com" veya "/\evil.com" gibi degerler acik yonlendirmeye
- * (open redirect) kapi aralar; bu yuzden tek "/" ile baslamasi sart.
- */
-function safeNextPath(value: string | null): string | null {
-  if (!value) return null;
-  if (!value.startsWith("/")) return null;
-  if (value.startsWith("//") || value.startsWith("/\\")) return null;
-  return value;
 }
 
 /**
@@ -53,6 +46,18 @@ function safeNextPath(value: string | null): string | null {
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
 
+  function redirectWithActivity(destination: string) {
+    const response = NextResponse.redirect(destination);
+    response.cookies.set(SESSION_ACTIVITY_COOKIE, String(Date.now()), {
+      httpOnly: false,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      maxAge: SESSION_ACTIVITY_COOKIE_MAX_AGE,
+    });
+    return response;
+  }
+
   const next = safeNextPath(searchParams.get("next"));
   const tokenHash = searchParams.get("token_hash");
   const type = searchParams.get("type");
@@ -63,10 +68,16 @@ export async function GET(request: Request) {
   const providerError =
     searchParams.get("error_description") ?? searchParams.get("error");
 
+  const errorPath = next === "/sifre-yenile" ? "/sifremi-unuttum" : "/login";
+
+  function redirectWithError(message: string) {
+    const target = new URL(errorPath, origin);
+    target.searchParams.set("error", message);
+    return NextResponse.redirect(target);
+  }
+
   if (providerError) {
-    return NextResponse.redirect(
-      `${origin}/login?error=${encodeURIComponent(providerError)}`,
-    );
+    return redirectWithError(providerError);
   }
 
   const supabase = await createServerSupabaseClient();
@@ -80,11 +91,9 @@ export async function GET(request: Request) {
     });
 
     if (error || !data.user) {
-      return NextResponse.redirect(
-        `${origin}/login?error=${encodeURIComponent(
-          error?.message ??
-            "Dogrulama baglantisi gecersiz veya suresi dolmus. Yeni bir baglanti isteyin.",
-        )}`,
+      return redirectWithError(
+        error?.message ??
+          "Doğrulama bağlantısı geçersiz veya süresi dolmuş. Yeni bir bağlantı isteyin.",
       );
     }
 
@@ -93,24 +102,20 @@ export async function GET(request: Request) {
     const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (error || !data.user) {
-      return NextResponse.redirect(
-        `${origin}/login?error=${encodeURIComponent(
-          error?.message ??
-            "Oturum acilamadi. Baglantiyi kaydi baslattiginiz tarayicida acmayi deneyin.",
-        )}`,
+      return redirectWithError(
+        error?.message ??
+          "Oturum açılamadı. Bağlantıyı isteği başlattığınız tarayıcıda açmayı deneyin.",
       );
     }
 
     userId = data.user.id;
   } else {
-    return NextResponse.redirect(
-      `${origin}/login?error=${encodeURIComponent(
-        "Dogrulama bilgisi bulunamadi. Baglantinin tamamini kopyaladiginizdan emin olun.",
-      )}`,
+    return redirectWithError(
+      "Doğrulama bilgisi bulunamadı. Bağlantının tamamını kopyaladığınızdan emin olun.",
     );
   }
 
-  if (next) return NextResponse.redirect(`${origin}${next}`);
+  if (next) return redirectWithActivity(`${origin}${next}`);
 
   const { data: profile } = await supabase
     .from("users")
@@ -120,5 +125,5 @@ export async function GET(request: Request) {
 
   const role = isUserRole(profile?.role) ? profile.role : "ogrenci";
 
-  return NextResponse.redirect(`${origin}${dashboardPathFor(role)}`);
+  return redirectWithActivity(`${origin}${dashboardPathFor(role)}`);
 }

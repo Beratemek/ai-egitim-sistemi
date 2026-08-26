@@ -1,10 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { LogOut, Menu } from "lucide-react";
+import Link from "next/link";
+import { LogOut, Menu, UserRound } from "lucide-react";
 
 import { NavLinks, RoleCard } from "@/components/shared/app-nav";
-import { DevRoleSwitcher } from "@/components/shared/dev-role-switcher";
+import { FloatingBooks } from "@/components/shared/floating-books";
+import { ActiveRoleSwitcher } from "@/components/shared/active-role-switcher";
 import { BrandMark } from "@/components/shared/brand-mark";
 import { ROLE_ICONS } from "@/components/shared/role-icons";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
@@ -32,26 +34,21 @@ import { ROLE_DEFINITIONS } from "@/lib/roles";
 import type { UserRole } from "@/lib/types";
 
 export interface DashboardShellProps {
+  /** Basliklarda ve rol kartinda gosterilen rol. */
   role: UserRole;
+  /** Kullaniciya verilmis roller; birden fazlaysa rol degistirici cikar. */
+  grantedRoles?: readonly UserRole[];
   fullName: string;
-  /** Supabase yapilandirilmadiginda demo rozeti gosterilir. */
+  /** Supabase yapilandirilmadiginda demo rozeti gösterilir. */
   demoMode?: boolean;
-  /** Gelistirici rol degistiricisi acik mi? */
-  devSwitch?: boolean;
-  /** Veritabanindaki gercek rol (rol degistirici icin). */
-  actualRole?: UserRole;
-  /** Su an baska bir rol taklit ediliyor mu? */
-  impersonating?: boolean;
   children: React.ReactNode;
 }
 
 export function DashboardShell({
   role,
+  grantedRoles = [],
   fullName,
   demoMode = false,
-  devSwitch = false,
-  actualRole,
-  impersonating = false,
   children,
 }: DashboardShellProps) {
   const [mobileOpen, setMobileOpen] = React.useState(false);
@@ -66,29 +63,53 @@ export function DashboardShell({
     .join("");
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="bg-study min-h-screen bg-background">
+      {/*
+        Kenar kitapliklari (SideBooks) KALDIRILDI.
+
+        Genis ekranlarda icerik sutununun iki yanindaki bos seritleri
+        dolduruyorlardi, ama calisma ekraninda dikkat dagitiyordu: sagdaki raf
+        icerigin hemen yaninda durdugu icin goz surekli oraya kayiyordu.
+        Soldaki zaten opak sol menunun (z-30) arkasinda kaliyor, hic
+        gorunmuyordu - yani tek etkisi bosuna render'di.
+
+        Bilesen duruyor (components/shared/side-books.tsx); geri istenirse
+        buraya iki satir eklemek yetiyor. Giris ve karsilama sayfalarindaki
+        BookshelfBackdrop'a dokunulmadi - orasi calisma ekrani degil.
+      */}
+
       {/* ---------- Masaustu sol menu ---------- */}
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-[264px] flex-col border-r bg-card lg:flex print:hidden">
-        <div className="flex h-16 items-center border-b px-5">
+        {/*
+          Dekoratif zemin: havada suzulen silik kitaplar.
+
+          Once burada `.bg-shelf` vardi - dibe yapisik, sert dikey cizgili
+          bir raf. Krem acik temada o cizgiler zeminden ayrisip rol kartinin
+          arkasinda kir gibi duruyordu. Yeni motif TUM kenar cubuguna
+          dagilir ama ust %34 tamamen seffaftir; menu baglantilarinin
+          arkasi her zaman temiz kalir (bkz. floating-books.tsx).
+        */}
+        <FloatingBooks className="pointer-events-none absolute inset-0" />
+        <div className="relative z-10 flex h-16 items-center border-b px-5">
           <BrandMark />
         </div>
 
-        <div className="flex-1 overflow-y-auto px-3 py-4">
-          <p className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Menu
+        <div className="relative z-10 flex-1 overflow-y-auto px-3 py-4">
+          <p className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+            Menü
           </p>
           <NavLinks role={role} />
         </div>
 
-        <div className="border-t p-3">
+        <div className="relative z-10 border-t p-3">
           <RoleCard role={role} />
         </div>
       </aside>
 
-      {/* ---------- Icerik sutunu ---------- */}
-      <div className="lg:pl-[264px] print:pl-0">
-        {/* ---------- Ust cubuk ---------- */}
-        <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b bg-background/80 px-4 backdrop-blur-md sm:px-6 print:hidden">
+      {/* ---------- İçerik sutunu ---------- */}
+      <div className="relative z-10 lg:pl-[264px] print:pl-0">
+        {/* ---------- Üst cubuk ---------- */}
+        <header className="safe-top sticky top-0 z-20 flex h-16 items-center gap-3 border-b bg-background/80 px-4 backdrop-blur-md sm:px-6 print:hidden">
           {/* Mobil cekmece */}
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
             <SheetTrigger asChild>
@@ -96,7 +117,7 @@ export function DashboardShell({
                 variant="ghost"
                 size="icon"
                 className="lg:hidden"
-                aria-label="Menuyu ac"
+                aria-label="Menüyü ac"
               >
                 <Menu className="h-5 w-5" />
               </Button>
@@ -109,7 +130,7 @@ export function DashboardShell({
                   </div>
                 </SheetTitle>
                 <SheetDescription className="sr-only">
-                  Panel gezinti menusu
+                  Panel gezinti menüsü
                 </SheetDescription>
               </SheetHeader>
 
@@ -123,32 +144,39 @@ export function DashboardShell({
             </SheetContent>
           </Sheet>
 
-          {/* Mobilde marka, masaustunde rol basligi */}
+          {/*
+            ROL BASLIGI: SOLDA, dikeyde ortali.
+
+            Bir ara cubuga gore yatay ortalanmisti - istenen o degildi.
+            Baslik sola yaslı kalir; hizalama DIKEY olanidir.
+
+            leading-none: `font-display` bir serif ve kendi satir yuksekligi
+            metni kutunun icinde asagi itiyordu; ikon items-center ile tam
+            ortadayken yazi birkac piksel kayik duruyordu. Satir yuksekligi
+            sifirlaninca ikon ve yazi ayni eksende oturur.
+          */}
+          {/* Mobilde marka, masaustunde rol başlığı */}
           <div className="flex min-w-0 flex-1 items-center gap-3">
             <div className="lg:hidden">
               <BrandMark />
             </div>
 
-            <div className="hidden items-center gap-2 lg:flex">
-              <RoleIcon className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium">{definition.label} Paneli</span>
+            <div className="hidden min-w-0 items-center gap-2 lg:flex">
+              <RoleIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <span className="truncate font-display text-[15px] font-semibold leading-none">
+                {definition.label} Paneli
+              </span>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
             {demoMode ? (
               <Badge variant="warning" className="hidden sm:inline-flex">
-                Demo modu
+                Tanıtım modu
               </Badge>
             ) : null}
 
-            {devSwitch ? (
-              <DevRoleSwitcher
-                currentRole={role}
-                actualRole={actualRole ?? role}
-                impersonating={impersonating}
-              />
-            ) : null}
+            <ActiveRoleSwitcher activeRole={role} roles={grantedRoles} />
 
             <ThemeToggle />
 
@@ -159,7 +187,7 @@ export function DashboardShell({
                 <Button
                   variant="ghost"
                   className="h-9 gap-2 px-2"
-                  aria-label="Hesap menusu"
+                  aria-label="Hesap menüsü"
                 >
                   <Avatar className="h-7 w-7">
                     <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">
@@ -181,13 +209,20 @@ export function DashboardShell({
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
+                  <Link href="/dashboard/profil" className="flex items-center gap-2">
+                    <UserRound className="h-4 w-4" />
+                    Profilim
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
                   <form action="/auth/signout" method="post" className="w-full">
                     <button
                       type="submit"
                       className="flex w-full items-center gap-2 text-left"
                     >
                       <LogOut className="h-4 w-4" />
-                      Cikis yap
+                      Çıkış yap
                     </button>
                   </form>
                 </DropdownMenuItem>
@@ -196,7 +231,16 @@ export function DashboardShell({
           </div>
         </header>
 
-        <main className="mx-auto w-full max-w-[1400px] space-y-6 px-4 py-6 sm:px-6 sm:py-8 print:max-w-none print:space-y-0 print:p-0">
+        {/*
+          UST BOSLUK ayri tutuluyor (py-4 -> pt-7/pb-4, sm:py-8 -> sm:pt-14/sm:pb-8).
+
+          Yapiskan ust cubuk 64px ve icerikle ARASINDA yalnizca 32px vardi;
+          sayfa basligi ile cubuk tek bir blok gibi gorunuyor, baslik cubuga
+          "yapisik" duruyordu. Ust bosluk alt bosluktan bagimsiz buyutuldu:
+          asagida zaten kartlar arasi ritim (space-y) var, tekrar buyutmek
+          sayfayi gereksiz uzatirdi.
+        */}
+        <main className="animate-kitap-yukselir mx-auto w-full max-w-[1400px] space-y-4 px-3 pb-4 pt-7 sm:space-y-6 sm:px-6 sm:pb-8 sm:pt-14 print:max-w-none print:space-y-0 print:p-0">
           {children}
         </main>
       </div>

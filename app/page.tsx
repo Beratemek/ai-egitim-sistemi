@@ -1,207 +1,90 @@
 import Link from "next/link";
-import {
-  ArrowRight,
-  BrainCircuit,
-  ClipboardCheck,
-  FileUp,
-  GraduationCap,
-  LineChart,
-  ShieldCheck,
-} from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
-import { BrandMark } from "@/components/shared/brand-mark";
-import { ROLE_ICONS } from "@/components/shared/role-icons";
-import { ThemeToggle } from "@/components/shared/theme-toggle";
-import { Badge } from "@/components/ui/badge";
+import { LandingPillNav } from "@/components/shared/landing-pill-nav";
+import { LandingMotionController } from "@/components/shared/landing-motion-controller";
+import { LandingProcessFlow } from "@/components/shared/landing-process-flow";
+import { LandingRoleShowcase } from "@/components/shared/landing-role-showcase";
+import { LandingRotatingMotto } from "@/components/shared/landing-rotating-motto";
+import { LandingWorkflowOrbit } from "@/components/shared/landing-workflow-orbit";
 import { buttonVariants } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { ROLE_LIST } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 
-const PIPELINE: readonly { icon: LucideIcon; title: string; body: string }[] = [
-  {
-    icon: FileUp,
-    title: "Icerik yuklenir",
-    body: "Icerik uzmani kaynak metni ve kazanimi sisteme girer.",
-  },
-  {
-    icon: BrainCircuit,
-    title: "AI soru uretir",
-    body: "Model kazanima uygun test ve acik uclu taslaklari sema zorlamali JSON olarak dondurur.",
-  },
-  {
-    icon: ClipboardCheck,
-    title: "Egitmen onaylar",
-    body: "Taslaklar incelenir; onaylananlar soru havuzuna girer, digerleri reddedilir.",
-  },
-  {
-    icon: GraduationCap,
-    title: "Ogrenci cevaplar",
-    body: "Sinav sirasinda acik uclu cevaplar toplanir.",
-  },
-  {
-    icon: ShieldCheck,
-    title: "AI puanlar, egitmen dogrular",
-    body: "Cevap rubrige gore puanlanir; nihai puani her zaman egitmen onaylar.",
-  },
-  {
-    icon: LineChart,
-    title: "Yonetici raporlar",
-    body: "Sinav bazli ortalama, katilim ve onay oranlari izlenir.",
-  },
-];
+const PRINCIPLES = ["Kaynağa dayalı", "İnsan onaylı", "Rol bazlı"] as const;
 
 export default function HomePage() {
   return (
-    <div className="min-h-screen">
-      {/* ---------- Ust cubuk ---------- */}
-      <header className="sticky top-0 z-20 border-b bg-background/80 backdrop-blur-md">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
-          <BrandMark />
-          <div className="flex items-center gap-2">
-            <ThemeToggle />
-            <Link href="/login" className={cn(buttonVariants({ size: "sm" }), "gap-2")}>
-              Giris yap
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen overflow-x-clip bg-background">
+      <LandingPillNav />
+      <LandingMotionController />
 
       <main>
-        {/* ---------- Kahraman bolum ---------- */}
-        <section className="relative overflow-hidden border-b">
-          <div className="bg-grid absolute inset-0 opacity-40" aria-hidden />
-          <div
-            className="absolute left-1/2 top-0 h-[420px] w-[720px] -translate-x-1/2 rounded-full bg-primary/15 blur-[120px]"
-            aria-hidden
-          />
-
-          <div className="relative mx-auto max-w-6xl px-4 py-20 sm:px-6 sm:py-28">
-            <div className="mx-auto max-w-3xl text-center">
-              <Badge variant="soft" className="gap-1.5">
-                <BrainCircuit className="h-3.5 w-3.5" />
-                Hackathon MVP
-              </Badge>
-
-              <h1 className="mt-5 text-4xl font-semibold tracking-tight sm:text-6xl">
-                Yapay Zeka Destekli{" "}
-                <span className="text-primary">Egitim Sistemi</span>
+        <section id="ana-sayfa" className="landing-hero relative overflow-hidden border-b">
+          <div className="landing-paper-field absolute inset-0" aria-hidden />
+          <div className="relative mx-auto grid min-h-[100svh] w-full max-w-7xl grid-cols-1 gap-8 px-5 pb-14 pt-28 sm:px-8 sm:pb-20 sm:pt-32 lg:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)] lg:items-stretch lg:gap-4 lg:pb-8 lg:pt-24">
+            <div className="relative z-10 flex min-w-0 flex-col justify-center lg:py-14" data-landing-reveal data-landing-reveal-delay="1">
+              <p className="landing-kicker">Ölçme ve değerlendirme, tek akışta.</p>
+              <h1 className="mt-5 max-w-[11ch] font-sans text-[clamp(3.25rem,6.2vw,6.75rem)] font-semibold leading-[0.9] tracking-[-0.065em]">
+                Öğrenmeyi
+                <LandingRotatingMotto />
               </h1>
-
-              <p className="mx-auto mt-5 max-w-2xl text-lg leading-relaxed text-muted-foreground">
-                Kazanimdan soruya, cevaptan puana kadar tum degerlendirme surecini
-                yapay zeka ile hizlandirin — son sozu her zaman egitmen soylesin.
+              <p className="mt-7 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg">
+                Soru hazırlama, sınav, değerlendirme ve gelişim takibi. Her rol için ayrı bir çalışma alanı;
+                tüm eğitim süreci için ortak bir düzen.
               </p>
 
-              <div className="mt-8 flex flex-wrap justify-center gap-3">
+              <div className="mt-8 flex flex-col items-start gap-4 sm:flex-row sm:items-center">
                 <Link
-                  href="/login"
-                  className={cn(buttonVariants({ size: "lg" }), "gap-2")}
-                >
-                  Hemen basla
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-                <Link
-                  href="/dashboard/egitmen/soru-havuzu"
+                  href="/auth/signout-and-login?mode=kayit"
                   className={cn(
-                    buttonVariants({ variant: "outline", size: "lg" }),
-                    "gap-2",
+                    buttonVariants({ size: "lg" }),
+                    "specular-cta h-[3.25rem] rounded-xl px-6 shadow-[0_14px_28px_-14px_hsl(var(--primary)/0.65)]",
                   )}
                 >
-                  Soru havuzunu incele
+                  Sistemi keşfedin
+                  <ArrowRight />
                 </Link>
+                <a className="group inline-flex items-center gap-2 border-b border-foreground/25 py-2 text-sm font-semibold transition-colors hover:border-primary hover:text-primary" href="#surec">
+                  Süreci inceleyin
+                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                </a>
+              </div>
+
+              <div className="mt-12 flex flex-wrap border-y border-border/70 py-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground sm:mt-14">
+                {PRINCIPLES.map((item) => (
+                  <span key={item} className="mr-4 border-r pr-4 last:mr-0 last:border-0 last:pr-0">{item}</span>
+                ))}
               </div>
             </div>
+
+            <LandingWorkflowOrbit />
           </div>
         </section>
 
-        {/* ---------- Roller ---------- */}
-        <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
-          <div className="max-w-2xl">
-            <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-              Dort rol, dort panel
-            </h2>
-            <p className="mt-2 text-muted-foreground">
-              Her kullanici yalnizca kendi isine odaklanan bir arayuz gorur.
-            </p>
-          </div>
-
-          <div className="mt-8 grid gap-4 sm:grid-cols-2">
-            {ROLE_LIST.map((definition) => {
-              const Icon = ROLE_ICONS[definition.role];
-
-              return (
-                <Link key={definition.role} href={definition.path} className="group">
-                  <Card className="h-full transition-all group-hover:border-primary/50 group-hover:shadow-md">
-                    <CardContent className="flex items-start gap-4 p-5">
-                      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                        <Icon className="h-5 w-5" />
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="font-semibold">{definition.label}</p>
-                        <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-                          {definition.description}
-                        </p>
-                      </div>
-                      <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
-                    </CardContent>
-                  </Card>
-                </Link>
-              );
-            })}
-          </div>
+        <section id="surec" className="px-5 py-24 sm:px-8 sm:py-32" data-landing-reveal>
+          <LandingProcessFlow />
         </section>
 
-        {/* ---------- Akis ---------- */}
-        <section className="border-t bg-muted/30">
-          <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
-            <div className="max-w-2xl">
-              <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-                Uctan uca akis
-              </h2>
-              <p className="mt-2 text-muted-foreground">
-                Yapay zeka isin yorucu kismini yapar; karar insanda kalir.
+        <section id="roller" className="landing-roles-section border-t bg-muted/45 px-5 py-20 sm:px-8 lg:py-16">
+          <div className="mx-auto max-w-7xl">
+            <div className="grid gap-6 lg:grid-cols-[1fr_0.72fr] lg:items-end" data-landing-reveal>
+              <div>
+                <p className="landing-section-label">Çalışma alanları</p>
+                <h2 className="mt-5 max-w-3xl font-display text-4xl leading-[1.02] sm:text-5xl lg:text-6xl">
+                  Aynı sistem. Her role göre başka bir görünüm.
+                </h2>
+              </div>
+              <p className="max-w-md text-sm leading-relaxed text-muted-foreground lg:justify-self-end lg:text-right">
+                İçerik uzmanından eğitim yöneticisine kadar herkes kendi sorumluluğuna odaklanır; veri ve süreç kopmadan devam eder.
               </p>
             </div>
 
-            <ol className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {PIPELINE.map((step, index) => {
-                const Icon = step.icon;
-
-                return (
-                  <li key={step.title}>
-                    <Card className="h-full">
-                      <CardContent className="p-5">
-                        <div className="flex items-center gap-3">
-                          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                            <Icon className="h-4.5 w-4.5" />
-                          </span>
-                          <span className="text-xs font-semibold tabular text-muted-foreground">
-                            {String(index + 1).padStart(2, "0")}
-                          </span>
-                        </div>
-                        <p className="mt-3 font-medium">{step.title}</p>
-                        <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-                          {step.body}
-                        </p>
-                      </CardContent>
-                    </Card>
-                  </li>
-                );
-              })}
-            </ol>
+            <div data-landing-reveal data-landing-reveal-delay="1">
+              <LandingRoleShowcase />
+            </div>
           </div>
         </section>
       </main>
-
-      <footer className="border-t">
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-4 py-8 text-sm text-muted-foreground sm:flex-row sm:px-6">
-          <BrandMark />
-          <p>Next.js &middot; Supabase &middot; AI SDK &middot; shadcn/ui</p>
-        </div>
-      </footer>
     </div>
   );
 }

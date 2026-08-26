@@ -1,0 +1,688 @@
+"use client";
+
+import * as React from "react";
+import { useRouter } from "next/navigation";
+import {
+  BookMarked,
+  CalendarClock,
+  Camera,
+  Check,
+  Clock3,
+  Loader2,
+  Scale,
+  Settings2,
+  TriangleAlert,
+} from "lucide-react";
+import { toast } from "sonner";
+
+import {
+  resetExamPoints,
+  setExamSubject,
+  updateExamSettings,
+} from "@/app/actions/exams";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { SubjectCombobox } from "@/components/shared/subject-combobox";
+import { subjectLabel } from "@/lib/subjects";
+import { cn } from "@/lib/utils";
+
+/**
+ * Sinav ayarlari.
+ *
+ * Ders, sure ve kamera zorunlulugu tek panelde toplandi. Onceden ders ayri
+ * bir kartta, kamera ise "Siniflara ata" panelinin icindeydi; egitmen ayni
+ * sinavin ayarlarini uc ayri yerde ariyordu.
+ *
+ * Her ayar KENDI basina kaydedilir (anahtar tiklaninca, alan kaydedilince).
+ * Tek bir "Kaydet" dugmesi olsaydi, kaydetmeden ayrilan egitmenin
+ * degisiklikleri sessizce kaybolurdu.
+ */
+
+export interface ExamSettingsPanelProps {
+  examId: string;
+  subject: string | null;
+  durationMinutes: number | null;
+  proctored: boolean;
+  /** Sinavin acildigi an (ISO) - null ise yayina alinir alinmaz acilir. */
+  startsAt?: string | null;
+  /** Sinavin kapandigi an (ISO) - null ise kendiliginden kapanmaz. */
+  endsAt?: string | null;
+  /** Secilebilir ders adlari; soru havuzundan turetilir. */
+  subjectOptions?: readonly string[];
+  /**
+   * Sinavin sorularindan TURETILEN dersler.
+   *
+   * Sinav birden fazla derse ait olabilir ve gorunurluk kararini bu kume
+   * verir (bkz. exam_subjects / teaches_exam_subjects). Doluysa `subject`
+   * alani hicbir sey yapmaz - o yalnizca sorusu olmayan sinavin yedegidir.
+   */
+  derivedSubjects?: readonly string[];
+  /** Sinavdaki toplam puan; sure alaninin yaninda ozet olarak gosterilir. */
+  totalPoints?: number;
+  questionCount?: number;
+  /** Puanlar soru sayisina gore kendiliginden mi dagitiliyor? */
+  pointsAuto?: boolean;
+  canPersist?: boolean;
+}
+
+/** Bos pencere degeri; iki ucun de "yok" halini tek yerden anlatir. */
+const BOS_PENCERE = { baslangic: "", bitis: "" } as const;
+
+export function ExamSettingsPanel({
+  examId,
+  subject,
+  durationMinutes,
+  proctored,
+  startsAt = null,
+  endsAt = null,
+  subjectOptions = [],
+  derivedSubjects = [],
+  totalPoints = 0,
+  questionCount = 0,
+  pointsAuto = true,
+  canPersist = true,
+}: ExamSettingsPanelProps) {
+  const router = useRouter();
+
+  const [kamera, setKamera] = React.useState(proctored);
+  const [sure, setSure] = React.useState(
+    durationMinutes === null ? "" : String(durationMinutes),
+  );
+  const [ders, setDers] = React.useState(subject ?? "");
+
+  /** Sorusu olan sinavta dersler turetilir; yedek alan okunmaz. */
+  const dersTuretildi = derivedSubjects.length > 0;
+  const [pending, setPending] = React.useState<string | null>(null);
+
+  /*
+    Tarih alanlari `datetime-local` ve degerleri YEREL saattir. Baslangic
+    degerini dogrudan `useState` icinde hesaplamak sunucu ile tarayicinin
+    saat dilimi ayrildiginda hydration uyusmazligi uretirdi; bu yuzden
+    ikisi de bos dogar ve ilk cizimden SONRA, tarayicida doldurulur.
+
+    `temel`, kaydedilmis halin ayni bicime cevrilmisidir: "degisti mi?"
+    karsilastirmasi ham ISO ile degil bu kopya ile yapiliyor.
+  */
+  const [pencere, setPencere] = React.useState<{ baslangic: string; bitis: string }>(
+    BOS_PENCERE,
+  );
+  const [temel, setTemel] = React.useState<{ baslangic: string; bitis: string }>(
+    BOS_PENCERE,
+  );
+
+  React.useEffect(() => setKamera(proctored), [proctored]);
+  React.useEffect(
+    () => setSure(durationMinutes === null ? "" : String(durationMinutes)),
+    [durationMinutes],
+  );
+  React.useEffect(() => setDers(subject ?? ""), [subject]);
+  React.useEffect(() => {
+    const next = {
+      baslangic: isoToLocalInput(startsAt),
+      bitis: isoToLocalInput(endsAt),
+    };
+    setPencere(next);
+    setTemel(next);
+  }, [startsAt, endsAt]);
+
+  const sureDirty = sure.trim() !== (durationMinutes === null ? "" : String(durationMinutes));
+  const dersDirty = ders.trim() !== (subject ?? "");
+  const pencereDirty =
+    pencere.baslangic !== temel.baslangic || pencere.bitis !== temel.bitis;
+
+  function demoUyarisi() {
+    toast.error("Tanıtım modunda kayıt yapılmaz");
+  }
+
+  async function kamerayiDegistir(deger: boolean) {
+    if (!canPersist) return demoUyarisi();
+
+    // Once ekranda degistir: anahtar tiklamaya aninda yanit vermeli.
+    setKamera(deger);
+    setPending("kamera");
+
+    try {
+      const result = await updateExamSettings(examId, { proctored: deger });
+      if (!result.ok) throw new Error(result.error);
+
+      toast.success(
+        result.data.proctored
+          ? "Kamera zorunluluğu açıldı"
+          : "Kamera zorunluluğu kaldırıldı",
+      );
+      router.refresh();
+    } catch (caught) {
+      setKamera(!deger);
+      toast.error("Ayar kaydedilemedi", {
+        description: caught instanceof Error ? caught.message : "Tekrar deneyin.",
+      });
+    } finally {
+      setPending(null);
+    }
+  }
+
+  async function sureyiKaydet() {
+    if (!canPersist) return demoUyarisi();
+
+    const ham = sure.trim();
+    const deger = ham === "" ? null : Number.parseInt(ham, 10);
+
+    if (deger !== null && (!Number.isFinite(deger) || deger < 1 || deger > 600)) {
+      toast.error("Süre 1 ile 600 dakika arasında olmalı");
+      return;
+    }
+
+    setPending("sure");
+
+    try {
+      const result = await updateExamSettings(examId, { durationMinutes: deger });
+      if (!result.ok) throw new Error(result.error);
+
+      toast.success(
+        result.data.durationMinutes === null
+          ? "Süre sınırı kaldırıldı"
+          : `Süre: ${result.data.durationMinutes} dakika`,
+      );
+      router.refresh();
+    } catch (caught) {
+      toast.error("Süre kaydedilemedi", {
+        description: caught instanceof Error ? caught.message : "Tekrar deneyin.",
+      });
+    } finally {
+      setPending(null);
+    }
+  }
+
+  async function puanlariEsitle() {
+    if (!canPersist) return demoUyarisi();
+
+    setPending("puan");
+
+    try {
+      const result = await resetExamPoints(examId);
+      if (!result.ok) throw new Error(result.error);
+
+      toast.success("Puanlar eşit dağıtıldı", {
+        description: `Toplam ${result.data.total} puan.`,
+      });
+      router.refresh();
+    } catch (caught) {
+      toast.error("Puanlar dağıtılamadı", {
+        description: caught instanceof Error ? caught.message : "Tekrar deneyin.",
+      });
+    } finally {
+      setPending(null);
+    }
+  }
+
+  async function pencereyiKaydet() {
+    if (!canPersist) return demoUyarisi();
+
+    const baslangic = localInputToIso(pencere.baslangic);
+    const bitis = localInputToIso(pencere.bitis);
+
+    if (baslangic === undefined || bitis === undefined) {
+      toast.error("Tarih okunamadı", { description: "Alanları yeniden doldurun." });
+      return;
+    }
+
+    // Sunucu da ayni kurali uyguluyor; buradaki kontrol yalnizca gereksiz
+    // gidis-donusu kesip hatayi aninda gostermek icin.
+    if (baslangic && bitis && bitis <= baslangic) {
+      toast.error("Bitiş, başlangıçtan sonra olmalı");
+      return;
+    }
+
+    setPending("pencere");
+
+    try {
+      const result = await updateExamSettings(examId, {
+        startsAt: baslangic,
+        endsAt: bitis,
+      });
+      if (!result.ok) throw new Error(result.error);
+
+      toast.success(
+        result.data.startsAt || result.data.endsAt
+          ? "Sınav penceresi kaydedildi"
+          : "Sınav penceresi kaldırıldı",
+        {
+          description:
+            result.data.startsAt || result.data.endsAt
+              ? undefined
+              : "Sınav, yayına alındığı sürece açık kalır.",
+        },
+      );
+      router.refresh();
+    } catch (caught) {
+      toast.error("Tarihler kaydedilemedi", {
+        description: caught instanceof Error ? caught.message : "Tekrar deneyin.",
+      });
+    } finally {
+      setPending(null);
+    }
+  }
+
+  async function dersiKaydet() {
+    if (!canPersist) return demoUyarisi();
+
+    setPending("ders");
+
+    try {
+      const result = await setExamSubject(examId, ders);
+      if (!result.ok) throw new Error(result.error);
+
+      toast.success(
+        result.data.subject ? `Ders: ${result.data.subject}` : "Ders bilgisi kaldırıldı",
+      );
+      router.refresh();
+    } catch (caught) {
+      toast.error("Ders kaydedilemedi", {
+        description: caught instanceof Error ? caught.message : "Tekrar deneyin.",
+      });
+    } finally {
+      setPending(null);
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Settings2 className="h-4.5 w-4.5 text-primary" />
+          Sınav ayarları
+        </CardTitle>
+        <CardDescription>
+          Ders, süre ve kamera kuralı. Her ayar kaydettiğiniz anda geçerli olur.
+        </CardDescription>
+      </CardHeader>
+
+      <CardContent className="space-y-5">
+        <div className="grid gap-5 md:grid-cols-2">
+          {/* ---------- Ders(ler) ---------- */}
+          <div className="space-y-2">
+            {/*
+              Turetilmis modda `htmlFor` YOK: ortada odaklanacak bir alan
+              kalmiyor, bos bir hedefe isaret eden etiket ekran okuyucuyu
+              yaniltir.
+            */}
+            <Label
+              {...(dersTuretildi ? {} : { htmlFor: "ayar-ders" })}
+              className="flex items-center gap-1.5"
+            >
+              <BookMarked className="h-3.5 w-3.5 text-muted-foreground" />
+              {dersTuretildi ? "Dersler" : "Ders"}
+            </Label>
+
+            {/*
+              Sinavin dersi TEK degil.
+
+              Sorusu olan bir sinavin dersleri sorularindan turetilir ve
+              gorunurluk kararini o kume verir. Burada tek secimli bir kutu
+              gostermek iki bakimdan yanlisti: sinav "Yapay Zeka + Robotik +
+              4 ders" oldugu halde kutu bos gorunuyor ve "dersi yok" izlenimi
+              veriyordu; ustelik o kutuya bir sey yazmak hicbir sey de
+              degistirmiyordu (yedek alan yalnizca sorusuz sinavda okunur).
+
+              Bu yuzden sorusu olan sinavta dersler ROZET olarak, oldugu gibi
+              gosteriliyor. Elle secim yalnizca yedegin gercekten okundugu
+              durumda - sinavin hic sorusu yokken - aciliyor.
+            */}
+            {dersTuretildi ? (
+              <>
+                <div className="flex flex-wrap gap-1.5">
+                  {derivedSubjects.map((ad) => (
+                    <Badge key={ad} variant="soft" className="font-normal">
+                      {subjectLabel(ad)}
+                    </Badge>
+                  ))}
+                </div>
+
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  {derivedSubjects.length === 1
+                    ? "Ders sınavın sorularından belirlendi."
+                    : `Sınav ${derivedSubjects.length} derse ait; dersler sorularından belirlendi.`}{" "}
+                  Soru ekleyip çıkardıkça kendiliğinden güncellenir. Sınavı bu
+                  derslerden <strong>herhangi birine</strong> yetkili eğitmenler
+                  ve sınav sahibi görür.
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="flex gap-1.5">
+                  {/*
+                    Native <datalist> yerine SubjectCombobox: eslesme Turkce
+                    kurallariyla yapiliyor ("matematik" -> "MATEMATİK"), liste
+                    uygulamanin temasiyla ciziliyor ve klavyeyle gezilebiliyor.
+                    Serbest metin hala serbest - listede olmayan ders yazilabilir.
+                  */}
+                  <SubjectCombobox
+                    id="ayar-ders"
+                    value={ders}
+                    onChange={setDers}
+                    options={subjectOptions}
+                    placeholder="Biyoloji"
+                    disabled={pending !== null}
+                    onEnter={() => {
+                      if (dersDirty) void dersiKaydet();
+                    }}
+                  />
+
+                  <KaydetDugmesi
+                    dirty={dersDirty}
+                    busy={pending === "ders"}
+                    disabled={pending !== null}
+                    onClick={() => void dersiKaydet()}
+                    label="Dersi kaydet"
+                  />
+                </div>
+
+                {/*
+                  Iki ayri "ders turetilemedi" hali var ve ayni cumle ikisini
+                  birden anlatamaz: sinavin hic sorusu olmamasi ile sorulari
+                  olup hicbirinde ders YAZMAMASI. Ikincisinde "henuz sorusu
+                  yok" demek egitmeni yanlis yere bakmaya gonderirdi - cozum
+                  soru eklemek degil, sorularin dersini doldurmak.
+                */}
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  {subject
+                    ? "Şimdilik yalnızca bu derse yetkili eğitmenler ve sınav sahibi görür."
+                    : "Ders atanmadığı için sınav tüm eğitmenlere açık."}{" "}
+                  {questionCount === 0
+                    ? "Soru eklendiğinde dersler sorulardan belirlenir."
+                    : "Sınavın sorularında ders bilgisi yok; soru havuzunda derslerini doldurduğunuzda burası kendiliğinden güncellenir."}
+                </p>
+              </>
+            )}
+          </div>
+
+          {/* ---------- Süre ---------- */}
+          <div className="space-y-2">
+            <Label htmlFor="ayar-sure" className="flex items-center gap-1.5">
+              <Clock3 className="h-3.5 w-3.5 text-muted-foreground" />
+              Süre (dakika)
+            </Label>
+
+            <div className="flex gap-1.5">
+              <Input
+                id="ayar-sure"
+                type="number"
+                min={1}
+                max={600}
+                inputMode="numeric"
+                value={sure}
+                onChange={(event) => setSure(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && sureDirty) void sureyiKaydet();
+                }}
+                placeholder="Sınırsız"
+                disabled={pending !== null}
+              />
+
+              <KaydetDugmesi
+                dirty={sureDirty}
+                busy={pending === "sure"}
+                disabled={pending !== null}
+                onClick={() => void sureyiKaydet()}
+                label="Süreyi kaydet"
+              />
+            </div>
+
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              {durationMinutes === null
+                ? "Süre sınırı yok; yalnızca sınavın açık olduğu tarih aralığı geçerli."
+                : `Her öğrenci sınava başladığı andan itibaren ${durationMinutes} dakika alır. Tarih aralığı daha önce biterse o bağlar.`}
+            </p>
+          </div>
+        </div>
+
+        {/* ---------- Sinav penceresi ---------- */}
+        <div className="space-y-2 rounded-lg border p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="flex items-center gap-1.5 text-sm font-medium">
+              <CalendarClock className="h-3.5 w-3.5 text-muted-foreground" />
+              Sınav penceresi
+            </span>
+
+            <div className="flex items-center gap-1.5">
+              {pencere.baslangic || pencere.bitis ? (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-8 text-xs text-muted-foreground"
+                  disabled={pending !== null}
+                  onClick={() => setPencere({ baslangic: "", bitis: "" })}
+                >
+                  Temizle
+                </Button>
+              ) : null}
+
+              <KaydetDugmesi
+                dirty={pencereDirty}
+                busy={pending === "pencere"}
+                disabled={pending !== null}
+                onClick={() => void pencereyiKaydet()}
+                label="Sınav penceresini kaydet"
+              />
+            </div>
+          </div>
+
+          {/*
+            Iki alan dar ekranda ALT ALTA: `datetime-local` denetiminin kendi
+            asgari genisligi var (tarih + saat + takvim ikonu), yan yana
+            sikistirildiginda ikon kutunun disina tasiyor.
+          */}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="ayar-baslangic" className="text-xs text-muted-foreground">
+                Başlangıç
+              </Label>
+              <Input
+                id="ayar-baslangic"
+                type="datetime-local"
+                value={pencere.baslangic}
+                disabled={pending !== null}
+                onChange={(event) =>
+                  setPencere((current) => ({
+                    ...current,
+                    baslangic: event.target.value,
+                  }))
+                }
+                className="w-full"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="ayar-bitis" className="text-xs text-muted-foreground">
+                Bitiş
+              </Label>
+              <Input
+                id="ayar-bitis"
+                type="datetime-local"
+                value={pencere.bitis}
+                disabled={pending !== null}
+                min={pencere.baslangic || undefined}
+                onChange={(event) =>
+                  setPencere((current) => ({ ...current, bitis: event.target.value }))
+                }
+                className="w-full"
+              />
+            </div>
+          </div>
+
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            {!startsAt && !endsAt
+              ? "Tarih verilmedi: sınav, yayında olduğu sürece açık kalır."
+              : "Süre alanından farklıdır: pencere sınavın AÇIK OLDUĞU aralık, süre ise her öğrenciye başladığı andan itibaren tanınan zamandır. Hangisi önce biterse o bağlar."}
+          </p>
+        </div>
+
+        {/* ---------- Kamera ---------- */}
+        <label
+          htmlFor="ayar-kamera"
+          className={cn(
+            "flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors",
+            kamera ? "border-primary/50 bg-primary/5" : "hover:bg-accent/40",
+          )}
+        >
+          <Checkbox
+            id="ayar-kamera"
+            checked={kamera}
+            disabled={pending !== null || !canPersist}
+            onChange={(event) => void kamerayiDegistir(event.target.checked)}
+            className="mt-0.5"
+          />
+          <span className="min-w-0">
+            <span className="flex items-center gap-1.5 text-sm font-medium">
+              <Camera className="h-3.5 w-3.5" />
+              Kamera zorunlu olsun
+              {pending === "kamera" ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+              ) : null}
+            </span>
+            <span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
+              Açarsanız öğrenci sınava ancak kamerası ve mikrofonu açıkken
+              girebilir; soruları tek tek geçer. Görüntü ve ses kaydedilmez,
+              yalnızca sınav boyunca açık kalması gerekir.
+            </span>
+          </span>
+        </label>
+
+        {/* ---------- Puan özeti ---------- */}
+        <div className="space-y-2 rounded-lg border bg-muted/40 px-3 py-2.5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span className="text-sm text-muted-foreground">
+              {questionCount} soru · toplam{" "}
+              {/* Toplamin 100 olmasi zorunlu degil; 50 puanlik bir sinav da
+                  gecerli. 100 yalnizca esit dagitimin varsayilani. */}
+              <span className="font-semibold text-foreground">{totalPoints}</span>{" "}
+              puan
+            </span>
+
+            {/*
+              "Otomatik dağıtım" ROZETI ve "Eşit dağıt" DUGMESI KALDIRILDI.
+
+              Dagitim zaten arka planda calisiyordu: `points_auto` acikken
+              soru eklendikce/cikarildikca puanlar 100 uzerinden yeniden
+              bolusturuluyor (lib/exam-paper.ts -> distributePoints, toplam
+              100). Egitmenin bunu "acmasi" gerekmiyordu; iki denetim
+              yalnizca calisan bir seyi gorunur kiliyor ve ekrani mesgul
+              ediyordu.
+
+              GERI DONUS YOLU KORUNDU: bir soruya elle puan verilince
+              otomatik dagitim kapanir ve bu TEK YONLU bir kapi olurdu.
+              Bu yuzden yalnizca elle ayarlanmis durumda kucuk bir baglanti
+              cikiyor. Normal (otomatik) durumda hicbir denetim gorunmez.
+            */}
+            {!pointsAuto && questionCount > 0 ? (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-auto gap-1.5 px-2 py-1 text-xs text-muted-foreground"
+                disabled={pending !== null}
+                onClick={() => void puanlariEsitle()}
+              >
+                {pending === "puan" ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Scale className="h-3.5 w-3.5" />
+                )}
+                Otomatik dağıtıma dön
+              </Button>
+            ) : null}
+          </div>
+
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            {questionCount === 0 ? (
+              "Sınava soru ekleyince puanlar 100 üzerinden kendiliğinden dağıtılır."
+            ) : pointsAuto ? (
+              "Puanlar soru sayısına göre kendiliğinden dağıtılıyor; soru ekleyip çıkardıkça güncellenir. Bir soruya elle puan verirseniz bu durur."
+            ) : (
+              <span className="flex items-start gap-1.5">
+                <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                Puanları elle ayarladınız; soru ekleyip çıkarmak artık puanları
+                değiştirmiyor.
+              </span>
+            )}
+          </p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+
+/** Yalnizca deger degistiginde etkinlesen kaydetme dugmesi. */
+function KaydetDugmesi({
+  dirty,
+  busy,
+  disabled,
+  onClick,
+  label,
+}: {
+  dirty: boolean;
+  busy: boolean;
+  disabled: boolean;
+  onClick: () => void;
+  label: string;
+}) {
+  return (
+    <Button
+      size="icon"
+      variant={dirty ? "default" : "ghost"}
+      className="shrink-0"
+      disabled={!dirty || disabled}
+      onClick={onClick}
+      aria-label={label}
+    >
+      {busy ? (
+        <Loader2 className="h-4 w-4 animate-spin" />
+      ) : (
+        <Check className="h-4 w-4" />
+      )}
+    </Button>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Tarih donusumleri                                                         */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * ISO an -> `datetime-local` girdisinin bekledigi YEREL "yyyy-aa-ggTss:dd".
+ *
+ * `toISOString()` her zaman UTC verir; girdi ise yerel saat bekler. Aradaki
+ * farki once dilim kaymasi kadar geri alarak kapatiyoruz - aksi halde
+ * Turkiye'de kurulan 14:00'lik bir sinav kutuda 11:00 gorunurdu.
+ *
+ * YALNIZCA tarayicida cagrilmali: sunucunun dilimi baska olabilir.
+ */
+function isoToLocalInput(iso: string | null): string {
+  if (!iso) return "";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 16);
+}
+
+/**
+ * `datetime-local` degeri -> ISO an. Bos alan `null` (pencere ucu yok)
+ * demektir; okunamayan deger `undefined` doner ve cagiran kaydetmeyi keser.
+ */
+function localInputToIso(value: string): string | null | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const date = new Date(trimmed);
+  return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
+}

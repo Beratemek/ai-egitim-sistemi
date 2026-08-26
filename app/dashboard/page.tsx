@@ -6,7 +6,7 @@ import { getCurrentRole } from "@/lib/supabase-server";
 
 /**
  * /dashboard bir dagitim noktasidir: kullaniciyi rolune ait panele yollar.
- * (Middleware de ayni yonlendirmeyi yapar; bu sayfa dogrudan erisim icin var.)
+ * (Middleware de ayni yonlendirmeyi yapar; bu sayfa doğrudan erisim için var.)
  */
 export default async function DashboardIndexPage() {
   if (!isSupabaseConfigured) redirect("/login");

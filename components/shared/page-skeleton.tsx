@@ -1,18 +1,19 @@
+import { LoadingBanner } from "@/components/shared/hourglass";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export interface PageSkeletonProps {
-  /** Ust siradaki istatistik karti sayisi. */
+  /** Üst siradaki istatistik karti sayısı. */
   stats?: number;
-  /** Govdedeki icerik blogu sayisi. */
+  /** Govdedeki içerik blogu sayısı. */
   blocks?: number;
 }
 
 /**
  * Sayfa yuklenirken gosterilen iskelet.
  *
- * Amaci algilanan hizi artirmak: sunucu bileseni verisini beklerken kullanici
- * bos ekrana degil, gelecek duzenin taslagina bakar.
+ * Amaci algilanan hizi artirmak: sunucu bileseni verisini beklerken kullanıcı
+ * boş ekrana değil, gelecek duzenin taslagina bakar.
  */
 export function PageSkeleton({ stats = 4, blocks = 2 }: PageSkeletonProps) {
   return (
@@ -22,8 +23,15 @@ export function PageSkeleton({ stats = 4, blocks = 2 }: PageSkeletonProps) {
         <Skeleton className="h-4 w-96 max-w-full" />
       </div>
 
+      {/*
+        Iskelet "duzen bu olacak" der ama HAREKETSIZDIR; uzun bir beklemede
+        sayfa donmus gibi gorunur. Kum saati "hala calisiyorum" diyen tek
+        hareketli ogedir.
+      */}
+      <LoadingBanner />
+
       {stats > 0 ? (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2.5 sm:gap-4 xl:grid-cols-4">
           {Array.from({ length: stats }, (_, index) => (
             <Card key={index}>
               <CardContent className="space-y-3 p-5">

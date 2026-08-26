@@ -1,10 +1,17 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
-import { ROLE_CACHE_COOKIE } from "@/lib/auth-cookies";
+import {
+  ROLE_CACHE_COOKIE,
+} from "@/lib/auth-cookies";
 import { DEV_ROLE_COOKIE, isDevRoleSwitchEnabled } from "@/lib/dev-mode";
 import { isSupabaseConfigured, publicEnv } from "@/lib/env";
-import { dashboardPathFor, roleForPath } from "@/lib/roles";
+import { dashboardPathFor, landingRole, roleForPath } from "@/lib/roles";
+import {
+  SESSION_ACTIVITY_COOKIE,
+  isSessionIdle,
+  parseSessionActivity,
+} from "@/lib/session-activity";
 import { isRoleStatus, isUserRole } from "@/lib/types";
 import type { Database, RoleStatus, UserRole } from "@/lib/types";
 
@@ -21,6 +28,12 @@ const PENDING_PATH = "/onay-bekleniyor";
  * cerezde tutulur; sure dolunca yeniden sorgulanir. Bu cerez YETKI KAYNAGI
  * DEGILDIR - veri erisimini her zaman veritabanindaki RLS politikalari belirler,
  * cerez yalnizca hangi panele yonlendirilecegini soyler.
+ *
+ * Sure secimi bir denge: cerez dolunca middleware veritabanina gidiyor ve bu
+ * tur uzak Supabase ornegimizde yaklasik 150 ms - her sayfa gecisinde
+ * hissedilir. Kisa tutmanin tek kazanci, yonetici bir rolu geri aldiginda o
+ * panelin KABUGUNUN daha cabuk kapanmasi; icerik zaten bos gelir cunku
+ * sorgular RLS'e tabidir. Gorunur gecikmeye deger bir kazanc degil.
  */
 const ROLE_CACHE_MAX_AGE = 300; // 5 dakika
 
@@ -41,6 +54,24 @@ export async function middleware(request: NextRequest) {
 
   // Supabase yapilandirilmamissa demo modunda calisilir: koruma uygulanmaz.
   if (!isSupabaseConfigured) return response;
+
+  const isDashboard = pathname.startsWith("/dashboard");
+  const isExam = pathname.startsWith("/sinav/");
+  const isLogin = pathname === "/login";
+  const isOnboarding = pathname === ONBOARDING_PATH;
+  const isPending = pathname === PENDING_PATH;
+
+  const lastActivity = parseSessionActivity(
+    request.cookies.get(SESSION_ACTIVITY_COOKIE)?.value,
+  );
+  if ((isDashboard || isExam) && isSessionIdle(lastActivity)) {
+    const signoutUrl = new URL("/auth/signout-and-login", request.url);
+    signoutUrl.searchParams.set(
+      "message",
+      "30 dakika işlem yapılmadığı için oturumunuz kapatıldı.",
+    );
+    return NextResponse.redirect(signoutUrl);
+  }
 
   const supabase = createServerClient<Database>(
     publicEnv.supabaseUrl,
@@ -68,13 +99,13 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const isDashboard = pathname.startsWith("/dashboard");
-  const isLogin = pathname === "/login";
-  const isOnboarding = pathname === ONBOARDING_PATH;
-  const isPending = pathname === PENDING_PATH;
-
+  /**
+   * Sinav cozme ekrani panel kabugunun disinda ama korumasi AYNI olmali:
+   * oturum, e-posta dogrulamasi ve rol onayi burada da aranir. Ayri bir
+   * kok yol acip korumayi unutmak, sinava herkesin girebilmesi demekti.
+   */
   if (!user) {
-    if (isDashboard || isOnboarding || isPending) {
+    if (isDashboard || isExam || isOnboarding || isPending) {
       const loginUrl = new URL("/login", request.url);
       loginUrl.searchParams.set("next", pathname);
       return NextResponse.redirect(loginUrl);
@@ -89,15 +120,15 @@ export async function middleware(request: NextRequest) {
    * vermez; bu kontrol ikinci bir savunma katmani. Proje ayari sonradan
    * gevsetilse bile uygulama dogrulanmamis hesabi iceri almaz.
    */
-  if (!user.email_confirmed_at && isDashboard) {
+  if (!user.email_confirmed_at && (isDashboard || isExam)) {
     return NextResponse.redirect(new URL("/auth/dogrulama-bekleniyor", request.url));
   }
 
   // Rol yalnizca yonlendirme kararinin gerektigi yerlerde lazim.
   // Tanitim sayfasi, /auth/* gibi yollarda sorgulamaya gerek yok.
-  if (!isDashboard && !isLogin && !isOnboarding && !isPending) return response;
+  if (!isDashboard && !isExam && !isLogin && !isOnboarding && !isPending) return response;
 
-  const { role: actualRole, status } = await resolveProfile(
+  const { role: actualRole, roles, status } = await resolveProfile(
     request,
     response,
     supabase,
@@ -137,25 +168,54 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
-  // Gelistirici rol degistiricisi: yalnizca yonlendirme kurallarini etkiler.
+  /**
+   * Gelistirici rol degistiricisi: yalnizca yonlendirme kurallarini etkiler.
+   *
+   * Taklit edilebilecek roller kullaniciya VERILMIS rollerle sinirli. Aksi
+   * halde bu cerez, rol atamasi olmadan baska bir panele girmenin yolu
+   * olurdu - yetkinin tek kaynagi verilmis roller kumesi olmali.
+   */
   const devRole = request.cookies.get(DEV_ROLE_COOKIE)?.value;
-  const role = isDevRoleSwitchEnabled && isUserRole(devRole) ? devRole : actualRole;
+  const role =
+    isDevRoleSwitchEnabled && isUserRole(devRole) && roles.includes(devRole)
+      ? devRole
+      : actualRole;
+
+  /**
+   * Yonlendirmelerin gittigi panel.
+   *
+   * Admin rolu verilmis hesap her zaman Sistem Yoneticisi panelinde acilir;
+   * ust cubukta rol degistirici de o hesapta gosterilmedigi icin ikisi ayni
+   * kurali (lib/roles.ts) okumak zorunda - yoksa hesap baska bir panelde
+   * acilip cikis yolu olmadan orada kalirdi.
+   */
+  const acilisRolu = landingRole(roles, role);
 
   // Oturum acikken /login'e gidilirse kendi paneline gonder.
   if (isLogin) {
-    return NextResponse.redirect(new URL(dashboardPathFor(role), request.url));
+    return NextResponse.redirect(new URL(dashboardPathFor(acilisRolu), request.url));
   }
 
   const requiredRole = roleForPath(pathname);
 
   // /dashboard kok yolu -> role gore dagit
   if (pathname === "/dashboard") {
-    return NextResponse.redirect(new URL(dashboardPathFor(role), request.url));
+    return NextResponse.redirect(new URL(dashboardPathFor(acilisRolu), request.url));
   }
 
-  // Baska bir rolun alanina girilmisse kendi paneline geri gonder.
-  if (requiredRole && requiredRole !== role) {
-    return NextResponse.redirect(new URL(dashboardPathFor(role), request.url));
+  /**
+   * Erisim yalnizca VERILMIS rollerden gelir.
+   *
+   * `admin` icin gizli bir "her seye erisim" kapisi YOKTUR: sistem yoneticisi
+   * de tipki digerleri gibi yalnizca kendisine atanmis rollerin panellerine
+   * girer. Bir yoneticinin her panele girmesi isteniyorsa cozum ona o rolleri
+   * ATAMAKTIR - coklu rol tam olarak bunun icin var.
+   *
+   * Verilmis rollerden herhangi birinin alani acilabilir; ust cubuktaki rol
+   * degistirici yalnizca varsayilan paneli secer, bir kapi degildir.
+   */
+  if (requiredRole && !roles.includes(requiredRole)) {
+    return NextResponse.redirect(new URL(dashboardPathFor(acilisRolu), request.url));
   }
 
   return response;
@@ -177,38 +237,48 @@ async function resolveProfile(
   response: NextResponse,
   supabase: ReturnType<typeof createServerClient<Database>>,
   userId: string,
-): Promise<{ role: UserRole; status: RoleStatus }> {
+): Promise<{ role: UserRole; roles: UserRole[]; status: RoleStatus }> {
   const cached = request.cookies.get(ROLE_CACHE_COOKIE)?.value;
 
   if (cached) {
-    const separator = cached.indexOf(":");
-    const cachedUserId = cached.slice(0, separator);
-    const cachedRole = cached.slice(separator + 1);
+    // Bicim: "<userId>:<etkinRol>:<rol1,rol2,...>"
+    const [cachedUserId, cachedRole, cachedRoles] = cached.split(":");
 
-    if (cachedUserId === userId && isUserRole(cachedRole)) {
-      return { role: cachedRole, status: "onayli" };
+    if (cachedUserId === userId && isUserRole(cachedRole) && cachedRoles) {
+      const roles = cachedRoles.split(",").filter(isUserRole);
+      // Bos kume eski bicimli cerezi isaret eder; o zaman yeniden sorgula.
+      if (roles.length > 0) return { role: cachedRole, roles, status: "onayli" };
     }
   }
 
   const { data: profile } = await supabase
     .from("users")
-    .select("role, role_status")
+    .select("role, roles, role_status")
     .eq("id", userId)
     .maybeSingle();
 
   const role = isUserRole(profile?.role) ? profile.role : "ogrenci";
   const status = isRoleStatus(profile?.role_status) ? profile.role_status : "onayli";
 
+  // `roles` kolonu eklenmeden once olusmus kayitlarda kume bos olabilir;
+  // o durumda etkin rol tek eleman olarak kabul edilir.
+  const granted = (profile?.roles ?? []).filter(isUserRole);
+  const roles = granted.length > 0 ? granted : [role];
+
   if (status === "onayli") {
-    response.cookies.set(ROLE_CACHE_COOKIE, `${userId}:${role}`, {
-      httpOnly: true,
-      sameSite: "lax",
-      path: "/",
-      maxAge: ROLE_CACHE_MAX_AGE,
-    });
+    response.cookies.set(
+      ROLE_CACHE_COOKIE,
+      `${userId}:${role}:${roles.join(",")}`,
+      {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        maxAge: ROLE_CACHE_MAX_AGE,
+      },
+    );
   }
 
-  return { role, status };
+  return { role, roles, status };
 }
 
 export const config = {

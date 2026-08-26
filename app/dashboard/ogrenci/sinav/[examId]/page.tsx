@@ -1,32 +1,47 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, CalendarClock, CheckCircle2 } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  CalendarClock,
+  Camera,
+  CheckCircle2,
+  Clock3,
+  Hourglass,
+  LockKeyhole,
+} from "lucide-react";
 
 import { AiMockNotice } from "@/components/shared/ai-mock-notice";
-import { AnswerForm } from "@/components/shared/answer-form";
+import { ExamCountdown } from "@/components/shared/exam-countdown";
+import { ExamStartPanel } from "@/components/shared/exam-start-panel";
 import { PageHeader } from "@/components/shared/page-header";
-import { QuestionTypeBadge } from "@/components/shared/status-badge";
+import { ResultViewMarker } from "@/components/shared/result-view-marker";
+import { StudentExamQuestions } from "@/components/shared/student-exam-questions";
 import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { serverEnv } from "@/lib/env";
+import { effectiveDeadline } from "@/lib/exam-time";
 import { getStudentExamDetail } from "@/lib/queries";
-import { formatDateTime } from "@/lib/utils";
+import { getCurrentUser } from "@/lib/supabase-server";
+import {
+  canAnswerStudentExam,
+  getStudentExamStatus,
+} from "@/lib/student-exam-status";
+import { cn, formatDateTime } from "@/lib/utils";
 
-export const metadata: Metadata = { title: "Sinav" };
+export const metadata: Metadata = { title: "Sınav" };
 
 /**
- * Ogrencinin sinav ekrani: sinavdaki tum sorular sirayla yanitlanir.
+ * Öğrencinin sınav ekrani: sınavdaki tüm sorular sirayla yanitlanir.
  *
- * Sorular `getStudentExamDetail` ile cekilir; bu fonksiyon dogru cevap ve
- * rubrigi BILINCLI OLARAK getirmez (bkz. lib/queries.ts).
+ * Sorular `getStudentExamDetail` ile cekilir; bu fonksiyon doğru cevap ve
+ * rubriği BILINCLI Olarak getirmez (bkz. lib/queries.ts).
  */
 export default async function OgrenciSinavPage({
   params,
@@ -34,13 +49,24 @@ export default async function OgrenciSinavPage({
   params: Promise<{ examId: string }>;
 }) {
   const { examId } = await params;
-  const detail = await getStudentExamDetail(examId);
+  const [detail, current] = await Promise.all([
+    getStudentExamDetail(examId),
+    getCurrentUser(),
+  ]);
 
-  if (!detail) notFound();
+  if (!detail || !current) notFound();
 
-  const { exam, questions, submissions } = detail;
+  const {
+    exam,
+    questions,
+    submissions,
+    assignment,
+    attempt,
+    questionCount,
+    totalPoints,
+  } = detail;
 
-  // Soru -> ogrencinin cevabi eslesmesi.
+  // Soru -> öğrencinin cevabı eşleşmesi.
   const answerByQuestion = new Map(
     submissions
       .filter((submission) => submission.question_id !== null)
@@ -50,97 +76,298 @@ export default async function OgrenciSinavPage({
   const answered = questions.filter((question) =>
     answerByQuestion.has(question.id),
   ).length;
-  const isComplete = questions.length > 0 && answered === questions.length;
+  const approved = questions.filter(
+    (question) => answerByQuestion.get(question.id)?.status === "egitmen_onayli",
+  ).length;
+  const evaluated = questions.filter((question) => {
+    const submission = answerByQuestion.get(question.id);
+    return submission && submission.status !== "gonderildi";
+  }).length;
+  const status = getStudentExamStatus({
+    exam,
+    questionCount,
+    answeredCount: answered,
+    evaluatedCount: evaluated,
+    approvedCount: approved,
+    attemptStatus: attempt?.status,
+    attemptStartedAt: attempt?.started_at ?? null,
+  });
+
+  /**
+   * Ogrenciyi baglayan etkin bitis: pencere ile kisiye ozel sureden hangisi
+   * once biterse o. Sayac ve "Bitis" satiri bunu gosterir, aksi halde
+   * ogrenci 2 saatlik pencereyi gorup 40 dakikasi oldugunu bilmezdi.
+   */
+  const deadline = effectiveDeadline({
+    endsAt: exam.ends_at,
+    durationMinutes: exam.duration_minutes,
+    startedAt: attempt?.started_at ?? null,
+  });
+  const canAnswer = canAnswerStudentExam(status);
+  const lockReason = getLockReason(status, exam.starts_at, exam.ends_at);
+  const requiresStart = Boolean(assignment && !attempt && status === "baslanabilir");
 
   return (
     <>
+      {attempt?.status === "sonuclandi" &&
+      attempt.result_viewed_at === null ? (
+        <ResultViewMarker examId={exam.id} />
+      ) : null}
+
       <Link
         href="/dashboard/ogrenci"
         className="flex w-fit items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
       >
         <ArrowLeft className="h-4 w-4" />
-        Sinavlarim
+        Sınavlarım
       </Link>
 
       <PageHeader
         title={exam.title}
-        description={exam.description || "Sorulari yanitlayin."}
+        description={exam.description || "Soruları yanıtlayın."}
         actions={
-          isComplete ? (
-            <Badge variant="success" className="gap-1.5">
-              <CheckCircle2 className="h-3.5 w-3.5" />
-              Tamamlandi
-            </Badge>
-          ) : null
+          <div className="flex flex-wrap items-center gap-2">
+            {exam.proctored ? (
+              <Badge variant="warning" className="gap-1.5">
+                <Camera className="h-3.5 w-3.5" />
+                Kamera zorunlu
+              </Badge>
+            ) : null}
+            <ExamStatusBadge status={status} />
+          </div>
         }
       />
 
-      {serverEnv.aiMockMode ? <AiMockNotice capability="puanlama" /> : null}
+      {lockReason ? <ExamAvailabilityNotice status={status} message={lockReason} /> : null}
 
-      {/* ---------- Ilerleme ---------- */}
-      <Card>
-        <CardContent className="space-y-3 p-5">
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <span className="text-sm text-muted-foreground">Ilerleme</span>
-            <span className="text-sm font-semibold tabular">
-              {answered} / {questions.length} soru
-            </span>
-          </div>
-          <Progress
-            value={questions.length > 0 ? (answered / questions.length) * 100 : 0}
-            className="h-2"
-          />
-          {exam.ends_at ? (
-            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <CalendarClock className="h-3.5 w-3.5" />
-              Bitis: {formatDateTime(exam.ends_at)}
-            </p>
-          ) : null}
-        </CardContent>
-      </Card>
-
-      {/* ---------- Sorular ---------- */}
-      {questions.length === 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="py-16 text-center text-sm text-muted-foreground">
-            Bu sinava henuz soru eklenmemis.
+      {attempt?.status === "sonuclandi" ? (
+        <Card className="border-success/30 bg-success/5">
+          <CardContent className="grid gap-4 p-5 sm:grid-cols-3">
+            <ResultMetric label="Nihai puan" value={`${attempt.final_score ?? "-"} / 100`} />
+            <ResultMetric
+              label="Kazanılan puan"
+              value={`${attempt.earned_points ?? "-"} / ${attempt.total_points ?? "-"}`}
+            />
+            <ResultMetric
+              label="Açıklanma"
+              value={formatDateTime(attempt.completed_at)}
+            />
           </CardContent>
         </Card>
-      ) : (
-        <div className="space-y-4">
-          {questions.map((question, index) => (
-            <Card key={question.id}>
-              <CardHeader>
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/10 text-xs font-semibold text-primary">
-                    {index + 1}
-                  </span>
-                  <QuestionTypeBadge type={question.type} />
-                  <Badge variant="soft">{question.topic}</Badge>
-                </div>
+      ) : null}
 
-                <CardTitle className="mt-2 leading-snug">{question.text}</CardTitle>
+      {serverEnv.aiMockMode && canAnswer && !requiresStart ? (
+        <AiMockNotice capability="puanlama" audience="student" />
+      ) : null}
 
-                <CardDescription>
-                  {question.type === "test"
-                    ? "Dogru sikki secip gonderin."
-                    : "Cevabiniz rubrige gore degerlendirilecek. Nihai puani egitmen onaylar."}
-                </CardDescription>
-              </CardHeader>
+      {requiresStart ? (
+        <ExamStartPanel
+          examId={exam.id}
+          questionCount={questionCount}
+          totalPoints={totalPoints}
+          endsAt={exam.ends_at}
+          proctored={exam.proctored}
+        />
+      ) : null}
 
-              <CardContent>
-                <AnswerForm
-                  examId={exam.id}
-                  questionId={question.id}
-                  type={question.type}
-                  options={question.options_json}
-                  existing={answerByQuestion.get(question.id) ?? null}
-                />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+      {/* ---------- İlerleme ---------- */}
+      {!requiresStart ? (
+        <Card>
+          <CardContent className="space-y-3 p-5">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <span className="text-sm text-muted-foreground">Ilerleme</span>
+              <span className="text-sm font-semibold tabular">
+                {answered} / {questionCount} soru
+              </span>
+            </div>
+            <Progress
+              value={questionCount > 0 ? (answered / questionCount) * 100 : 0}
+              className="h-2"
+            />
+            {deadline ? (
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <CalendarClock className="h-3.5 w-3.5" />
+                  Bitiş: {formatDateTime(deadline.toISOString())}
+                  {exam.duration_minutes !== null ? (
+                    <span className="text-muted-foreground/80">
+                      · {exam.duration_minutes} dk süre
+                    </span>
+                  ) : null}
+                </p>
+                {attempt?.status === "devam_ediyor" ? (
+                  <ExamCountdown
+                    examId={exam.id}
+                    endsAt={deadline.toISOString()}
+                    autoSubmit
+                  />
+                ) : null}
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {/*
+        Sinav BURADA cozulmuyor.
+
+        Cozme ekrani /sinav/<id> adresinde, panel kabugunun disinda ve tam
+        ekran. Bu sayfa sinavin kunyesi: kurallar, sure, durum ve sonuc.
+        Sorulari iki yerde birden gostermek, ogrencinin hangi ekranda
+        cevap verdiginden emin olamamasi demekti.
+      */}
+      {canAnswer && !requiresStart ? (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardContent className="flex flex-wrap items-center justify-between gap-4 py-5">
+            <div className="min-w-0">
+              <p className="font-medium">Sınav devam ediyor</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {answered} / {questionCount} soru cevaplandı. Kaldığınız yerden
+                devam edebilirsiniz.
+              </p>
+            </div>
+
+            <Link
+              href={`/sinav/${exam.id}`}
+              className={cn(buttonVariants({ size: "lg" }), "gap-2")}
+            >
+              Sınava devam et
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {/* ---------- Cevaplar (yalnizca sinav bittikten sonra) ---------- */}
+      {!requiresStart && !canAnswer && questions.length > 0 ? (
+        <StudentExamQuestions
+          examId={exam.id}
+          studentId={current.user.id}
+          questions={questions}
+          submissions={submissions}
+          disabledReason={lockReason}
+          revealResults={status === "sonuclandi"}
+        />
+      ) : null}
+
+      {!requiresStart && questions.length === 0 && questionCount > 0 ? (
+        <Card className="border-dashed">
+          <CardContent className="flex flex-col items-center justify-center py-12 text-center text-sm text-muted-foreground min-h-[240px]">
+            <p className="font-medium text-foreground">Sorular yüklenemedi</p>
+            <p className="mx-auto mt-1.5 max-w-sm">
+              Bu sınavda {questionCount} soru var ama size gösterilemedi.
+              Sayfayı yenileyin; sorun sürerse eğitmeninize bildirin.
+            </p>
+          </CardContent>
+        </Card>
+      ) : null}
     </>
+  );
+}
+
+function ResultMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="mt-1 text-lg font-semibold tabular">{value}</p>
+    </div>
+  );
+}
+
+function getLockReason(
+  status: ReturnType<typeof getStudentExamStatus>,
+  startsAt: string | null,
+  endsAt: string | null,
+): string | null {
+  switch (status) {
+    case "yaklasan":
+      return startsAt
+        ? `Bu sınav ${formatDateTime(startsAt)} tarihinde baslayacak. Baslangictan önce cevap veremezsiniz.`
+        : "Bu sınav henüz başlamadı.";
+    case "suresi_doldu":
+      return endsAt
+        ? `Bu sınav ${formatDateTime(endsAt)} tarihinde sona erdi. Yeni cevap gonderemezsiniz.`
+        : "Bu sınavın cevaplama süresi sona erdi.";
+    case "onay_bekliyor":
+      return "Tüm cevaplarınız kaydedildi. Sonuçlar eğitmen değerlendirmesinden sonra açıklanacak.";
+    case "sonuclandi":
+      return "Sınav sonucunuz açıklandı. Yanıtladığınız soruların onaylı puan ve geri bildirimlerini soru gezintisinden inceleyebilirsiniz.";
+    default:
+      return null;
+  }
+}
+
+function ExamStatusBadge({
+  status,
+}: {
+  status: ReturnType<typeof getStudentExamStatus>;
+}) {
+  switch (status) {
+    case "yaklasan":
+      return (
+        <Badge variant="soft" className="gap-1.5">
+          <Clock3 className="h-3.5 w-3.5" />
+          Yaklaşan
+        </Badge>
+      );
+    case "suresi_doldu":
+      return (
+        <Badge variant="danger" className="gap-1.5">
+          <LockKeyhole className="h-3.5 w-3.5" />
+          Süresi doldu
+        </Badge>
+      );
+    case "onay_bekliyor":
+      return (
+        <Badge variant="warning" className="gap-1.5">
+          <Hourglass className="h-3.5 w-3.5" />
+          Onay bekliyor
+        </Badge>
+      );
+    case "sonuclandi":
+      return (
+        <Badge variant="success" className="gap-1.5">
+          <CheckCircle2 className="h-3.5 w-3.5" />
+          Sonuçlandı
+        </Badge>
+      );
+    case "devam_ediyor":
+      return <Badge variant="warning">Devam ediyor</Badge>;
+    case "baslanabilir":
+      return <Badge>Baslanabilir</Badge>;
+  }
+}
+
+function ExamAvailabilityNotice({
+  status,
+  message,
+}: {
+  status: ReturnType<typeof getStudentExamStatus>;
+  message: string;
+}) {
+  const isExpired = status === "suresi_doldu";
+  const isCompleted = status === "sonuclandi";
+  const Icon = isExpired
+    ? LockKeyhole
+    : status === "yaklasan"
+      ? Clock3
+      : isCompleted
+        ? CheckCircle2
+        : Hourglass;
+
+  return (
+    <div
+      role="status"
+      className={
+        isExpired
+          ? "flex items-start gap-3 rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-destructive"
+          : isCompleted
+            ? "flex items-start gap-3 rounded-xl border border-success/40 bg-success/10 px-4 py-3 text-success"
+          : "flex items-start gap-3 rounded-xl border border-warning/40 bg-warning/10 px-4 py-3 text-warning"
+      }
+    >
+      <Icon className="mt-0.5 h-4.5 w-4.5 shrink-0" />
+      <p className="text-sm leading-relaxed">{message}</p>
+    </div>
   );
 }

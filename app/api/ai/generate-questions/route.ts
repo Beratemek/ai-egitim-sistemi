@@ -1,6 +1,6 @@
 import { generateQuestions } from "@/lib/ai";
-import { errorMessage, jsonError, jsonOk, readJson, requireRole } from "@/lib/api";
-import { categoryLabel, isDeneyapCategory } from "@/lib/deneyap";
+import { describeAiError } from "@/lib/ai";
+import { jsonError, jsonOk, readJson, requireRole } from "@/lib/api";
 import { getStyleGuide } from "@/lib/queries";
 import type { GenerateQuestionsRequest, GeneratedQuestion } from "@/lib/types";
 
@@ -11,10 +11,15 @@ export const maxDuration = 60;
 /**
  * POST /api/ai/generate-questions
  *
- * Govde: { context, kazanim, topic?, count?, type? }
+ * Govde: { context, kazanim, subject?, topic?, count?, type?, difficulty? }
  * Yanit: { ok: true, data: GeneratedQuestion[] }
  *
  * Yetki: icerik uzmani ve egitmen.
+ *
+ * GORSEL ICIN SECIM YOK: model her soruda gorsele ihtiyac olup olmadigina
+ * ve turune (chart/svg/referans) kendisi karar verir - bkz. lib/ai.ts
+ * icindeki VISUAL_INSTRUCTION. Once bir "gorsel modu" secimi vardi, kullanici
+ * her uretimde bunu elle secmek zorundaydi; kaldirildi.
  */
 export async function POST(request: Request) {
   const guard = await requireRole(["icerik_uzmani", "egitmen"]);
@@ -33,8 +38,15 @@ export async function POST(request: Request) {
 
     const count = Math.min(Math.max(body.count ?? 5, 1), 20);
 
-    // Icerik uzmaninin gecmis begeni/red kayitlari modele ornek olarak verilir.
-    const styleGuide = await getStyleGuide();
+    /*
+      Tarz hafizasi KAPSAMLI okunuyor: once bu ders + bu konu, yeterli ornek
+      yoksa bu ders, o da yoksa genel. Onceden kapsam yoktu ve baska bir
+      dersteki geri bildirim buraya karisiyordu.
+    */
+    const styleGuide = await getStyleGuide({
+      ...(body.subject ? { subject: body.subject } : {}),
+      ...(body.topic ? { topic: body.topic } : {}),
+    });
 
     const questions: GeneratedQuestion[] = await generateQuestions(
       body.context,
@@ -42,17 +54,14 @@ export async function POST(request: Request) {
       {
         count,
         type: body.type ?? "karisik",
+        difficulty: body.difficulty ?? "karisik",
         styleGuide,
         ...(body.topic ? { topic: body.topic } : {}),
-        // Atolye dali modele alan baglami olarak verilir; gecersiz deger atlanir.
-        ...(isDeneyapCategory(body.category)
-          ? { categoryLabel: categoryLabel(body.category) }
-          : {}),
       },
     );
 
     return jsonOk(questions);
   } catch (caught) {
-    return jsonError(errorMessage(caught), 500);
+    return jsonError(describeAiError(caught), 500);
   }
 }

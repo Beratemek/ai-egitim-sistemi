@@ -21,9 +21,9 @@ import type { ApiResponse } from "@/lib/types";
 const ACCEPTED = ".pdf,.docx,.txt,.md";
 
 export interface SourceFileUploadProps {
-  /** Su anki kaynak metin - "Metni goster" onizlemesinde kullanilir. */
+  /** Su anki kaynak metin - "Metni göster" onizlemesinde kullanilir. */
   value: string;
-  /** Cikarilan metin hazir oldugunda cagrilir; form bunu kaynak metin alanina yazar. */
+  /** Cikarilan metin hazır oldugunda cagrilir; form bunu kaynak metin alanına yazar. */
   onExtracted: (text: string) => void;
   disabled?: boolean;
 }
@@ -31,9 +31,9 @@ export interface SourceFileUploadProps {
 /**
  * Kaynak metni dosyadan yukleme.
  *
- * Dosya sunucuda (`POST /api/extract-text`) cozumlenir, yalnizca duz metin
- * geri doner ve kaynak metin alanina yazilir. Kullanici metni gorup
- * duzenleyebildigi icin modele ne gittigi seffaf kalir - dosya hicbir yere
+ * Dosya sunucuda (`POST /api/extract-text`) cozumlenir, yalnızca duz metin
+ * geri doner ve kaynak metin alanına yazilir. Kullanıcı metni gorup
+ * duzenleyebildigi için modele ne gittigi seffaf kalir - dosya hicbir yere
  * kaydedilmez.
  */
 export function SourceFileUpload({
@@ -65,14 +65,14 @@ export function SourceFileUpload({
       setLoaded(result.data);
       onExtracted(result.data.text);
 
-      toast.success("Metin cikarildi", {
+      toast.success("Metin çıkarıldı", {
         description: `${result.data.fileName} - ${result.data.chars.toLocaleString("tr")} karakter${
-          result.data.truncated ? " (kirpildi)" : ""
+          result.data.truncated ? " (kırpıldı)" : ""
         }`,
       });
     } catch (caught) {
       const message =
-        caught instanceof Error ? caught.message : "Dosya okunurken hata olustu.";
+        caught instanceof Error ? caught.message : "Dosya okunurken hata oluştu.";
       setError(message);
       toast.error("Dosya okunamadi", { description: message });
     } finally {
@@ -96,7 +96,7 @@ export function SourceFileUpload({
         type="file"
         accept={ACCEPTED}
         className="sr-only"
-        aria-label="Kaynak dosya sec"
+        aria-label="Kaynak dosya seç"
         onChange={(event) => {
           const file = event.target.files?.[0];
           if (file) void handleFile(file);
@@ -104,7 +104,7 @@ export function SourceFileUpload({
       />
 
       {loaded ? (
-        /* ---------- Yuklendi ---------- */
+        /* ---------- Yüklendi ---------- */
         <div className="space-y-2 rounded-lg border bg-muted/40 p-3">
           <div className="flex items-center gap-3">
             <FileText className="h-4 w-4 shrink-0 text-primary" />
@@ -129,15 +129,15 @@ export function SourceFileUpload({
           </div>
 
           {/*
-            Kirpma sessizce gecilmemeli: 169 sayfalik bir kitaptan yalnizca ilk
-            40.000 karakter modele gider, geri kalani hic gormez.
+            Kirpma sessizce gecilmemeli: 169 sayfalik bir kitaptan yalnızca ilk
+            40.000 karakter modele gider, geri kalani hic görmez.
           */}
           {loaded.truncated ? (
             <p className="flex items-start gap-2 rounded-md bg-warning/10 px-2.5 py-2 text-xs text-warning">
               <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               <span>
-                Metin 40.000 karaktere kirpildi; modele yalnizca bastaki bolum gidiyor.
-                Daha isabetli sorular icin ilgili bolumu ayirip yuklemeniz onerilir.
+                Metin 40.000 karaktere kırpıldı; modele yalnızca bastaki bolum gidiyor.
+                Daha isabetli sorular için ilgili bölümü ayirip yuklemeniz onerilir.
               </span>
             </p>
           ) : null}
@@ -151,7 +151,7 @@ export function SourceFileUpload({
             <ChevronDown
               className={cn("h-3.5 w-3.5 transition-transform", showText && "rotate-180")}
             />
-            {showText ? "Metni gizle" : "Metni goster"}
+            {showText ? "Metni gizle" : "Metni göster"}
           </button>
 
           {showText ? (
@@ -161,7 +161,7 @@ export function SourceFileUpload({
           ) : null}
         </div>
       ) : (
-        /* ---------- Birakma alani ---------- */
+        /* ---------- Birakma alanı ---------- */
         <div
           onDragOver={(event) => {
             event.preventDefault();
@@ -206,7 +206,7 @@ export function SourceFileUpload({
             ) : (
               <>
                 <Paperclip className="h-3.5 w-3.5" />
-                Dosya sec
+                Dosya seç
               </>
             )}
           </Button>

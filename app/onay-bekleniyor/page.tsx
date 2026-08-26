@@ -16,7 +16,7 @@ export const metadata: Metadata = { title: "Onay Bekleniyor" };
  * Rol talebi karara baglanana kadar gosterilen ekran.
  *
  * Kullanicinin etkin rolu bu asamada 'ogrenci'dir; yani burada beklerken
- * yetkili alanlara zaten erisemez. Ekran yalnizca durumu anlatir.
+ * yetkili alanlara zaten erisemez. Ekran yalnızca durumu anlatir.
  */
 export default async function OnayBekleniyorPage() {
   const current = await getCurrentUser();
@@ -27,13 +27,16 @@ export default async function OnayBekleniyorPage() {
   const wanted = profile.requested_role ? roleLabel(profile.requested_role) : "-";
 
   return (
-    <main className="flex min-h-screen flex-col bg-background">
-      <header className="flex h-16 items-center justify-between px-4 sm:px-6">
+    <main className="bg-study relative flex min-h-screen flex-col overflow-hidden bg-background">
+      {/* Bekleme ekrani kullanicinin gunlerce gorebilecegi tek sayfa
+          olabiliyor; ciplak bir zemin yerine ayni kitap dili. */}
+      <div className="bg-shelf pointer-events-none absolute inset-x-0 bottom-0 h-52 opacity-[0.4]" aria-hidden />
+      <header className="relative z-10 flex h-16 items-center justify-between px-4 sm:px-6">
         <BrandMark />
         <ThemeToggle />
       </header>
 
-      <div className="flex flex-1 items-center justify-center px-4 pb-16">
+      <div className="relative z-10 flex flex-1 items-center justify-center px-4 pb-16">
         <div className="w-full max-w-lg rounded-2xl border bg-card p-8 text-center shadow-sm">
           <span
             className={cn(
@@ -49,21 +52,21 @@ export default async function OnayBekleniyorPage() {
           </span>
 
           <h1 className="mt-5 text-xl font-semibold tracking-tight">
-            {rejected ? "Talebiniz onaylanmadi" : "Onay bekleniyor"}
+            {rejected ? "Talebiniz onaylanmadı" : "Onay bekleniyor"}
           </h1>
 
           <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
             {rejected ? (
               <>
                 <strong className="font-medium text-foreground">{wanted}</strong> rolu
-                icin yaptiginiz basvuru egitim yoneticisi tarafindan reddedildi.
-                Farkli bir rol icin yeniden basvurabilirsiniz.
+                için yaptığınız başvuru sistem yöneticisi tarafından reddedildi.
+                Farklı bir rol için yeniden başvurabilirsiniz.
               </>
             ) : (
               <>
                 <strong className="font-medium text-foreground">{wanted}</strong> rolu
-                icin talebiniz egitim yoneticisine iletildi. Onaylandiginda bu hesapla
-                dogrudan panele girebileceksiniz.
+                için talebiniz sistem yöneticisine iletildi. Onayladığında bu hesapla
+                doğrudan panele girebileceksiniz.
               </>
             )}
           </p>
@@ -79,7 +82,7 @@ export default async function OnayBekleniyorPage() {
             </div>
             <div className="flex items-baseline justify-between gap-3">
               <dt className="text-muted-foreground">
-                {rejected ? "Karar tarihi" : "Basvuru tarihi"}
+                {rejected ? "Karar tarihi" : "Başvuru tarihi"}
               </dt>
               <dd className="font-medium">
                 {formatDateTime(profile.role_reviewed_at ?? profile.updated_at)}
@@ -94,7 +97,7 @@ export default async function OnayBekleniyorPage() {
                 className={cn(buttonVariants(), "flex-1 gap-2")}
               >
                 <UserCog className="h-4 w-4" />
-                Baska bir rol sec
+                Başka bir rol seç
               </Link>
             ) : (
               <Link
@@ -109,7 +112,7 @@ export default async function OnayBekleniyorPage() {
             <form action="/auth/signout" method="post" className="flex-1">
               <Button type="submit" variant="ghost" className="w-full gap-2">
                 <LogOut className="h-4 w-4" />
-                Cikis yap
+                Çıkış yap
               </Button>
             </form>
           </div>

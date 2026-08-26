@@ -1,16 +1,17 @@
 /**
  * Cevap on degerlendirme katmani.
  *
- * Coktan secmeli sorular deterministik olarak (dogru sik karsilastirmasi),
+ * Coktan secmeli sorular deterministik olarak (dogru secenek karsilastirmasi),
  * acik uclu sorular rubrige gore AI ile puanlanir. Her iki yolda da uretilen
  * puan bir ON DEGERLENDIRMEdir; nihai puani her zaman egitmen onaylar.
  *
- * Hem `POST /api/submissions` hem `submitAnswer` server action'i buradan gecer,
- * boylece iki yol ayni puani uretir.
+ * Sinav teslim aksiyonu tum kayitli cevaplari buradan gecirir.
  */
 
 import { gradeAnswer } from "@/lib/ai";
 import type { GradingResult, Question, SubmissionStatus } from "@/lib/types";
+import { normalizeOptionKey } from "@/lib/answer-normalization";
+import { buildTestFeedback } from "@/lib/assessment-feedback";
 
 /** Puanlama icin gereken soru alanlari. */
 export type GradableQuestion = Pick<
@@ -29,20 +30,14 @@ export interface AutoGradeResult {
 
 /**
  * Sik anahtarini karsilastirmaya hazirlar: "b", "B)", "b) Tilakoit zar" -> "B".
- * Turkce'ye ozel buyuk harf donusumu KULLANILMAZ; sik anahtarlari A-D'dir ve
+ * Turkce'ye ozel buyuk harf donusumu KULLANILMAZ; secenek anahtarlari A-D'dir ve
  * `toLocaleUpperCase("tr")` "i" harfini "I" yerine "İ" yapardi.
  */
-function normalizeOptionKey(value: string): string {
-  const trimmed = value.trim();
-  const leadingLetter = trimmed.match(/^[A-Za-z]/);
-  return (leadingLetter ? leadingLetter[0] : trimmed).toUpperCase();
-}
-
 /**
  * Ogrenci cevabina on puan uretir.
  *
  * @param question   Puanlanacak soru (rubrik/dogru cevap veritabanindan okunmali).
- * @param answerText Coktan secmelide sik anahtari, acik ucluda serbest metin.
+ * @param answerText Coktan secmelide secenek anahtari, acik ucluda serbest metin.
  */
 export async function autoGrade(
   question: GradableQuestion,
@@ -54,9 +49,10 @@ export async function autoGrade(
 
     return {
       score: isCorrect ? 100 : 0,
-      feedback: isCorrect
-        ? "Dogru cevap."
-        : `Yanlis cevap. Dogru sik: ${correctKey}.`,
+      // Doğru seçenek öğrenciye sınav sonuçlanmadan önce geri bildirim alanı
+      // üzerinden sızmamalı. Anahtar yalnızca yetkili eğitmen görünümünde
+      // kalır; öğrenciye sonuç güvenlik sözleşmesinin izin verdiği bilgi gider.
+      feedback: buildTestFeedback(isCorrect),
       criteria: [],
       status: "ai_degerlendirildi",
     };
