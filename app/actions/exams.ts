@@ -4,10 +4,56 @@ import { revalidatePath } from "next/cache";
 
 import { demoGuard, type ActionResult } from "@/app/actions/shared";
 import { isSupabaseConfigured } from "@/lib/env";
+import { loadExamQualityBundle } from "@/lib/exam-quality-data";
 import { getSubjectOptions } from "@/lib/queries";
 import { canonicalizeSubject } from "@/lib/subjects";
 import type { Exam } from "@/lib/types";
-import { createServerSupabaseClient, getCurrentUser } from "@/lib/supabase-server";
+import {
+  createServerSupabaseClient,
+  getCurrentUser,
+  type TypedServerClient,
+} from "@/lib/supabase-server";
+
+const EXAM_STRUCTURE_LOCKED_ERROR =
+  "Bu sinava bir ogrenci baslamis veya cevap kaydi olusmus. Soru yapisi ve puanlar artik degistirilemez.";
+
+/**
+ * Kullaniciya veritabanindaki tetikleyiciden once acik bir hata verir.
+ *
+ * Bu kontrol tek basina guvenlik siniri degildir: kontrol ile yazma arasinda
+ * bir ogrenci sinava baslayabilir. Asil atomik koruma migration'daki BEFORE
+ * trigger'dir; buradaki kontrol yalnizca daha anlasilir arayuz geri bildirimi
+ * saglar.
+ */
+async function guardExamStructureEditable(
+  supabase: TypedServerClient,
+  examId: string,
+): Promise<ActionResult> {
+  const [attempts, submissions] = await Promise.all([
+    supabase
+      .from("exam_attempts")
+      .select("id", { count: "exact", head: true })
+      .eq("exam_id", examId),
+    supabase
+      .from("submissions")
+      .select("id", { count: "exact", head: true })
+      .eq("exam_id", examId),
+  ]);
+
+  const error = attempts.error ?? submissions.error;
+  if (error) {
+    return {
+      ok: false,
+      error: `Sinav yapisi kilidi denetlenemedi: ${error.message}`,
+    };
+  }
+
+  if ((attempts.count ?? 0) > 0 || (submissions.count ?? 0) > 0) {
+    return { ok: false, error: EXAM_STRUCTURE_LOCKED_ERROR };
+  }
+
+  return { ok: true, data: undefined };
+}
 
 /** Sinav degisikliklerinden etkilenen sayfalari tazeler. */
 function revalidateExamPaths(examId?: string): void {
@@ -108,6 +154,9 @@ export async function addExamQuestions(
 
   const supabase = await createServerSupabaseClient();
 
+  const editable = await guardExamStructureEditable(supabase, examId);
+  if (!editable.ok) return editable;
+
   const { data: existing, error: existingError } = await supabase
     .from("exam_questions")
     .select("question_id, position")
@@ -148,6 +197,9 @@ export async function removeExamQuestion(
 
   const supabase = await createServerSupabaseClient();
 
+  const editable = await guardExamStructureEditable(supabase, examId);
+  if (!editable.ok) return editable;
+
   const { error } = await supabase
     .from("exam_questions")
     .delete()
@@ -177,16 +229,34 @@ export async function setExamPublished(
   const supabase = await createServerSupabaseClient();
 
   if (isPublished) {
-    const { count, error: countError } = await supabase
-      .from("exam_questions")
-      .select("*", { count: "exact", head: true })
-      .eq("exam_id", examId);
-
-    if (countError) return { ok: false, error: countError.message };
-    if (!count) {
+    try {
+      const quality = await loadExamQualityBundle(supabase, examId);
+      if (!quality) {
+        return {
+          ok: false,
+          error: "Sınav bulunamadı veya bu sınav üzerinde yetkiniz yok.",
+        };
+      }
+      if (!quality.report.canPublish) {
+        const summary = quality.report.blockers
+          .slice(0, 3)
+          .map((issue) => issue.title)
+          .join("; ");
+        const remaining = Math.max(0, quality.report.blockers.length - 3);
+        return {
+          ok: false,
+          error: `Yayın öncesi kalite kontrolü tamamlanmadı: ${summary}${
+            remaining > 0 ? ` ve ${remaining} engel daha` : ""
+          }. Kalite Kontrolü sekmesini inceleyin.`,
+        };
+      }
+    } catch (caught) {
       return {
         ok: false,
-        error: "Sinavi yayina almak icin en az bir soru eklemelisiniz.",
+        error:
+          caught instanceof Error
+            ? caught.message
+            : "Yayın öncesi kalite kontrolü tamamlanamadı.",
       };
     }
   }
@@ -465,6 +535,9 @@ export async function setExamQuestionPoints(
 
   const supabase = await createServerSupabaseClient();
 
+  const editable = await guardExamStructureEditable(supabase, examId);
+  if (!editable.ok) return editable;
+
   const { data: updated, error } = await supabase
     .from("exam_questions")
     .update({ points })
@@ -511,6 +584,10 @@ export async function resetExamPoints(
   if (!examId) return { ok: false, error: "Sinav secilmedi." };
 
   const supabase = await createServerSupabaseClient();
+
+  const editable = await guardExamStructureEditable(supabase, examId);
+  if (!editable.ok) return editable;
+
   const { data, error } = await supabase.rpc("reset_exam_points", {
     target_exam: examId,
   });

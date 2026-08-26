@@ -13,11 +13,16 @@ import {
   ManagerOutcomeRiskChart,
   ManagerScoreTrendChart,
 } from "@/components/shared/manager-analytics-charts";
+import { ManagerAnalyticsFilter } from "@/components/shared/manager-analytics-filter";
+import { ManagerDataQualityNotice } from "@/components/shared/manager-data-quality-notice";
+import { ManagerOutcomeHeatmap } from "@/components/shared/manager-outcome-heatmap";
+import { ManagerReportHeader } from "@/components/shared/manager-report-header";
 import {
   ManagerRiskBadge,
   ManagerScore,
 } from "@/components/shared/manager-status";
 import { PageHeader } from "@/components/shared/page-header";
+import { PrintReportButton } from "@/components/shared/print-report-button";
 import { StatCard } from "@/components/shared/stat-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -38,37 +43,66 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { getManagerAnalytics } from "@/lib/manager-data";
+import {
+  managerScopeFromSearchParams,
+  managerScopeQuery,
+  type ManagerAnalyticsSearchParams,
+} from "@/lib/manager-filters";
 
 export const metadata: Metadata = { title: "Sınıf analizi" };
 
 export default async function ManagerClassroomDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ classroom: string }>;
+  searchParams: Promise<ManagerAnalyticsSearchParams>;
 }) {
   const { classroom: encodedClassroom } = await params;
   const classroomName = decodeURIComponent(encodedClassroom);
-  const analytics = await getManagerAnalytics({ classroom: classroomName });
+  const scope = managerScopeFromSearchParams(await searchParams);
+  const query = managerScopeQuery(scope);
+  const analytics = await getManagerAnalytics({ ...scope, classroom: classroomName });
   const classroom = analytics.classrooms.find((item) => item.name === classroomName);
 
   if (!classroom) notFound();
 
   return (
-    <>
+    <section className="manager-report space-y-4 sm:space-y-6 print:space-y-4">
+      <ManagerReportHeader
+        reportType="Sınıf analiz raporu"
+        entityName={classroom.name}
+        scope={scope}
+        masteryThreshold={analytics.masteryThreshold}
+        exams={analytics.filterOptions.exams}
+      />
+
       <PageHeader
         title={classroom.name}
         description="Sınıfın katılım, başarı, kazanım ve öğrenci gelişim görünümü."
+        className="print:hidden"
         actions={
-          <Button asChild variant="outline" size="sm">
-            <Link href="/dashboard/yonetici/siniflar">
-              <ArrowLeft />
-              Sınıflar
-            </Link>
-          </Button>
+          <>
+            <PrintReportButton />
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/dashboard/yonetici/siniflar${query}`}>
+                <ArrowLeft />
+                Sınıflar
+              </Link>
+            </Button>
+          </>
         }
       />
 
-      <div className="grid grid-cols-2 gap-2.5 sm:gap-4 xl:grid-cols-4">
+      <ManagerAnalyticsFilter
+        basePath={`/dashboard/yonetici/siniflar/${encodeURIComponent(classroomName)}`}
+        scope={scope}
+        options={analytics.filterOptions}
+      />
+
+      <ManagerDataQualityNotice overview={analytics.overview} />
+
+      <div className="manager-report-stats print-report-keep grid grid-cols-2 gap-2.5 sm:gap-4 xl:grid-cols-4">
         <StatCard
           label="Öğrenci"
           value={classroom.studentCount}
@@ -99,12 +133,18 @@ export default async function ManagerClassroomDetailPage({
         />
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-2">
+      <div className="manager-report-chart-grid print-report-keep grid gap-6 xl:grid-cols-2">
         <ManagerScoreTrendChart data={analytics.trend} />
         <ManagerOutcomeRiskChart outcomes={analytics.outcomes} />
       </div>
 
-      <Card>
+      <ManagerOutcomeHeatmap
+        outcomes={analytics.outcomes}
+        mode="students"
+        query={query}
+      />
+
+      <Card className="print-report-table">
         <CardHeader className="flex-row items-start justify-between gap-4 space-y-0">
           <div>
             <CardTitle>Öğrenci görünümü</CardTitle>
@@ -131,7 +171,7 @@ export default async function ManagerClassroomDetailPage({
                 <TableRow key={student.studentId}>
                   <TableCell>
                     <Link
-                      href={`/dashboard/yonetici/ogrenciler/${student.studentId}`}
+                      href={`/dashboard/yonetici/ogrenciler/${student.studentId}${query}`}
                       className="font-medium hover:text-primary hover:underline"
                     >
                       {student.name}
@@ -171,7 +211,7 @@ export default async function ManagerClassroomDetailPage({
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="print-report-table">
         <CardHeader>
           <CardTitle>Sınav akışı</CardTitle>
           <CardDescription>
@@ -212,6 +252,6 @@ export default async function ManagerClassroomDetailPage({
           </Table>
         </CardContent>
       </Card>
-    </>
+    </section>
   );
 }

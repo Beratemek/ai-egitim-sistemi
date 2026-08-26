@@ -1,5 +1,7 @@
 "use client";
 
+import * as React from "react";
+
 import {
   Area,
   AreaChart,
@@ -111,20 +113,42 @@ export function ManagerScoreTrendChart({
 }: {
   data: readonly ManagerTrendPoint[];
 }) {
+  const subjects = React.useMemo(
+    () => [...new Set(data.map((point) => point.subject))].sort((a, b) => a.localeCompare(b, "tr")),
+    [data],
+  );
+  const [subject, setSubject] = React.useState(subjects[0] ?? "");
+  const activeSubject = subjects.includes(subject) ? subject : subjects[0] ?? "";
+  const visibleData = data.filter((point) => point.subject === activeSubject);
+
   return (
     <Card className="overflow-hidden">
-      <CardHeader>
-        <CardTitle>Değerlendirme eğrisi</CardTitle>
-        <CardDescription>Sonuçlanan son sekiz sınavın kronolojik hareketi.</CardDescription>
+      <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
+        <div>
+          <CardTitle>Değerlendirme eğrisi</CardTitle>
+          <CardDescription className="mt-1.5">
+            Yalnızca aynı dersin sonuçları birbirine bağlanır.
+          </CardDescription>
+        </div>
+        {subjects.length > 1 ? (
+          <select
+            value={activeSubject}
+            onChange={(event) => setSubject(event.target.value)}
+            aria-label="Grafikte gösterilecek ders"
+            className="h-8 max-w-44 rounded-md border bg-background px-2 text-xs outline-none focus:ring-2 focus:ring-ring"
+          >
+            {subjects.map((item) => <option key={item} value={item}>{item}</option>)}
+          </select>
+        ) : null}
       </CardHeader>
       <CardContent>
-        {data.length === 0 ? (
+        {visibleData.length === 0 ? (
           <EmptyChart label="Henüz sonuçlanan sınav yok." />
         ) : (
           <ChartContainer config={trendConfig} className="h-[290px] w-full">
             <AreaChart
               accessibilityLayer
-              data={[...data]}
+              data={visibleData}
               margin={{ left: 0, right: 10, top: 12, bottom: 4 }}
             >
               <defs>
@@ -171,7 +195,8 @@ export function ManagerOutcomeRiskChart({
 }: {
   outcomes: readonly ManagerOutcomeSummary[];
 }) {
-  const rows = outcomes
+  const actionable = outcomes.filter((outcome) => outcome.isActionableWeak);
+  const rows = (actionable.length > 0 ? actionable : outcomes)
     .filter((outcome) => outcome.averageScore !== null)
     .slice(0, 7)
     .map((outcome) => ({
@@ -187,7 +212,11 @@ export function ManagerOutcomeRiskChart({
     <Card className="overflow-hidden">
       <CardHeader>
         <CardTitle>Öncelikli kazanımlar</CardTitle>
-        <CardDescription>En düşük onaylı puandan başlayarak ilk yedi alan.</CardDescription>
+        <CardDescription>
+          {actionable.length > 0
+            ? "Yeterli kanıta sahip, eşik altındaki ilk yedi alan."
+            : "Kesin müdahale bulgusu yok; ölçülen en düşük yedi alan."}
+        </CardDescription>
       </CardHeader>
       <CardContent>
         {rows.length === 0 ? (

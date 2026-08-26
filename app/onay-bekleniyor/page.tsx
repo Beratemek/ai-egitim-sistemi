@@ -59,13 +59,13 @@ export default async function OnayBekleniyorPage() {
             {rejected ? (
               <>
                 <strong className="font-medium text-foreground">{wanted}</strong> rolu
-                için yaptığınız başvuru eğitim yöneticisi tarafından reddedildi.
+                için yaptığınız başvuru sistem yöneticisi tarafından reddedildi.
                 Farklı bir rol için yeniden başvurabilirsiniz.
               </>
             ) : (
               <>
                 <strong className="font-medium text-foreground">{wanted}</strong> rolu
-                için talebiniz eğitim yöneticisine iletildi. Onayladığında bu hesapla
+                için talebiniz sistem yöneticisine iletildi. Onayladığında bu hesapla
                 doğrudan panele girebileceksiniz.
               </>
             )}

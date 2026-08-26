@@ -10,11 +10,15 @@ import {
 } from "lucide-react";
 
 import { ManagerOutcomeRiskChart } from "@/components/shared/manager-analytics-charts";
+import { ManagerAnalyticsFilter } from "@/components/shared/manager-analytics-filter";
+import { ManagerDataQualityNotice } from "@/components/shared/manager-data-quality-notice";
+import { ManagerReportHeader } from "@/components/shared/manager-report-header";
 import {
   ManagerRiskBadge,
   ManagerScore,
 } from "@/components/shared/manager-status";
 import { PageHeader } from "@/components/shared/page-header";
+import { PrintReportButton } from "@/components/shared/print-report-button";
 import { StudentExamDataDelete } from "@/components/shared/student-exam-data-delete";
 import {
   StudentGrowthChart,
@@ -40,16 +44,26 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { getManagerAnalytics } from "@/lib/manager-data";
+import {
+  managerScopeFromSearchParams,
+  managerScopeQuery,
+  type ManagerAnalyticsSearchParams,
+} from "@/lib/manager-filters";
+import type { OutcomeEvidenceLevel } from "@/lib/outcome-diagnostics";
 
 export const metadata: Metadata = { title: "Öğrenci gelişimi" };
 
 export default async function ManagerStudentDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ studentId: string }>;
+  searchParams: Promise<ManagerAnalyticsSearchParams>;
 }) {
   const { studentId } = await params;
-  const analytics = await getManagerAnalytics({ studentId });
+  const scope = managerScopeFromSearchParams(await searchParams);
+  const query = managerScopeQuery(scope);
+  const analytics = await getManagerAnalytics({ ...scope, studentId });
   const student = analytics.students[0];
 
   if (!student) notFound();
@@ -72,15 +86,25 @@ export default async function ManagerStudentDetailPage({
   );
 
   return (
-    <>
+    <section className="manager-report space-y-4 sm:space-y-6 print:space-y-4">
+      <ManagerReportHeader
+        reportType="Öğrenci gelişim raporu"
+        entityName={student.name}
+        scope={scope}
+        masteryThreshold={analytics.masteryThreshold}
+        exams={analytics.filterOptions.exams}
+      />
+
       <PageHeader
         title={student.name}
         description={`${student.classroom} · Bireysel sınav, gelişim ve kazanım görünümü.`}
+        className="print:hidden"
         actions={
           <>
             <ManagerRiskBadge level={student.riskLevel} />
+            <PrintReportButton />
             <Button asChild variant="outline" size="sm">
-              <Link href="/dashboard/yonetici/ogrenciler">
+              <Link href={`/dashboard/yonetici/ogrenciler${query}`}>
                 <ArrowLeft />
                 Öğrenciler
               </Link>
@@ -89,7 +113,15 @@ export default async function ManagerStudentDetailPage({
         }
       />
 
-      <div className="grid grid-cols-2 gap-2.5 sm:gap-4 xl:grid-cols-4">
+      <ManagerAnalyticsFilter
+        basePath={`/dashboard/yonetici/ogrenciler/${studentId}`}
+        scope={scope}
+        options={analytics.filterOptions}
+      />
+
+      <ManagerDataQualityNotice overview={analytics.overview} />
+
+      <div className="manager-report-stats print-report-keep grid grid-cols-2 gap-2.5 sm:gap-4 xl:grid-cols-4">
         <StatCard
           label="Atanan sınav"
           value={student.assignedCount}
@@ -112,17 +144,19 @@ export default async function ManagerStudentDetailPage({
           accent="cat3"
         />
         <StatCard
-          label="Zayıf kazanım"
+          label="Destek alanı"
           value={student.weakOutcomeCount}
-          hint="Onaylı yanıtlara göre"
+          hint="Yeterli kanıta sahip sonuçlara göre"
           icon={AlertTriangle}
           accent="cat4"
         />
       </div>
 
-      <StudentGrowthChart points={growthPoints} />
+      <div className="print-report-keep">
+        <StudentGrowthChart points={growthPoints} />
+      </div>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,.95fr)]">
+      <div className="manager-report-insights print-report-keep grid gap-6 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,.95fr)]">
         <ManagerOutcomeRiskChart outcomes={analytics.outcomes} />
 
         <Card>
@@ -147,6 +181,17 @@ export default async function ManagerStudentDetailPage({
                         {outcome.subject} · {outcome.answerCount} onaylı
                         {outcome.pendingCount > 0 ? ` · ${outcome.pendingCount} bekliyor` : ""}
                       </p>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        <EvidenceBadge level={outcome.evidenceLevel} />
+                        {outcome.blankCount > 0 ? (
+                          <Badge variant="outline">{outcome.blankCount} boş</Badge>
+                        ) : null}
+                        {outcome.questions[0]?.wrongAnswers[0] ? (
+                          <Badge variant="danger">
+                            Sık hata: {outcome.questions[0].wrongAnswers[0].answer}
+                          </Badge>
+                        ) : null}
+                      </div>
                     </div>
                     <ManagerScore score={outcome.averageScore} />
                   </div>
@@ -158,7 +203,7 @@ export default async function ManagerStudentDetailPage({
         </Card>
       </div>
 
-      <Card>
+      <Card className="print-report-table">
         <CardHeader>
           <CardTitle>Sınav geçmişi</CardTitle>
           <CardDescription>
@@ -215,7 +260,7 @@ export default async function ManagerStudentDetailPage({
           </Table>
         </CardContent>
       </Card>
-    </>
+    </section>
   );
 }
 
@@ -231,4 +276,11 @@ function formatDate(value: string) {
     month: "short",
     year: "numeric",
   }).format(new Date(value));
+}
+
+function EvidenceBadge({ level }: { level: OutcomeEvidenceLevel }) {
+  if (level === "strong") return <Badge variant="success">Güçlü kanıt</Badge>;
+  if (level === "supported") return <Badge variant="soft">Destekli bulgu</Badge>;
+  if (level === "early") return <Badge variant="warning">Erken sinyal</Badge>;
+  return <Badge variant="outline">Ölçülmedi</Badge>;
 }

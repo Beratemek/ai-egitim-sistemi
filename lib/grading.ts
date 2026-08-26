@@ -10,6 +10,8 @@
 
 import { gradeAnswer } from "@/lib/ai";
 import type { GradingResult, Question, SubmissionStatus } from "@/lib/types";
+import { normalizeOptionKey } from "@/lib/answer-normalization";
+import { buildTestFeedback } from "@/lib/assessment-feedback";
 
 /** Puanlama icin gereken soru alanlari. */
 export type GradableQuestion = Pick<
@@ -31,12 +33,6 @@ export interface AutoGradeResult {
  * Turkce'ye ozel buyuk harf donusumu KULLANILMAZ; secenek anahtarlari A-D'dir ve
  * `toLocaleUpperCase("tr")` "i" harfini "I" yerine "İ" yapardi.
  */
-function normalizeOptionKey(value: string): string {
-  const trimmed = value.trim();
-  const leadingLetter = trimmed.match(/^[A-Za-z]/);
-  return (leadingLetter ? leadingLetter[0] : trimmed).toUpperCase();
-}
-
 /**
  * Ogrenci cevabina on puan uretir.
  *
@@ -53,9 +49,10 @@ export async function autoGrade(
 
     return {
       score: isCorrect ? 100 : 0,
-      feedback: isCorrect
-        ? "Doğru cevap."
-        : `Yanlış cevap. Doğru şık: ${correctKey}.`,
+      // Doğru seçenek öğrenciye sınav sonuçlanmadan önce geri bildirim alanı
+      // üzerinden sızmamalı. Anahtar yalnızca yetkili eğitmen görünümünde
+      // kalır; öğrenciye sonuç güvenlik sözleşmesinin izin verdiği bilgi gider.
+      feedback: buildTestFeedback(isCorrect),
       criteria: [],
       status: "ai_degerlendirildi",
     };

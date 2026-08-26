@@ -9,6 +9,7 @@ import {
   Loader2,
   Printer,
   Send,
+  ShieldCheck,
   Users,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -42,22 +43,30 @@ export interface ExamDetailTabsProps {
   totalPoints: number;
   /** Sinava atanmis toplam ogrenci sayisi; seritte ozet olarak gosterilir. */
   assignedCount: number;
+  qualityCanPublish: boolean;
+  qualityBlockerCount: number;
+  qualityWarningCount: number;
   canPersist?: boolean;
   /** Sekme icerikleri; sunucuda cizilip buraya gecirilir. */
   kurulum: React.ReactNode;
+  kalite: React.ReactNode;
   siniflar: React.ReactNode;
   kagit: React.ReactNode;
 }
 
-type Sekme = "kurulum" | "siniflar" | "kagit";
+type Sekme = "kurulum" | "kalite" | "siniflar" | "kagit";
 
 export function ExamDetailTabs({
   exam,
   questionCount,
   totalPoints,
   assignedCount,
+  qualityCanPublish,
+  qualityBlockerCount,
+  qualityWarningCount,
   canPersist = true,
   kurulum,
+  kalite,
   siniflar,
   kagit,
 }: ExamDetailTabsProps) {
@@ -66,7 +75,7 @@ export function ExamDetailTabs({
   const [pending, setPending] = React.useState(false);
 
   /** Sorusu olmayan sinav yayina alinamaz - kural sunucuda da var. */
-  const yayinaAlinabilir = questionCount > 0;
+  const yayinaAlinabilir = qualityCanPublish;
 
   async function yayiniDegistir(next: boolean) {
     if (!canPersist) {
@@ -79,6 +88,7 @@ export function ExamDetailTabs({
     setPending(false);
 
     if (!result.ok) {
+      if (next) setSekme("kalite");
       toast.error(next ? "Yayına alınamadı" : "Yayından çıkarılamadı", {
         description: result.error,
       });
@@ -152,7 +162,7 @@ export function ExamDetailTabs({
               disabled={pending || (!exam.is_published && !yayinaAlinabilir)}
               title={
                 !exam.is_published && !yayinaAlinabilir
-                  ? "Yayına almak için en az bir soru ekleyin"
+                  ? "Yayına almak için kalite kontrolündeki engelleri kapatın"
                   : undefined
               }
               onClick={() => void yayiniDegistir(!exam.is_published)}
@@ -175,15 +185,37 @@ export function ExamDetailTabs({
           gorunmez, yani tek basina yeterli bir aciklama degil.
         */}
         {!exam.is_published && !yayinaAlinabilir ? (
-          <p className="mt-2 text-xs text-muted-foreground">
-            Yayına almak için önce en az bir soru ekleyin.
-          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <span>
+              Yayına almadan önce {qualityBlockerCount} kalite engelini kapatın.
+            </span>
+            <button
+              type="button"
+              className="font-semibold text-primary underline-offset-4 hover:underline"
+              onClick={() => setSekme("kalite")}
+            >
+              Kalite kontrolünü aç
+            </button>
+          </div>
         ) : null}
 
         <TabsList className="mt-3 h-auto w-full justify-start overflow-x-auto p-1 sm:w-auto">
           <TabsTrigger value="kurulum" className="gap-1.5">
             <ClipboardList className="h-3.5 w-3.5" />
             Kurulum
+          </TabsTrigger>
+          <TabsTrigger value="kalite" className="gap-1.5">
+            <ShieldCheck className="h-3.5 w-3.5" />
+            Kalite Kontrolü
+            {qualityBlockerCount > 0 ? (
+              <span className="rounded-full bg-destructive/15 px-1.5 text-[10px] font-semibold text-destructive">
+                {qualityBlockerCount}
+              </span>
+            ) : qualityWarningCount > 0 ? (
+              <span className="rounded-full bg-warning/15 px-1.5 text-[10px] font-semibold text-warning">
+                {qualityWarningCount}
+              </span>
+            ) : null}
           </TabsTrigger>
           <TabsTrigger value="siniflar" className="gap-1.5">
             <Users className="h-3.5 w-3.5" />
@@ -198,6 +230,10 @@ export function ExamDetailTabs({
 
       <TabsContent value="kurulum" className="mt-0 space-y-4 sm:space-y-6">
         {kurulum}
+      </TabsContent>
+
+      <TabsContent value="kalite" className="mt-0">
+        {kalite}
       </TabsContent>
 
       <TabsContent value="siniflar" className="mt-0">

@@ -4,6 +4,7 @@ import Chart2 from "@solar-icons/react/ssr/business/Chart2";
 import ClipboardCheck from "@solar-icons/react/ssr/notes/ClipboardCheck";
 import DocumentText from "@solar-icons/react/ssr/notes/DocumentText";
 import SquareAcademicCap from "@solar-icons/react/ssr/school/SquareAcademicCap";
+import UserHeart from "@solar-icons/react/ssr/users/UserHeart";
 import Link from "next/link";
 import { ArrowRight, CheckCircle2 } from "lucide-react";
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
@@ -61,6 +62,18 @@ const ROLE_PREVIEWS: Record<PublicRole, RolePreview> = {
     bars: [42, 55, 61, 68, 73, 79, 86],
     status: "Fen Bilimleri sınavı bugün",
   },
+  veli: {
+    description: "Kendisine tanımlanan öğrencilerin sınav katılımını ve kazanım gelişimini güvenli özetlerle izler.",
+    eyebrow: "Öğrenci gelişim takibi",
+    headline: "Çocuğunuzun ilerlemesini, desteğe ihtiyaç duyduğu alanlarla birlikte görün.",
+    metrics: [
+      { label: "Tamamlanan", value: "07" },
+      { label: "Ortalama", value: "%82" },
+      { label: "Destek alanı", value: "02" },
+    ],
+    bars: [48, 56, 61, 70, 74, 80, 84],
+    status: "Son gelişim özeti hazır",
+  },
   egitim_yoneticisi: {
     description: "Sınıf, sınav ve kazanım verilerini karşılaştırarak eğitim sürecini izler.",
     eyebrow: "Kurum görünümü",
@@ -79,6 +92,7 @@ const ROLE_ICONS = {
   icerik_uzmani: DocumentText,
   egitmen: ClipboardCheck,
   ogrenci: SquareAcademicCap,
+  veli: UserHeart,
   egitim_yoneticisi: Chart2,
 } as const;
 

@@ -23,16 +23,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  MANAGER_WEAK_OUTCOME_SCORE,
-  type ManagerOutcomeSummary,
-} from "@/lib/manager-analytics";
+import type { ManagerOutcomeSummary } from "@/lib/manager-analytics";
+import type { OutcomeEvidenceLevel } from "@/lib/outcome-diagnostics";
 
-type OutcomeFilter = "all" | "weak" | "measured" | "unmeasured";
+type OutcomeFilter = "all" | "weak" | "early" | "measured" | "unmeasured";
 
 const FILTERS: Array<{ value: OutcomeFilter; label: string }> = [
   { value: "all", label: "Tümü" },
   { value: "weak", label: "Güçlendirilmeli" },
+  { value: "early", label: "Erken sinyal" },
   { value: "measured", label: "Ölçülen" },
   { value: "unmeasured", label: "Ölçülmeyen" },
 ];
@@ -56,9 +55,8 @@ export function ManagerOutcomeBrowser({
     return outcomes.filter((outcome) => {
       const matchesFilter =
         filter === "all" ||
-        (filter === "weak" &&
-          outcome.averageScore !== null &&
-          outcome.averageScore < MANAGER_WEAK_OUTCOME_SCORE) ||
+        (filter === "weak" && outcome.isActionableWeak) ||
+        (filter === "early" && outcome.evidenceLevel === "early") ||
         (filter === "measured" && outcome.averageScore !== null) ||
         (filter === "unmeasured" && outcome.averageScore === null);
       const matchesSubject = subject === "all" || outcome.subject === subject;
@@ -117,6 +115,7 @@ export function ManagerOutcomeBrowser({
               <TableHead>Kazanım</TableHead>
               <TableHead>Ders / konu</TableHead>
               <TableHead className="text-right">Başarı</TableHead>
+              <TableHead>Kanıt düzeyi</TableHead>
               <TableHead className="text-right">Onaylı yanıt</TableHead>
               <TableHead className="text-right">Öğrenci / sınıf</TableHead>
               <TableHead className="text-right">Bekleyen</TableHead>
@@ -125,7 +124,7 @@ export function ManagerOutcomeBrowser({
           <TableBody>
             {visible.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="h-44 text-center">
+                <TableCell colSpan={7} className="h-44 text-center">
                   <span className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
                     <Target className="h-5 w-5" />
                   </span>
@@ -138,7 +137,9 @@ export function ManagerOutcomeBrowser({
                 <TableRow key={outcome.outcomeId}>
                   <TableCell className="min-w-72 max-w-xl">
                     <p className="line-clamp-2 font-medium leading-snug">{outcome.outcomeText}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">{outcome.questionCount} soru ile eşleşiyor</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {outcome.measuredQuestionCount} ölçülen · {outcome.linkedQuestionCount} sınava bağlı · {outcome.questionCount} havuzda
+                    </p>
                   </TableCell>
                   <TableCell className="min-w-40">
                     <p className="text-sm">{outcome.subject}</p>
@@ -147,6 +148,9 @@ export function ManagerOutcomeBrowser({
                   <TableCell className="min-w-36 text-right">
                     <ManagerScore score={outcome.averageScore} />
                     <Progress value={outcome.averageScore ?? 0} className="mt-2 ml-auto h-1 w-28" />
+                  </TableCell>
+                  <TableCell>
+                    <EvidenceBadge level={outcome.evidenceLevel} />
                   </TableCell>
                   <TableCell className="text-right tabular-nums">{outcome.answerCount}</TableCell>
                   <TableCell className="text-right tabular-nums">
@@ -171,4 +175,11 @@ export function ManagerOutcomeBrowser({
       </p>
     </div>
   );
+}
+
+function EvidenceBadge({ level }: { level: OutcomeEvidenceLevel }) {
+  if (level === "strong") return <Badge variant="success">Güçlü kanıt</Badge>;
+  if (level === "supported") return <Badge variant="soft">Destekli bulgu</Badge>;
+  if (level === "early") return <Badge variant="warning">Erken sinyal</Badge>;
+  return <Badge variant="outline">Ölçülmedi</Badge>;
 }

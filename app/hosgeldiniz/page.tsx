@@ -5,6 +5,7 @@ import { BookshelfBackdrop } from "@/components/shared/bookshelf-backdrop";
 import { BrandMark } from "@/components/shared/brand-mark";
 import { RoleOnboarding } from "@/components/shared/role-onboarding";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
+import { dashboardPathFor } from "@/lib/roles";
 import { getCurrentUser } from "@/lib/supabase-server";
 
 export const metadata: Metadata = { title: "Hoş Geldiniz" };
@@ -19,6 +20,12 @@ export const metadata: Metadata = { title: "Hoş Geldiniz" };
 export default async function HosGeldinizPage() {
   const current = await getCurrentUser();
   if (!current) redirect("/login");
+  if (current.profile.role_status === "onayli") {
+    redirect(dashboardPathFor(current.profile.role));
+  }
+  if (current.profile.role_status === "beklemede") {
+    redirect("/onay-bekleniyor");
+  }
 
   return (
     <main className="bg-study relative flex min-h-screen flex-col overflow-hidden bg-background">

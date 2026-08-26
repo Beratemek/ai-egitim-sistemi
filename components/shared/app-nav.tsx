@@ -7,12 +7,15 @@ import {
   BookOpen,
   ClipboardCheck,
   ClipboardList,
+  ChartNoAxesColumnIncreasing,
   GraduationCap,
+  HeartHandshake,
   LayoutDashboard,
   Library,
   ListChecks,
   ListTodo,
   MessageSquareText,
+  NotebookPen,
   School,
   Target,
   TrendingUp,
@@ -81,6 +84,12 @@ const BASE_NAV = {
       icon: MessageSquareText,
       description: "Anonim öğrenci deneyimi özeti",
     },
+    {
+      href: "/dashboard/egitmen/soru-analizi",
+      label: "Soru Analizi",
+      icon: ChartNoAxesColumnIncreasing,
+      description: "Başarı, çeldirici ve ayırt edicilik",
+    },
   ],
   ogrenci: [
     {
@@ -96,6 +105,12 @@ const BASE_NAV = {
       description: "Onaylanan puan ve geri bildirimler",
     },
     {
+      href: "/dashboard/ogrenci/yanlislarim",
+      label: "Yanlışlarım Defteri",
+      icon: NotebookPen,
+      description: "Yanlışlarını incele ve yeniden çalış",
+    },
+    {
       href: "/dashboard/ogrenci/gelisim",
       label: "Gelişimim",
       icon: TrendingUp,
@@ -106,6 +121,14 @@ const BASE_NAV = {
       label: "Çalışma Planım",
       icon: ListTodo,
       description: "Kazanımlarını planla ve tamamla",
+    },
+  ],
+  veli: [
+    {
+      href: "/dashboard/veli",
+      label: "Çocuklarım",
+      icon: HeartHandshake,
+      description: "Sınav ve kazanım gelişimini izle",
     },
   ],
   egitim_yoneticisi: [

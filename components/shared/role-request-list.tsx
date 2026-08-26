@@ -14,7 +14,7 @@ import type { UserProfile } from "@/lib/types";
 import { formatDateTime } from "@/lib/utils";
 
 /**
- * Eğitim yoneticisinin rol onay kuyrugu.
+ * Sistem yöneticisinin rol onay kuyruğu.
  *
  * Karar veritabanındaki `review_role_request` fonksiyonuna gider; orada rol
  * yeniden dogrulanir, yani bu ekrani atlayip doğrudan istek atmak da ise
@@ -59,8 +59,7 @@ export function RoleRequestList({ requests }: RoleRequestListProps) {
         <ShieldCheck className="h-8 w-8 text-muted-foreground/50" />
         <p className="font-medium">Bekleyen rol talebi yok</p>
         <p className="max-w-sm text-sm text-muted-foreground">
-          Öğrenci disinda bir rol secen her yeni kullanıcı burada onayınızı
-          bekler.
+          Yeni kullanıcıların seçtiği roller burada onayınızı bekler.
         </p>
       </div>
     );

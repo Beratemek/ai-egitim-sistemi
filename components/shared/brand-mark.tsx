@@ -17,44 +17,75 @@ type BrandMarkProps = {
 /**
  * İzometri marka sembolü.
  *
- * Dört dış kol sistemdeki dört çalışma alanını, ortadaki düşey eksen ortak
- * ölçüm dilini temsil eder. Üstteki nokta hem Türkçe “İ” harfini tamamlar
- * hem de öğrenmenin görünür hâle geldiği ölçüm noktasını oluşturur.
+ * KAVRAM - DÖNME. Matematikte izometri, uzaklığı koruyan dönüşümlerdir: dönme,
+ * yansıma, öteleme. İşaret bunlardan dönmeyi kendi üzerinde gösteriyor: tek bir
+ * kare, merkez etrafında 120° aralıklarla üç kez yerleştirilmiş. Yani üç ayrı
+ * şekil değil, AYNI şeklin üç konumu - üçüncü dereceden dönme simetrisi.
+ * Markanın adı ne diyorsa biçim onu yapıyor.
+ *
+ * ÖLÇÜLER TARAYICIDA HESAPLANDI, göz kararı değil. `getBBox()` ile ölçülen
+ * gerçek sınır kutusu 75.37 x 66.02 idi - yani 72'lik tuvali YATAYDA AŞIYORDU
+ * ve kareler sağ/sol kenardan kırpılıyordu. Gelen dosyadaki `scale(0.84)`
+ * yetmiyordu; doğru değer 0.8215 ve merkeze oturtan öteleme (6.42, 6.79).
+ *
+ * `stroke-width` 5.6 yerine 6.82: ölçek küçültüldüğü için çizgi de küçülüyordu,
+ * telafi edilmeseydi işaret 16 pikselde sararıp kaybolacaktı. 6.82 x 0.8215
+ * ekranda yine 5.6 eder.
+ *
+ * SINIRI BILEREK YAZIYORUM: bu işaret detay yüklü - üç iç içe geçmiş KONTUR
+ * kare. 32 piksel ve üstünde iyi okunuyor, 16 pikselde (tarayıcı sekmesi)
+ * ayrıntı kayboluyor ve tek bir leke gibi duruyor. Favicon için sadeleşmiş bir
+ * varyant (tek kare, ya da kontur yerine dolu) gerekirse burası değiştirilecek
+ * yerdir.
+ *
+ * KAP İŞARETİN PARÇASI, süs değil: tek renk ve kontur bir çizim zeminsiz
+ * kullanıldığında kayboluyor. Kap ayrıca favicon, avatar ve uygulama simgesi
+ * gibi KARE alanlara doğal oturuyor.
+ *
+ * `inverse` koyu/renkli zeminler için ters kilit verir (krem kap, zümrüt
+ * işaret) - zümrüt kap koyu yeşil bir zeminin üstünde eriyordu.
+ *
+ * KONTRAST ölçüldü: kâğıt işaret / zümrüt kap = 5.14:1, grafik öğeleri için
+ * gereken 3:1 sınırının rahat üstünde.
  */
 export function BrandSymbol({ className, inverse = false }: BrandSymbolProps) {
+  const kap = inverse ? "#FDFAF2" : "#177866";
+  const isaret = inverse ? "#177866" : "#FDFAF2";
+
   return (
     <svg
       aria-hidden
       className={cn("shrink-0", className)}
-      viewBox="0 0 40 40"
+      viewBox="0 0 72 72"
       xmlns="http://www.w3.org/2000/svg"
     >
-      <rect
-        className={inverse ? "fill-primary-foreground/15 stroke-primary-foreground/25" : "fill-primary stroke-primary/20"}
-        height="36"
-        rx="10"
-        strokeWidth="1"
-        width="36"
-        x="2"
-        y="2"
-      />
+      <rect width="72" height="72" rx="16" fill={kap} />
       <g
-        className="stroke-primary-foreground"
+        transform="translate(6.42 6.79) scale(0.8215)"
         fill="none"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="2.15"
+        stroke={isaret}
+        strokeWidth="6.82"
+        strokeLinejoin="miter"
       >
-        <path d="m10 12 10-4.5L30 12l-10 4.5L10 12Z" />
-        <path d="m10 28 10-4.5L30 28l-10 4.5L10 28Z" />
-        <path d="M20 16.5v7" />
+        {/*
+          TEK kare, uc konum. Ayni `<rect>` tanimi 0/120/240 derece
+          dondurulerek tekrarlaniyor - kod da fikri tekrarliyor: bir sekil ve
+          onun donmeleri. Karenin kendi 20 derecelik egimi, uclusun pervane
+          gibi durmasini sagliyor; egim olmasa uc kare ust uste binip tek bir
+          yildiza donusuyordu.
+        */}
+        {[0, 120, 240].map((aci) => (
+          <g key={aci} transform={`rotate(${aci} 36 36)`}>
+            <rect
+              x="23"
+              y="9"
+              width="26"
+              height="26"
+              transform="rotate(20 36 22)"
+            />
+          </g>
+        ))}
       </g>
-      <circle
-        className={inverse ? "fill-primary-foreground" : "fill-highlight"}
-        cx="20"
-        cy="4.8"
-        r="1.7"
-      />
     </svg>
   );
 }

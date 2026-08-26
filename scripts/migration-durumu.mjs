@@ -92,6 +92,29 @@ const ADIMLAR = [
   // kaybolur - sessiz ve bulunmasi zor bir hata.
   ["gorsel-ve-grafik", gorselKontrolu],
   ["varsayilan-rol", varsayilanRolKontrolu],
+  // Sinav yapisi kilidi. Ogrenci sinava basladiktan sonra soru/sira/puan
+  // yapisinin degistirilememesi bu fonksiyona bagli; yoksa kilit hic yok
+  // demektir ve raporlanan sonuc ogrencinin gordugu sinavdan sapabilir.
+  [
+    "sinav-yapisi-kilidi",
+    () => fonksiyon("is_exam_structure_locked", { target_exam: BOS_ID }),
+  ],
+  // Veli baglantilari. DORT iz birlikte: tablo eklenip RPC'ler eklenmezse
+  // veli paneli acilir ama hicbir veri gelmez; RPC'ler olup tablo olmazsa
+  // atama hic kurulamaz. Ikisi ayri migration dosyasinda oldugu icin
+  // yarim uygulanma gercek bir olasilik.
+  [
+    "veli-baglantilari",
+    async () =>
+      (await sutun("guardian_student_links", "student_id")) &&
+      (await fonksiyon("get_guardian_students")) &&
+      (await fonksiyon("get_guardian_student_exams", {
+        target_student: BOS_ID,
+      })) &&
+      (await fonksiyon("get_guardian_student_outcomes", {
+        target_student: BOS_ID,
+      })),
+  ],
   // Sinav arsivi. UC iz birlikte: sutun eklenip fonksiyonlar eklenmezse
   // egitmen sinavi listeden kaldirabilir ama kalici silemez, yonetici de
   // ogrenci verisi silemez - yarim uygulanmis bir migration.

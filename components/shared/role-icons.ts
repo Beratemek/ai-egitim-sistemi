@@ -12,6 +12,7 @@ import {
   ClipboardCheck,
   FileQuestion,
   GraduationCap,
+  HeartHandshake,
   ShieldCheck,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -22,6 +23,7 @@ export const ROLE_ICONS: Record<UserRole, LucideIcon> = {
   icerik_uzmani: FileQuestion,
   egitmen: ClipboardCheck,
   ogrenci: GraduationCap,
+  veli: HeartHandshake,
   egitim_yoneticisi: BarChart3,
   admin: ShieldCheck,
 };
