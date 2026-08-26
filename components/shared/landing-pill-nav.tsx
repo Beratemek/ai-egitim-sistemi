@@ -115,12 +115,21 @@ export function LandingPillNav() {
             >
               Kayıt Ol
             </Link>
+            {/*
+              Etiket bilerek "Giriş Yap": "Çalışma alanını aç" ziyaretçiye giriş
+              noktasi gibi okunmuyordu - ana sayfadaki TEK giris baglantisi bu.
+              Hedef /dashboard degil /login?mode=giris: /dashboard yalnizca
+              middleware yonlendirmesiyle giris ekranina dusuyordu, bu yol ise
+              formu dogrudan giris kipinde acar. Oturum zaten aciksa middleware
+              (bkz. middleware.ts, "Oturum acikken /login") kullaniciyi kendi
+              paneline gonderir; buton her iki durumda da dogru yere gider.
+            */}
             <Link
-              href="/dashboard"
+              href="/login?mode=giris"
               className={cn(buttonVariants(), "specular-cta h-10 rounded-full px-4 sm:px-5")}
             >
               <span className="sm:hidden">Giriş</span>
-              <span className="hidden sm:inline">Çalışma alanını aç</span>
+              <span className="hidden sm:inline">Giriş Yap</span>
               <ArrowRight />
             </Link>
           </div>

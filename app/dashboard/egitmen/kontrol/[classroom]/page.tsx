@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
+  Archive,
   ArrowLeft,
   ArrowRight,
   BookMarked,
@@ -9,6 +10,7 @@ import {
   Users,
 } from "lucide-react";
 
+import { ExamPurgeButton } from "@/components/shared/exam-purge-button";
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
@@ -95,12 +97,15 @@ export default async function DerslikPage({ params }: PageProps) {
               ? Math.round((review.submittedCount / review.assignedCount) * 100)
               : 0;
 
+          /*
+            Kart bastan sona bir <Link>'ti; kalici silme dugmesi eklenince bu
+            gecersiz HTML olurdu (<a> icinde <button>). Baglanti karti ORTUYEN
+            bir katmana alindi, dugme z-10 ile onun ustunde durur.
+          */
+          const arsivli = Boolean(review.exam.archived_at);
+
           return (
-            <Link
-              key={review.exam.id}
-              href={href}
-              className="group rounded-xl focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            >
+            <div key={review.exam.id} className="group relative">
               <Card className="h-full transition-colors group-hover:border-primary/50 group-hover:bg-accent/30">
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between gap-2">
@@ -108,16 +113,36 @@ export default async function DerslikPage({ params }: PageProps) {
                       {review.exam.title}
                     </CardTitle>
 
-                    {review.pendingCount > 0 ? (
-                      <Badge variant="warning" className="shrink-0">
-                        {review.pendingCount} bekliyor
-                      </Badge>
-                    ) : (
-                      <Badge variant="success" className="shrink-0">
-                        Onaylı
-                      </Badge>
-                    )}
+                    <div className="flex shrink-0 items-center gap-1">
+                      {review.pendingCount > 0 ? (
+                        <Badge variant="warning">
+                          {review.pendingCount} bekliyor
+                        </Badge>
+                      ) : (
+                        <Badge variant="success">Onaylı</Badge>
+                      )}
+
+                      <ExamPurgeButton
+                        examId={review.exam.id}
+                        examTitle={review.exam.title}
+                        archived={arsivli}
+                        submittedCount={review.submittedCount}
+                      />
+                    </div>
                   </div>
+
+                  {/*
+                    Arsiv rozeti: bu sinav egitmenin kendi listesinde artik
+                    gorunmuyor. Rozet olmasaydi egitmen sildigini sandigi bir
+                    sinavi burada gorup silmenin calismadigini dusunurdu.
+                  */}
+                  {arsivli ? (
+                    <span className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <Archive className="h-3 w-3" />
+                      Arşivde — sınav listenizden kaldırıldı, cevaplar burada
+                      duruyor
+                    </span>
+                  ) : null}
 
                   {review.exam.subject ? (
                     <span className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -157,7 +182,16 @@ export default async function DerslikPage({ params }: PageProps) {
                   </span>
                 </CardContent>
               </Card>
-            </Link>
+
+              <Link
+                href={href}
+                className="absolute inset-0 rounded-xl focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                <span className="sr-only">
+                  {review.exam.title} sınavını değerlendir
+                </span>
+              </Link>
+            </div>
           );
         })}
       </div>

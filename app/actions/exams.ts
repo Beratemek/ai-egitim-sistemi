@@ -723,3 +723,169 @@ export async function createExamWithQuestions(
   revalidateExamPaths(exam.id);
   return { ok: true, data: { id: exam.id, added: added.data.added } };
 }
+
+/* -------------------------------------------------------------------------- */
+/*  Arsivleme ve silme                                                       */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Sinavin ogrenci verisi var mi? (deneme ya da cevap)
+ *
+ * Silme davranisini bu belirler: veri yoksa korunacak bir sey de yoktur ve
+ * sinav dogrudan yok edilir; varsa arsivlenir.
+ */
+async function hasStudentData(
+  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
+  examId: string,
+): Promise<boolean> {
+  const [attempts, submissions] = await Promise.all([
+    supabase
+      .from("exam_attempts")
+      .select("exam_id", { count: "exact", head: true })
+      .eq("exam_id", examId),
+    supabase
+      .from("submissions")
+      .select("exam_id", { count: "exact", head: true })
+      .eq("exam_id", examId),
+  ]);
+
+  return (attempts.count ?? 0) > 0 || (submissions.count ?? 0) > 0;
+}
+
+export interface DeleteExamResult {
+  /** Sinav gercekten yok edildi mi, yoksa arsivlendi mi? */
+  outcome: "silindi" | "arsivlendi";
+}
+
+/**
+ * Egitmenin "Sil" dugmesi.
+ *
+ * Sinav COZULMUSSE yok edilmez, ARSIVLENIR: egitmenin listesinden cikar ama
+ * kontrol sayfasi, yonetici raporlari ve ogrencinin kendi sonuc ekrani onu
+ * gormeye devam eder. Sinav biriktikce listeyi toparlamak isteyen egitmen,
+ * bunu yaparken ogrencinin karnesini silmis olmaz.
+ *
+ * Hic cozulmemis sinavda korunacak veri yoktur; o dogrudan silinir, yoksa
+ * kontrol sayfasi hic girilmemis bos sinavlarla dolardi.
+ */
+export async function deleteExam(
+  examId: string,
+): Promise<ActionResult<DeleteExamResult>> {
+  if (!isSupabaseConfigured) return demoGuard();
+  if (!examId) return { ok: false, error: "Sinav id'si zorunludur." };
+
+  const supabase = await createServerSupabaseClient();
+
+  if (await hasStudentData(supabase, examId)) {
+    const { data: updated, error } = await supabase
+      .from("exams")
+      .update({ archived_at: new Date().toISOString() })
+      .eq("id", examId)
+      .select("id");
+
+    if (error) return { ok: false, error: error.message };
+
+    // RLS eslesmezse PostgREST hata dondurmez, sessizce 0 satir gunceller.
+    if (!updated || updated.length === 0) {
+      return {
+        ok: false,
+        error:
+          "Sinav arsivlenemedi: bu sinav uzerinde yetkiniz yok ya da sinav artik mevcut degil.",
+      };
+    }
+
+    revalidateExamPaths(examId);
+    revalidatePath("/dashboard/egitmen/kontrol");
+    return { ok: true, data: { outcome: "arsivlendi" } };
+  }
+
+  return deleteExamPermanently(examId);
+}
+
+/** Arsivden geri alir; sinav yeniden egitmenin listesinde gorunur. */
+export async function unarchiveExam(examId: string): Promise<ActionResult> {
+  if (!isSupabaseConfigured) return demoGuard();
+  if (!examId) return { ok: false, error: "Sinav id'si zorunludur." };
+
+  const supabase = await createServerSupabaseClient();
+  const { data: updated, error } = await supabase
+    .from("exams")
+    .update({ archived_at: null })
+    .eq("id", examId)
+    .select("id");
+
+  if (error) return { ok: false, error: error.message };
+  if (!updated || updated.length === 0) {
+    return { ok: false, error: "Sinav geri alinamadi: yetkiniz yok." };
+  }
+
+  revalidateExamPaths(examId);
+  revalidatePath("/dashboard/egitmen/kontrol");
+  return { ok: true, data: undefined };
+}
+
+/**
+ * Sinavi ve TUM cevaplarini kalici siler. Geri alinamaz.
+ *
+ * Dogrudan `delete` KULLANILMAZ: `exams` uzerindeki koruma tetikleyicisi,
+ * sinava baslanmis ya da cevap yazilmissa silmeyi reddediyor. Fonksiyon cocuk
+ * kayitlari once temizleyip sinavi oyle siler (bkz. uygulandi/2026-08-26-sinav-arsivi.sql).
+ */
+export async function deleteExamPermanently(
+  examId: string,
+): Promise<ActionResult<DeleteExamResult>> {
+  if (!isSupabaseConfigured) return demoGuard();
+  if (!examId) return { ok: false, error: "Sinav id'si zorunludur." };
+
+  const supabase = await createServerSupabaseClient();
+  const { error } = await supabase.rpc("delete_exam_permanently", {
+    target_exam: examId,
+  });
+
+  if (error) return { ok: false, error: migrationNotu(error.message) };
+
+  revalidateExamPaths(examId);
+  revalidatePath("/dashboard/egitmen/kontrol");
+  return { ok: true, data: { outcome: "silindi" } };
+}
+
+/**
+ * Egitim yoneticisi: TEK ogrencinin TEK sinavdaki verisini siler.
+ *
+ * Sinavin kendisi ve diger ogrencilerin verisi durur. Cevaplarla birlikte
+ * deneme kaydi da gider; ogrenci o sinava hic girmemis sayilir ve sinif
+ * istatistiklerinden duser.
+ */
+export async function deleteStudentExamData(
+  examId: string,
+  studentId: string,
+): Promise<ActionResult> {
+  if (!isSupabaseConfigured) return demoGuard();
+  if (!examId || !studentId) {
+    return { ok: false, error: "Sinav ve ogrenci id'si zorunludur." };
+  }
+
+  const supabase = await createServerSupabaseClient();
+  const { error } = await supabase.rpc("delete_student_exam_data", {
+    target_exam: examId,
+    target_student: studentId,
+  });
+
+  if (error) return { ok: false, error: migrationNotu(error.message) };
+
+  revalidateExamPaths(examId);
+  revalidatePath("/dashboard/egitmen/kontrol");
+  revalidatePath("/dashboard/yonetici");
+  return { ok: true, data: undefined };
+}
+
+/**
+ * Migration uygulanmadiysa PostgREST "fonksiyon bulunamadi" der; bu mesaj
+ * egitmene hicbir sey anlatmaz. Ne yapmasi gerektigini soyleyelim.
+ */
+function migrationNotu(message: string): string {
+  if (message.includes("PGRST202") || message.includes("Could not find the function")) {
+    return "Bu ozellik icin veritabani guncellemesi bekliyor: supabase/migrations/uygulandi/2026-08-26-sinav-arsivi.sql dosyasini SQL Editor'de calistirin.";
+  }
+  return message;
+}

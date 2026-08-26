@@ -42,18 +42,30 @@ export default async function DashboardLayout({
   const requestHeaders = await headers();
   const pathRole = roleForPath(requestHeaders.get("x-pathname") ?? "/dashboard");
 
+  /**
+   * Kullanicinin guvenle acabilecegi rol.
+   *
+   * `profile.role` TEK BASINA kullanilamaz: kumeden cikarilmis ya da
+   * `grantedRoles` tarafindan elenmis (arayuzde karsiligi olmayan) bir rol
+   * olabilir. Boyle bir rol DashboardShell'e gecerse ROLE_DEFINITIONS'ta
+   * aranirken `undefined` doner ve panel acilmadan coker.
+   */
+  const safeRole = granted.includes(current.profile.role)
+    ? current.profile.role
+    : granted[0];
+
   // Middleware ana korumadir; layout da ayni kurali uygular. Boylece istemci
   // gecisi, onbellek veya middleware yapilandirma hatasi baska rolun sayfa
   // icerigini mevcut kullanicinin adi altinda render edemez.
   if (pathRole && !granted.includes(pathRole)) {
-    const safeRole = granted.includes(current.profile.role)
-      ? current.profile.role
-      : granted[0];
     redirect(safeRole ? dashboardPathFor(safeRole) : "/login");
   }
 
+  // Verilmis tek bir gecerli rol bile yoksa gosterilecek panel de yok.
+  if (!safeRole) redirect("/login");
+
   const activeRole: UserRole =
-    pathRole && granted.includes(pathRole) ? pathRole : current.profile.role;
+    pathRole && granted.includes(pathRole) ? pathRole : safeRole;
 
   return (
     <DashboardShell

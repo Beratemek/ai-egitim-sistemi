@@ -83,6 +83,21 @@ export type QuestionOption = {
   key: string; // "A" | "B" | "C" | "D"
   text: string;
   /**
+   * Ogrenciye GOSTERILEN harf.
+   *
+   * Yalnizca kitapcik karistirmasindan gecmis siklarda dolar (bkz.
+   * lib/booklet.ts): siklarin ICERIGI yer degistirir ama ekrandaki harfler
+   * A, B, C, D sirasinda kalir. Bos ise `key` gosterilir - egitmenin
+   * inceleme ekraninda karistirma yoktur.
+   *
+   * Cevap olarak her zaman `key` gonderilir. Kayit boylece sorunun KENDI
+   * koordinatlarinda kalir; puanlama, inceleme ve istatistikler kitapcigi
+   * bilmek zorunda olmaz. Ekrandaki harf kaydedilseydi cevabi okuyan her
+   * yerin onu geri cevirmesi gerekirdi ve bir tanesi unutuldugunda ogrenci
+   * sessizce yanlis puan alirdi.
+   */
+  label?: string;
+  /**
    * Sikkin kendi gorseli.
    *
    * "Soru sozel, siklar gorsel olabilir" durumunu karsilar: soru metni
@@ -216,6 +231,17 @@ export type Exam = {
   starts_at: string | null;
   ends_at: string | null;
   created_at: string;
+  /**
+   * Sinav arsivlendiyse dolu.
+   *
+   * Egitmen "sil" dediginde sinav yok edilmez, arsivlenir: kendi listesinden
+   * cikar ama kontrol sayfasi, yonetici raporlari ve ogrencinin sonuc ekrani
+   * onu gormeye devam eder (bkz. uygulandi/2026-08-26-sinav-arsivi.sql).
+   *
+   * OPSIYONEL cunku sutun o migration ile geliyor; uygulanmamis bir
+   * kurulumda PostgREST bu alani hic dondurmez ve `undefined` kalir.
+   */
+  archived_at?: string | null;
 };
 
 export type ExamQuestion = {
@@ -240,6 +266,17 @@ export type ExamAssignment = {
   assigned_by: string | null;
   assigned_at: string;
   due_at: string | null;
+  /**
+   * Ogrencinin kitapcigi: A, B, C veya D.
+   *
+   * Soru ve sik sirasi bundan TURETILIR (bkz. lib/booklet.ts), saklanan tek
+   * sey harftir. Ogrenciye GOSTERILMEZ; yalnizca sunucu karistirmayi
+   * hesaplarken ve egitmen kontrol ekraninda kullanir.
+   *
+   * OPSIYONEL cunku sutun uygulandi/2026-08-26-kitapcik.sql ile geliyor; uygulanmamis
+   * bir kurulumda alan hic donmez ve karistirma devreye girmez.
+   */
+  booklet?: string | null;
 };
 
 /** Sistem yöneticisinin kurduğu tek veli -> çok öğrenci bağlantısı. */
@@ -632,6 +669,7 @@ export interface Database {
           | "proctored"
           | "duration_minutes"
           | "points_auto"
+          | "archived_at"
         >
       >;
       exam_questions: TableDefinition<
@@ -759,6 +797,16 @@ export interface Database {
       reset_exam_points: {
         Args: { target_exam: string };
         Returns: number;
+      };
+      // Sinav arsivi (uygulandi/2026-08-26-sinav-arsivi.sql). Ikisi de `security
+      // definer`: yetkiyi kendi govdesinde kontrol eder.
+      delete_exam_permanently: {
+        Args: { target_exam: string };
+        Returns: null;
+      };
+      delete_student_exam_data: {
+        Args: { target_exam: string; target_student: string };
+        Returns: null;
       };
       exam_attempt_deadline: {
         Args: { target_exam: string; target_student: string };

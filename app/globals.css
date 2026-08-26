@@ -1827,3 +1827,88 @@
     }
   }
 }
+
+/* --------------------------------------------------------------------------
+ * Tarayicinin kendi ciziminin gizlendigi yerler
+ *
+ * Sayi kutusunun cevirme oklari, datalist'in acilir oku ve kaydirma cubugu
+ * her tarayicida ve her isletim sisteminde baska turlu ciziliyor. Windows'ta
+ * kaydirma cubugu ustunde ve altinda birer ok dugmesiyle geliyor; panelin
+ * geri kalani yumusak kenarli ve jetonlanmis renklerdeyken bu, uzerine
+ * yapistirilmis bir parca gibi duruyordu.
+ *
+ * Islev korunuyor - yalnizca gorunum tasarim diline cekiliyor.
+ * ------------------------------------------------------------------------ */
+
+@layer utilities {
+  /*
+   * Sayi kutusunun cevirme oklari (spin button).
+   *
+   * `appearance: textfield` Firefox'u, `::-webkit-*-spin-button` ise
+   * Chrome/Edge/Safari'yi susturur. Deger yazarak girilir; artirma/azaltma
+   * gerekiyorsa yaninda tasarim sistemindeki dugmeler kullanilir
+   * (bkz. components/shared/submission-review-dialog.tsx).
+   */
+  .sayi-oksuz {
+    appearance: textfield;
+    -moz-appearance: textfield;
+  }
+
+  .sayi-oksuz::-webkit-outer-spin-button,
+  .sayi-oksuz::-webkit-inner-spin-button {
+    appearance: none;
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  /*
+   * `<input list>` kutusunun acilir oku.
+   *
+   * Tarayici bunu "takvim secici gostergesi" olarak ciziyor ve boyutu,
+   * rengi, konumu denetlenemiyor. Gizlenip yerine kutunun icine kendi
+   * chevron ikonumuz konuyor (yani bu sinif TEK BASINA kullanilmaz).
+   */
+  .liste-oksuz::-webkit-calendar-picker-indicator {
+    display: none !important;
+  }
+
+  /*
+   * Ince kaydirma cubugu.
+   *
+   * Firefox `scrollbar-width/color` ile, WebKit tabanlilar ::-webkit-scrollbar
+   * ile. Ok dugmeleri (`::-webkit-scrollbar-button`) tamamen kaldiriliyor;
+   * asagi kaydirmanin yolu zaten tekerlek, surukleme ve klavye.
+   */
+  .kaydirma-ince {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border)) transparent;
+  }
+
+  .kaydirma-ince::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .kaydirma-ince::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .kaydirma-ince::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--border));
+    border-radius: 9999px;
+    /* Kenardan bir tik iceride dursun: cubuk kutunun kenarina yapismasin. */
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+
+  .kaydirma-ince::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--muted-foreground) / 0.5);
+    background-clip: content-box;
+  }
+
+  .kaydirma-ince::-webkit-scrollbar-button {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+}

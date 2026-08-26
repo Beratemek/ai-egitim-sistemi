@@ -92,10 +92,17 @@ const ADIMLAR = [
   // kaybolur - sessiz ve bulunmasi zor bir hata.
   ["gorsel-ve-grafik", gorselKontrolu],
   ["varsayilan-rol", varsayilanRolKontrolu],
+  // Sinav yapisi kilidi. Ogrenci sinava basladiktan sonra soru/sira/puan
+  // yapisinin degistirilememesi bu fonksiyona bagli; yoksa kilit hic yok
+  // demektir ve raporlanan sonuc ogrencinin gordugu sinavdan sapabilir.
   [
     "sinav-yapisi-kilidi",
     () => fonksiyon("is_exam_structure_locked", { target_exam: BOS_ID }),
   ],
+  // Veli baglantilari. DORT iz birlikte: tablo eklenip RPC'ler eklenmezse
+  // veli paneli acilir ama hicbir veri gelmez; RPC'ler olup tablo olmazsa
+  // atama hic kurulamaz. Ikisi ayri migration dosyasinda oldugu icin
+  // yarim uygulanma gercek bir olasilik.
   [
     "veli-baglantilari",
     async () =>
@@ -108,6 +115,25 @@ const ADIMLAR = [
         target_student: BOS_ID,
       })),
   ],
+  // Sinav arsivi. UC iz birlikte: sutun eklenip fonksiyonlar eklenmezse
+  // egitmen sinavi listeden kaldirabilir ama kalici silemez, yonetici de
+  // ogrenci verisi silemez - yarim uygulanmis bir migration.
+  [
+    "sinav-arsivi",
+    async () =>
+      (await sutun("exams", "archived_at")) &&
+      (await fonksiyon("delete_exam_permanently", { target_exam: BOS_ID })) &&
+      (await fonksiyon("delete_student_exam_data", {
+        target_exam: BOS_ID,
+        target_student: BOS_ID,
+      })),
+  ],
+  // Kitapcik. Sutun tek basina yetmez: dagitimi TETIKLEYICI yapiyor ve o
+  // olmadan her ogrenci harfsiz kalir, yani sinav hic karismaz.
+  ["kitapcik", async () => sutun("exam_assignments", "booklet")],
+  // Cok dersli sinav. Iz olarak exam_subjects yeterli: teaches_exam_subjects
+  // ve politika ayni dosyada, biri varsa digeri de vardir.
+  ["cok-dersli-sinav", async () => fonksiyon("exam_subjects", { target_exam: BOS_ID })],
 ];
 
 /**
