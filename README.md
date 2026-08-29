@@ -174,6 +174,24 @@ Cikti sekli Zod semalariyla zorunlu kilinir (`generateObject`), bu yuzden
 kisitiyla uyumlu hale getirir: test sorusunda sik + dogru cevap, acik uclu
 soruda rubrik garanti edilir.
 
+## Sanal sinif (soru kalitesi olcumu)
+
+Uretilen bir taslak, havuza gonderilmeden once bes simule ogrenci profiliyle
+pilot uygulamaya sokulabilir. Ogrenci agent'lari soruyu **cevap anahtarini
+gormeden** cozer; madde guclugu (p degeri), ayirt edicilik, celdirici dagilimi
+ve ipucu sizintisi onlarin cevaplarindan hesaplanir.
+
+```ts
+import { runVirtualClass } from "@/lib/ai";
+
+const report = await runVirtualClass(question, { kazanim, subject });
+// -> { kaliteSkoru: 70, pDegeri: 0.6, ayirtEdicilik: 0.5, bulgular: [...] }
+```
+
+Bulgular tek tikla revizyon talimatina cevrilir, soru yeniden yazilir ve
+**yeniden olculur**; iki skor yan yana gosterilir. Ayrinti icin
+[`docs/sanal-sinif.md`](docs/sanal-sinif.md).
+
 ## Guvenlik notlari
 
 - Tum tablolarda **RLS acik**. Rol kontrolu, politika ozyinelemesini onlemek

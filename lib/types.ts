@@ -610,6 +610,25 @@ export interface ReviseQuestionRequest {
   context?: string;
 }
 
+/**
+ * Sanal sinif pilot uygulamasi istegi.
+ *
+ * Soru GOVDEDE tasiniyor cunku pilot, taslak henuz veritabanina yazilmadan
+ * uretim ekraninda calisiyor.
+ */
+export interface VirtualClassRequest {
+  /** Pilot uygulamaya sokulacak taslak. */
+  question: GeneratedQuestion;
+  /** Sorunun olctugu kazanim - simule ogrencilerin "derste ogrendigi" sey. */
+  kazanim?: string;
+  /** Ders adi. */
+  subject?: string;
+  /** Bu pilot icin kullanilacak model; verilmezse varsayilan model. */
+  model?: string;
+  /** Modelin saglayicisi. */
+  provider?: string;
+}
+
 export interface GradeAnswerRequest {
   studentAnswer: string;
   rubric: string;

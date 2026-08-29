@@ -16,12 +16,23 @@
  * Bu modul yalnizca sunucu tarafinda calistirilmalidir (API route / server action).
  */
 
-import { generateObject } from "ai";
+import { generateObject, type LanguageModelV1 } from "ai";
 import { z } from "zod";
 
 import { createAiModel } from "@/lib/ai-model";
 import type { AiProvider } from "@/lib/ai-providers";
 import { resolveAiConfig, resolveAiConfigFor } from "@/lib/ai-settings";
+import { normalizeOptionKey } from "@/lib/answer-normalization";
+import {
+  buildVirtualClassReport,
+  STUDENT_PERSONA_IDS,
+  STUDENT_PERSONAS,
+  type CueLeakProbe,
+  type PersonaRubricScore,
+  type StudentAgentAnswer,
+  type StudentPersonaId,
+  type VirtualClassReport,
+} from "@/lib/student-agents";
 import { parseVisual, type QuestionVisual } from "@/lib/visual";
 import { searchWikimediaImages } from "@/lib/visual-search";
 import type {
@@ -1107,6 +1118,442 @@ export async function reviewExamQuality(
       .slice(0, 5),
   };
 }
+/* -------------------------------------------------------------------------- */
+/*  runVirtualClass - sanal sinif pilot uygulamasi                            */
+/* -------------------------------------------------------------------------- */
+
+/** 0-max araligina cekilmis, yuvarlanmis puan. */
+function clampScore(value: number, max: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(max, Math.round(value)));
+}
+
+const personaIdSchema = z.enum(STUDENT_PERSONA_IDS);
+
+const studentCohortSchema = z.object({
+  answers: z
+    .array(
+      z.object({
+        personaId: personaIdSchema.describe("Cevabi veren ogrenci profilinin kimligi."),
+        answer: z
+          .string()
+          .describe(
+            'Test sorusunda YALNIZCA sik anahtari ("A", "B", "C" ya da "D"); acik uclu ' +
+              "soruda o ogrencinin gercekten yazacagi kisa cevap.",
+          ),
+        confidence: z
+          .number()
+          .min(0)
+          .max(100)
+          .describe("Ogrencinin bu cevaba duydugu guven, 0-100."),
+        reasoning: z
+          .string()
+          .describe("Ogrencinin bu cevaba nasil vardigi; 1-2 cumle, ogrencinin agzindan."),
+        ambiguous: z
+          .boolean()
+          .describe(
+            "Ogrenci soruyu belirsiz, eksik ya da birden fazla dogru cevaba acik buldu mu?",
+          ),
+        ambiguityNote: z
+          .string()
+          .nullable()
+          .describe("Belirsizligin nesi oldugu; ambiguous false ise null."),
+      }),
+    )
+    .describe("Her ogrenci profili icin BIR cevap; profillerin tamami doldurulmali."),
+});
+
+const cueLeakSchema = z.object({
+  guess: z.string().describe("Yalnizca bicimsel ipuclarina dayanan tahmin: sik anahtari."),
+  confidence: z.number().min(0).max(100).describe("Bu tahmine duyulan guven, 0-100."),
+  cue: z
+    .string()
+    .nullable()
+    .describe(
+      "Tahminin dayandigi BICIMSEL ipucu (or. 'dogru sik digerlerinden belirgin sekilde " +
+        "uzun'). Boyle bir ipucu yoksa null - o durumda tahmin saf sanstir.",
+    ),
+});
+
+const cohortRubricSchema = z.object({
+  scores: z
+    .array(
+      z.object({
+        personaId: personaIdSchema,
+        score: z.number().min(0).max(100).describe("Rubrige gore 0-100 arasi puan."),
+        comment: z.string().describe("Puanin tek cumlelik gerekcesi."),
+      }),
+    )
+    .describe("Her ogrenci cevabi icin bir puan."),
+});
+
+export interface VirtualClassOptions {
+  /** Sorunun olctugu kazanim - ogrencilerin derste ogrendigi sey. */
+  kazanim?: string;
+  /** Ders adi; simulasyonun ton ve seviye ayarini yapmasina yarar. */
+  subject?: string;
+  /** Bu pilot icin kullanilacak model. Verilmezse varsayilan model. */
+  modelId?: string;
+  /** Modelin saglayicisi; anahtari yoksa istek reddedilir. */
+  providerId?: AiProvider;
+}
+
+/**
+ * Soruyu sanal sinifta pilot uygulamaya sokar.
+ *
+ * UC CAGRI, IKISI PARALEL:
+ *
+ *   1. SINIF - bes ogrenci profili soruyu cozer. Tek cagri, cunku profillerin
+ *      ayni soruyu ayni kosullarda gormesi gerekiyor ve bes ayri cagri hem
+ *      besedelli hem bes kat yavas olurdu.
+ *
+ *   2. IPUCU SONDASI - konuyu bilmeyen bir ogrenci soruyu yalnizca siklarin
+ *      bicimine bakarak cozmeye calisir. AYRI CAGRI OLMAK ZORUNDA: ayni
+ *      cagrida sorulsaydi model soruyu zaten (1)'de cozmus olurdu ve buradaki
+ *      "bilmeden tahmin" onun kopyasi cikardi. Ayri cagrida ders, konu ve
+ *      kazanim hic verilmiyor.
+ *
+ *      (1) ve (2) birbirine bagimli degil, `Promise.all` ile paralel gider.
+ *
+ *   3. RUBRIK PUANLAMASI - yalnizca acik uclu soruda. Ogrencilerin yazdigi
+ *      cevaplar rubrige gore puanlanir; (1)'in ciktisina bagimli oldugu icin
+ *      sirali calisir. Test sorusunda bu cagri hic yapilmaz.
+ *
+ * Cevap anahtari ve rubrik (1) ve (2)'ye ASLA verilmez - bkz. lib/student-agents.ts.
+ */
+export async function runVirtualClass(
+  question: GeneratedQuestion,
+  options: VirtualClassOptions = {},
+): Promise<VirtualClassReport> {
+  const { kazanim, subject, modelId, providerId } = options;
+
+  if (!question.text.trim()) {
+    throw new Error("[ai] runVirtualClass: soru metni bos olamaz.");
+  }
+
+  const ai = providerId
+    ? await resolveAiConfigFor(providerId)
+    : await resolveAiConfig();
+
+  if (!ai) {
+    throw new Error(
+      `[ai] "${providerId}" saglayicisinin kayitli anahtari yok. Sistem > API Anahtarlari ekranindan tanimlayin.`,
+    );
+  }
+
+  if (ai.mockMode) return mockVirtualClass(question);
+
+  const model = createAiModel(ai, modelId || ai.modelGeneration);
+  const gorunenSoru = studentFacingQuestion(question);
+
+  const cohortCall = generateObject({
+    maxRetries: 0,
+    model,
+    schema: studentCohortSchema,
+    system: [
+      "Sen bir SINIF SIMULATORUSUN: bir sinav sorusunu farkli ogrenci profillerinin gozunden cozersin.",
+      "SANA DOGRU CEVAP VERILMEDI. Soruyu gercekten cozmen gerekiyor.",
+      "Her profil icin AYRI ve BAGIMSIZ bir cevap uret; profiller birbirinin cevabini gormez.",
+      "Rol yapmiyorsun, taklit ediyorsun: profilin bilgi duzeyi hangi cevaba goturuyorsa onu yaz.",
+      "Bilerek yanlis yapma; ama profil konuyu bilmiyorsa dogru cevabi da uydurma.",
+      "Test sorusunda `answer` alanina YALNIZCA sik anahtarini yaz (A, B, C ya da D).",
+      "Acik uclu soruda `answer` alanina o ogrencinin gercekten yazacagi cevabi yaz: guclu ogrenci ayrintili ve gerekceli, zorlanan ogrenci eksik ve yuzeysel yazar.",
+      "Soru belirsizse, birden fazla secenek savunulabiliyorsa ya da veri eksikse `ambiguous` alanini true yap ve nedenini yaz - bu tespit sorunun duzeltilmesini saglar, cekinme.",
+      "Turkce yanit ver.",
+    ].join(" "),
+    prompt: [
+      subject ? `DERS: ${subject}` : "",
+      kazanim
+        ? `OGRENCILERIN DERSTE OGRENDIGI KAZANIM (soruda yazmaz, yalnizca seviye baglami): ${kazanim}`
+        : "",
+      `SORU TIPI: ${question.type === "test" ? "Coktan secmeli" : "Acik uclu"}`,
+      `SORU (ogrencinin gordugu haliyle):\n${gorunenSoru}`,
+      `OGRENCI PROFILLERI:\n${STUDENT_PERSONAS.map(
+        (persona) => `- ${persona.id} (${persona.label}): ${persona.brief}`,
+      ).join("\n")}`,
+      `GOREV: Her profil icin bir cevap uret; toplam ${STUDENT_PERSONAS.length} cevap olmali.`,
+    ]
+      .filter(Boolean)
+      .join("\n\n"),
+  });
+
+  /*
+    Sonda yalnizca TEST sorusunda anlamli: acik uclu soruda secilecek sik yok,
+    dolayisiyla bicimsel ipucu da yok. Gereksiz cagri yapmiyoruz.
+  */
+  const probeCall =
+    question.type === "test"
+      ? generateObject({
+          maxRetries: 0,
+          model,
+          schema: cueLeakSchema,
+          system: [
+            "Sen bir sinav sorusunu KONUYU HIC BILMEDEN cozmeye calisan bir ogrencisin.",
+            "Konu bilgin YOK; ders, konu ve kazanim da sana verilmedi.",
+            "Yalnizca SIKLARIN BICIMINE bakarak tahmin yurutursun: en uzun ya da en ayrintili sik, digerlerinden farkli dilbilgisi yapisi, soru kokuyle kelime tekrari, 'hepsi'/'hicbiri' kaliplari, 'asla'/'her zaman' gibi asiri kesin ifadeler, tek basina digerlerinden ayrisan bir sik.",
+            "Boyle bir bicimsel ipucu VARSA `cue` alanina adini yaz ve tahminini ona dayandir.",
+            "Boyle bir ipucu YOKSA `cue` alanini null birak, rastgele bir sik sec ve guveni dusuk ver.",
+            "IPUCU YOKKEN IPUCU UYDURMA: uydurulmus bir ipucu bu olcumun tamamini gecersiz kilar.",
+            "Turkce yanit ver.",
+          ].join(" "),
+          prompt: [
+            `SORU:\n${gorunenSoru}`,
+            "GOREV: Yalnizca bicimsel ipuclarina bakarak bir sik sec.",
+          ].join("\n\n"),
+        })
+      : null;
+
+  const [cohort, probe] = await Promise.all([cohortCall, probeCall]);
+
+  const answers = normalizeCohortAnswers(cohort.object.answers, question);
+
+  const cueProbe: CueLeakProbe | null = probe
+    ? {
+        guess: probe.object.guess,
+        confidence: clampScore(probe.object.confidence, 100),
+        cue: probe.object.cue?.trim() || null,
+      }
+    : null;
+
+  const rubricScores =
+    question.type === "acik_uclu" && question.rubric
+      ? await gradeCohortAnswers(model, question.rubric, question.text, answers)
+      : null;
+
+  return buildVirtualClassReport({ question, answers, cueProbe, rubricScores });
+}
+
+/**
+ * Soruyu ogrencinin gordugu bicime cevirir.
+ *
+ * Dogru cevap ve rubrik BU METNE GIRMEZ. Gorsel ise metne cevrilir: simule
+ * ogrenci grafigi ya da cizimi goremez, ama verisini okuyabilir. Gorsel
+ * atlanirsa grafige dayanan sorularda butun profiller "veri eksik" der ve
+ * olcum anlamini yitirir.
+ */
+function studentFacingQuestion(question: GeneratedQuestion): string {
+  const parts = [question.text];
+
+  const visual = describeVisualForStudent(question.visual);
+  if (visual) parts.push(visual);
+
+  if (question.type === "test") {
+    parts.push(
+      (question.options ?? [])
+        .map((option) => `${option.key}) ${option.text}`)
+        .join("\n"),
+    );
+  }
+
+  return parts.join("\n\n");
+}
+
+/** Gorseli, simule ogrencinin okuyabilecegi metne cevirir. */
+function describeVisualForStudent(visual: QuestionVisual | null): string | null {
+  if (!visual) return null;
+
+  if (visual.kind === "chart") {
+    return [
+      `[SORUDAKI GORSEL - ${visual.chartType} grafigi${visual.title ? `: ${visual.title}` : ""}]`,
+      `Yatay eksen: ${visual.xKey}.`,
+      `Seriler: ${visual.series.map((series) => series.label).join(", ")}.`,
+      `Veri: ${JSON.stringify(visual.data)}`,
+    ].join(" ");
+  }
+
+  if (visual.kind === "svg") {
+    // Cizimin kaynagi veriliyor: etiketler ve olculer metin olarak okunabilsin.
+    return `[SORUDAKI GORSEL - cizim${visual.title ? `: ${visual.title}` : ""}]\n${visual.svg.slice(0, 1_500)}`;
+  }
+
+  return `[SORUDAKI GORSEL - fotograf] ${visual.alt}`;
+}
+
+/**
+ * Model ciktisini rapor katmaninin bekledigi bicime getirir.
+ *
+ * Iki sey garanti ediliyor: her personadan EN COK bir cevap (model bazen ayni
+ * profil icin iki satir uretiyor) ve test sorusunda `answer` alaninin sik
+ * anahtarina indirgenmesi ("B) ikinci secenek" -> "B").
+ */
+function normalizeCohortAnswers(
+  raw: z.infer<typeof studentCohortSchema>["answers"],
+  question: GeneratedQuestion,
+): StudentAgentAnswer[] {
+  const seen = new Set<StudentPersonaId>();
+  const answers: StudentAgentAnswer[] = [];
+
+  for (const item of raw) {
+    if (seen.has(item.personaId)) continue;
+    seen.add(item.personaId);
+
+    answers.push({
+      personaId: item.personaId,
+      answer:
+        question.type === "test"
+          ? normalizeOptionKey(item.answer)
+          : item.answer.trim(),
+      confidence: clampScore(item.confidence, 100),
+      reasoning: item.reasoning.trim(),
+      ambiguous: item.ambiguous,
+      ambiguityNote: item.ambiguous ? item.ambiguityNote?.trim() || null : null,
+    });
+  }
+
+  return answers;
+}
+
+/**
+ * Acik uclu cevaplari rubrige gore TEK cagride puanlar.
+ *
+ * `gradeAnswer()` her cevap icin ayri cagri yapardi; bes ogrenci icin bes
+ * cagri hem pahali hem yavas. Burada onemli olan mutlak puan degil ust ve alt
+ * grubun AYRISIP ayrismadigi, bu da tek cagrida guvenilir sekilde olculuyor.
+ */
+async function gradeCohortAnswers(
+  model: LanguageModelV1,
+  rubric: string,
+  questionText: string,
+  answers: readonly StudentAgentAnswer[],
+): Promise<PersonaRubricScore[]> {
+  if (answers.length === 0) return [];
+
+  const { object } = await generateObject({
+    maxRetries: 0,
+    model,
+    schema: cohortRubricSchema,
+    system: [
+      "Sen tarafsiz bir sinav degerlendiricisisin.",
+      "Sana bir soru, rubrigi ve ayni soruya verilmis birden fazla ogrenci cevabi verilir.",
+      "Her cevabi YALNIZCA rubrige gore, digerlerinden bagimsiz puanlarsin.",
+      "Cevaplarin kime ait oldugu puani etkilemez; yalnizca yazilana bak.",
+      "Rubrikte olmayan kriter uydurma; puan 0-100 arasinda kalsin.",
+    ].join(" "),
+    prompt: [
+      `SORU:\n${questionText}`,
+      `RUBRIK (tam puan 100):\n${rubric}`,
+      `OGRENCI CEVAPLARI:\n${answers
+        .map((answer) => `[${answer.personaId}] ${answer.answer}`)
+        .join("\n\n")}`,
+      "GOREV: Her cevabi rubrige gore puanla ve tek cumlelik gerekce yaz.",
+    ].join("\n\n"),
+  });
+
+  const seen = new Set<StudentPersonaId>();
+  const scores: PersonaRubricScore[] = [];
+
+  for (const item of object.scores) {
+    if (seen.has(item.personaId)) continue;
+    seen.add(item.personaId);
+    scores.push({
+      personaId: item.personaId,
+      score: clampScore(item.score, 100),
+      comment: item.comment.trim(),
+    });
+  }
+
+  return scores;
+}
+
+/**
+ * Mock modda sanal sinif.
+ *
+ * Deterministik ve GERCEKCI: guclu ile ortalama ogrenci dogru, zorlanan ile
+ * yanilgili ogrenci farkli celdiricilere gider. Boylece anahtar olmadan
+ * acilan demoda p degeri, ayirt edicilik ve celdirici dagilimi anlamli
+ * gorunur - hepsi dogru ya da hepsi yanlis olsaydi panel bos bir kabuk olurdu.
+ */
+function mockVirtualClass(question: GeneratedQuestion): VirtualClassReport {
+  const options = question.options ?? [];
+  const correctKey = question.correct_answer
+    ? normalizeOptionKey(question.correct_answer)
+    : "A";
+  const yanlisSiklar = options
+    .map((option) => normalizeOptionKey(option.key))
+    .filter((key) => key !== correctKey);
+
+  const sik = (index: number): string => yanlisSiklar[index] ?? correctKey;
+
+  const plan: ReadonlyArray<{
+    personaId: StudentPersonaId;
+    dogru: boolean;
+    confidence: number;
+    reasoning: string;
+    ambiguous: boolean;
+  }> = [
+    {
+      personaId: "guclu",
+      dogru: true,
+      confidence: 92,
+      reasoning: "[MOCK] Kazanimi hatirlayip secenekleri tek tek eledim.",
+      ambiguous: false,
+    },
+    {
+      personaId: "ortalama",
+      dogru: true,
+      confidence: 68,
+      reasoning: "[MOCK] Iki secenek arasinda kaldim, tanidik olani sectim.",
+      ambiguous: false,
+    },
+    {
+      personaId: "zorlanan",
+      dogru: false,
+      confidence: 30,
+      reasoning: "[MOCK] Konuyu tam bilmiyorum, anahtar kelimeye gore tahmin ettim.",
+      ambiguous: true,
+    },
+    {
+      personaId: "yanilgili",
+      dogru: false,
+      confidence: 74,
+      reasoning: "[MOCK] Yaygin yanilgiya uyan secenegi dogru sandim.",
+      ambiguous: false,
+    },
+    {
+      personaId: "aceleci",
+      dogru: true,
+      confidence: 55,
+      reasoning: "[MOCK] Soruyu hizli okudum ama ifade netti.",
+      ambiguous: false,
+    },
+  ];
+
+  const answers: StudentAgentAnswer[] = plan.map((item, index) => ({
+    personaId: item.personaId,
+    answer:
+      question.type === "test"
+        ? item.dogru
+          ? correctKey
+          : sik(index % Math.max(1, yanlisSiklar.length))
+        : `[MOCK] ${item.personaId} profilinin cevabi.`,
+    confidence: item.confidence,
+    reasoning: item.reasoning,
+    ambiguous: item.ambiguous,
+    ambiguityNote: item.ambiguous
+      ? "[MOCK] Soru kokunde neyin istendigi bana net gelmedi."
+      : null,
+  }));
+
+  const rubricScores: PersonaRubricScore[] | null =
+    question.type === "acik_uclu"
+      ? plan.map((item) => ({
+          personaId: item.personaId,
+          score: item.dogru ? 82 : 41,
+          comment: "[MOCK] Rubrik maddelerine kismi deginme.",
+        }))
+      : null;
+
+  return buildVirtualClassReport({
+    question,
+    answers,
+    cueProbe:
+      question.type === "test"
+        ? { guess: sik(0), confidence: 25, cue: null }
+        : null,
+    rubricScores,
+  });
+}
+
 
 /* -------------------------------------------------------------------------- */
 /*  Normalizasyon                                                             */
