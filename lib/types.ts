@@ -578,6 +578,23 @@ export interface GenerateQuestionsRequest {
   type?: QuestionType | "karisik";
   /** Talep edilen zorluk. Verilmezse "karisik". */
   difficulty?: DifficultyChoice;
+  /**
+   * Bu uretimde kullanilacak model.
+   *
+   * Verilmezse sistem yoneticisinin panelde sectigi varsayilan model gecerli
+   * olur. Icerik uzmani formdan yalnizca ANAHTARIN ERISEBILDIGI modeller
+   * arasindan secebilir (bkz. lib/ai-model-catalog.ts).
+   */
+  model?: string;
+  /**
+   * Modelin ait oldugu saglayici.
+   *
+   * Model adiyla BIRLIKTE tasiniyor cunku ayni anda birden fazla saglayicinin
+   * anahtari tanimli olabiliyor; "gpt-4o-mini" hem OpenAI hem OpenRouter
+   * listesinde gecebilir ve hangi anahtarla cagrilacagi yalnizca buradan
+   * anlasilir.
+   */
+  provider?: string;
 }
 
 export interface ReviseQuestionRequest {
@@ -648,6 +665,24 @@ export type AiSettingsRecord = {
   model_generation: string;
   model_grading: string;
   mock_mode: boolean;
+  updated_at: string;
+  updated_by: string | null;
+};
+
+/**
+ * `public.ai_provider_keys` - SAGLAYICI BASINA anahtar.
+ *
+ * `ai_settings` tek satirlik oldugu icin ayni anda tek anahtar tutabiliyordu;
+ * bu tablo her saglayiciya kendi satirini verir ve hepsi ayni anda tanimli
+ * kalabilir. Icerik uzmani model listesinde hepsini bir arada gorur.
+ *
+ * `interface` degil `type`: bkz. [[AiSettingsRecord]] uzerindeki not.
+ */
+export type AiProviderKeyRecord = {
+  provider: AiProvider;
+  api_key: string;
+  base_url: string;
+  model_generation: string;
   updated_at: string;
   updated_by: string | null;
 };
@@ -770,6 +805,13 @@ export interface Database {
           "id" | "anonymous" | "created_at" | "updated_at"
         >
       >;
+      ai_provider_keys: TableDefinition<
+        AiProviderKeyRecord,
+        Insertable<
+          AiProviderKeyRecord,
+          "api_key" | "base_url" | "model_generation" | "updated_at" | "updated_by"
+        >
+      >;
       ai_settings: TableDefinition<
         AiSettingsRecord,
         Insertable<
@@ -813,6 +855,28 @@ export interface Database {
         govdesinde `is_admin()` ile dogrular, yani bu ekrani atlayip PostgREST'e
         dogrudan istek atmak ise yaramaz.
       */
+      save_ai_provider_key: {
+        Args: {
+          target_provider: string;
+          new_api_key: string;
+          new_base_url: string;
+          new_model_generation: string;
+        };
+        Returns: null;
+      };
+      clear_ai_provider_key: {
+        Args: { target_provider: string };
+        Returns: null;
+      };
+      save_ai_defaults: {
+        Args: {
+          new_provider: string;
+          new_model_generation: string;
+          new_model_grading: string;
+          new_mock_mode: boolean;
+        };
+        Returns: null;
+      };
       save_ai_settings: {
         Args: {
           new_provider: string;

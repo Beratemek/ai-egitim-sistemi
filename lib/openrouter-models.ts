@@ -20,8 +20,14 @@ const MODELS_URL = "https://openrouter.ai/api/v1/models";
 /** Liste saatte bir tazelenir; fiyatlar gun icinde nadiren degisir. */
 const CACHE_SECONDS = 3600;
 
-/** Arayuze tasinan model sayisi ust siniri (istemci paketi sismesin). */
-const MAX_MODELS = 260;
+/**
+ * Arayuze tasinan model sayisi ust siniri.
+ *
+ * Yuksek tutuluyor: OpenRouter'in varlik sebebi tek anahtarla YUZLERCE modele
+ * erisebilmek, listeyi kirpmak o degeri gotururdu. Secim kutusunda arama
+ * oldugu icin uzunluk sorun degil.
+ */
+const MAX_MODELS = 400;
 
 /* -------------------------------------------------------------------------- */
 /*  Maliyet varsayimlari                                                      */
@@ -39,15 +45,11 @@ const MAX_MODELS = 260;
  * buradaki degerin katlarina cikabilir. Bu yuzden rakam "yaklasik" diye
  * sunulur ve karsilastirma amaclidir - modeller arasi SIRALAMA dogrudur.
  */
-export const COST_BASIS = {
+const COST_BASIS = {
   /** Soru uretimi: kazanim + kaynak metin payi + sema talimati. */
   generationInputTokens: 1200,
   /** Uretilen soru: govde, siklar, rubrik/gorsel JSON. */
   generationOutputTokens: 500,
-  /** Puanlama: ogrenci cevabi + rubrik. */
-  gradingInputTokens: 700,
-  /** Puanlama ciktisi: puan, gerekce, kriter listesi. */
-  gradingOutputTokens: 250,
 } as const;
 
 export interface OpenRouterModel {
@@ -205,15 +207,6 @@ export function questionCost(model: OpenRouterModel, questions: number): number 
     questions *
     (COST_BASIS.generationInputTokens * model.inputPrice +
       COST_BASIS.generationOutputTokens * model.outputPrice)
-  );
-}
-
-/** Verilen sayida CEVAP PUANLAMASININ tahmini USD maliyeti. */
-export function gradingCost(model: OpenRouterModel, answers: number): number {
-  return (
-    answers *
-    (COST_BASIS.gradingInputTokens * model.inputPrice +
-      COST_BASIS.gradingOutputTokens * model.outputPrice)
   );
 }
 

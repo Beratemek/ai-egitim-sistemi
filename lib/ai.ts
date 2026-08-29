@@ -20,7 +20,8 @@ import { generateObject } from "ai";
 import { z } from "zod";
 
 import { createAiModel } from "@/lib/ai-model";
-import { resolveAiConfig } from "@/lib/ai-settings";
+import type { AiProvider } from "@/lib/ai-providers";
+import { resolveAiConfig, resolveAiConfigFor } from "@/lib/ai-settings";
 import { parseVisual, type QuestionVisual } from "@/lib/visual";
 import { searchWikimediaImages } from "@/lib/visual-search";
 import type {
@@ -331,6 +332,23 @@ export interface GenerateQuestionsOptions {
    * verilir: begenilenler taklit edilecek tarz, reddedilenler kacinilacak tarz.
    */
   styleGuide?: StyleGuide;
+  /**
+   * Bu uretim icin kullanilacak model.
+   *
+   * Verilmezse sistem yoneticisinin panelde sectigi varsayilan model
+   * kullanilir. Icerik uzmani uretim formundan bunu ezebilir: kisa bir kazanim
+   * icin ucuz, zor bir konu icin guclu model secmek maliyeti ciddi degistirir.
+   * Yalnizca ANAHTARIN ERISEBILDIGI modeller sunulur (bkz. ai-model-catalog).
+   */
+  modelId?: string;
+  /**
+   * Modelin ait oldugu saglayici.
+   *
+   * Verilirse O saglayicinin anahtariyla cagrilir; anahtari yoksa istek
+   * reddedilir. Sessizce varsayilan saglayiciya dusmek, kullanicinin sectigi
+   * modelden baska bir modelle (ve baska bir faturayla) uretim yapmak olurdu.
+   */
+  providerId?: AiProvider;
 }
 
 /** Istenen zorluk seviyesinin modele verilecek talimati. */
@@ -548,13 +566,23 @@ export async function generateQuestions(
     topic,
     styleGuide,
     difficulty = "karisik",
+    modelId,
+    providerId,
   } = options;
 
   if (!context.trim() || !kazanim.trim()) {
     throw new Error("[ai] generateQuestions: context ve kazanim bos olamaz.");
   }
 
-  const ai = await resolveAiConfig();
+  const ai = providerId
+    ? await resolveAiConfigFor(providerId)
+    : await resolveAiConfig();
+
+  if (!ai) {
+    throw new Error(
+      `[ai] "${providerId}" saglayicisinin kayitli anahtari yok. Sistem > API Anahtarlari ekranindan tanimlayin.`,
+    );
+  }
 
   if (ai.mockMode) {
     return mockGenerateQuestions(kazanim, { count, type, topic, styleGuide });
@@ -579,7 +607,7 @@ export async function generateQuestions(
   */
   const { object } = await generateObject({
     maxRetries: 0,
-    model: createAiModel(ai, ai.modelGeneration),
+    model: createAiModel(ai, modelId || ai.modelGeneration),
     schema: generateQuestionsSchema,
     system: [
       "Sen deneyimli bir olcme-degerlendirme uzmanisin ve Turkce sinav sorulari yazarsin.",
@@ -631,7 +659,7 @@ export async function generateQuestions(
   try {
     const result = await generateObject({
     maxRetries: 0,
-    model: createAiModel(ai, ai.modelGeneration),
+    model: createAiModel(ai, modelId || ai.modelGeneration),
     schema: generateQuestionsSchema,
     system: [
       "Sen deneyimli bir olcme-degerlendirme uzmanisin ve Turkce sinav sorulari yazarsin.",

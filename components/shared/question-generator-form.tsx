@@ -12,8 +12,11 @@ import {
 import { toast } from "sonner";
 
 import { saveGeneratedQuestions } from "@/app/actions/questions";
+import type { ModelCatalog } from "@/lib/ai-model-catalog";
+import type { AiProvider } from "@/lib/ai-providers";
 import { subjectKey } from "@/lib/subjects";
 import { GeneratedQuestionCard } from "@/components/shared/generated-question-card";
+import { ModelCombobox } from "@/components/shared/model-combobox";
 import { OutcomeSearchField } from "@/components/shared/outcome-search-field";
 import { SourceTextField } from "@/components/shared/source-text-field";
 import { StyleMemoryPanel } from "@/components/shared/style-memory-panel";
@@ -120,6 +123,15 @@ export interface QuestionGeneratorFormProps {
   /** Supabase yoksa kaydetme kapali olur. */
   canPersist: boolean;
   /**
+   * Tanimli API anahtarlarinin ERISEBILDIGI modeller, saglayiciya gore gruplu.
+   *
+   * Birden fazla saglayici anahtari tanimliysa hepsi ayni listede cikar; secilen
+   * modelin saglayicisi istekle birlikte gider ve dogru anahtar kullanilir.
+   * Liste alinamazsa (anahtar yok, ag hatasi) gruplar bos gelir ve form
+   * yalnizca varsayilan modeli gosterir.
+   */
+  modelCatalog: ModelCatalog;
+  /**
    * Baslangicta secili gelecek kazanim.
    *
    * Egitmen panelindeki kazanim analizinden "bu kazanima tekrar sorusu uret"
@@ -146,6 +158,7 @@ export function QuestionGeneratorForm({
   preferenceStats,
   preferences = [],
   canPersist,
+  modelCatalog,
   initialOutcomeId,
 }: QuestionGeneratorFormProps) {
   const router = useRouter();
@@ -171,6 +184,70 @@ export function QuestionGeneratorForm({
   const [count, setCount] = React.useState("5");
   const [type, setType] = React.useState<TypeChoice>("karisik");
   const [difficulty, setDifficulty] = React.useState<DifficultyChoice>("karisik");
+  /**
+   * Secilebilir model gruplari.
+   *
+   * Modeli olmayan gruplar eleniyor: secilemeyecek bir saglayici basligi
+   * gostermek, sonra "model yok" demekten kotudur.
+   */
+  const availableGroups = React.useMemo(
+    () => modelCatalog.groups.filter((group) => group.models.length > 0),
+    [modelCatalog],
+  );
+
+  const totalModelCount = availableGroups.reduce(
+    (sum, group) => sum + group.models.length,
+    0,
+  );
+
+  /**
+   * Secili model ve saglayicisi.
+   *
+   * Ikisi BIRLIKTE tutuluyor: ayni model adi iki saglayicida gecebiliyor
+   * (or. "gpt-4o-mini" hem OpenAI hem OpenRouter listesinde), yalnizca ad
+   * tasinsa hangi anahtarla cagrilacagi belirsiz kalirdi.
+   *
+   * Baslangic degeri sistem yoneticisinin panelde sectigi saglayici + modeldir.
+   * Liste onu icermiyorsa (or. saglayici o modeli kapatmis) ilk secenege
+   * dusulur - aksi halde kutu bos bir deger tasir ve sessizce bozulur.
+   */
+  /*
+    Baslangicta ANAHTARI OLAN bir grup secilir.
+
+    OpenRouter anahtar olmadan da listeleniyor (fiyatlarini gormek icin);
+    forma varsayilan olarak onun bir modeli gelseydi kullanici hicbir sey
+    degistirmeden "Uret" deyip anahtar hatasi alirdi.
+  */
+  const initialGroup = React.useMemo(() => {
+    const usable = availableGroups.filter((group) => !group.keyMissing);
+    const pool = usable.length > 0 ? usable : availableGroups;
+
+    return (
+      pool.find((group) => group.provider === modelCatalog.defaultProvider) ??
+      pool[0] ??
+      null
+    );
+  }, [availableGroups, modelCatalog.defaultProvider]);
+
+  const [providerId, setProviderId] = React.useState<AiProvider>(
+    () => initialGroup?.provider ?? modelCatalog.defaultProvider,
+  );
+
+  const [modelId, setModelId] = React.useState(() =>
+    initialGroup?.models.some((model) => model.id === modelCatalog.defaultModel)
+      ? modelCatalog.defaultModel
+      : (initialGroup?.models[0]?.id ?? modelCatalog.defaultModel),
+  );
+
+  const selectedGroup =
+    availableGroups.find((group) => group.provider === providerId) ?? null;
+  const selectedModel =
+    selectedGroup?.models.find((model) => model.id === modelId) ?? null;
+
+  function changeModel(nextProvider: AiProvider, nextModel: string): void {
+    setProviderId(nextProvider);
+    setModelId(nextModel);
+  }
 
   const [pending, setPending] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
@@ -327,6 +404,22 @@ export function QuestionGeneratorForm({
       return;
     }
 
+    /*
+      Anahtari olmayan saglayicinin modeli SECILEBILIR ama uretimde
+      kullanilamaz. OpenRouter'in model/fiyat listesi anahtar olmadan da
+      cekilebildigi icin liste doluyor; secim burada durduruluyor ki kullanici
+      60 saniye bekleyip sunucudan hata almasin.
+    */
+    if (selectedGroup?.keyMissing) {
+      const message =
+        `${selectedGroup.providerLabel} için kayıtlı API anahtarı yok. ` +
+        "Sistem yöneticisi Sistem > API Anahtarları ekranından anahtarı " +
+        "tanımlamalı ya da anahtarı olan başka bir sağlayıcının modelini seçin.";
+      setError(message);
+      toast.error("Anahtar eksik", { description: message });
+      return;
+    }
+
     setPending(true);
     setError(null);
 
@@ -339,6 +432,11 @@ export function QuestionGeneratorForm({
       count: resolvedCount,
       type,
       difficulty,
+      // Model ve saglayici BIRLIKTE gidiyor; sunucu saglayicinin anahtarini
+      // dogrulayip o anahtarla cagiriyor.
+      ...(selectedModel
+        ? { model: selectedModel.id, provider: providerId }
+        : {}),
     };
 
     try {
@@ -613,7 +711,7 @@ export function QuestionGeneratorForm({
                     <SelectTrigger id="type">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent side="bottom" avoidCollisions={false}>
                       <SelectItem value="karisik">Karisik</SelectItem>
                       <SelectItem value="test">Çoktan seçmeli</SelectItem>
                       <SelectItem value="acik_uclu">Açık uçlu</SelectItem>
@@ -632,7 +730,7 @@ export function QuestionGeneratorForm({
                     <SelectTrigger id="difficulty">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent side="bottom" avoidCollisions={false}>
                       {DIFFICULTY_OPTIONS.map((option) => (
                         <SelectItem key={option.value} value={option.value}>
                           {option.label}
@@ -641,6 +739,55 @@ export function QuestionGeneratorForm({
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+
+              {/* ---------- Model ----------
+                  TEK kutu, saglayiciya gore kategorili, aramali. Uc sutunlu
+                  izgaraya girmiyor: model adlari uzun ve OpenRouter'da yaninda
+                  10 soruluk tutar da yaziyor. */}
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <Label htmlFor="model">Model</Label>
+                  {totalModelCount > 0 ? (
+                    <span className="text-xs text-muted-foreground">
+                      {totalModelCount} model
+                    </span>
+                  ) : null}
+                </div>
+
+                {availableGroups.length > 0 ? (
+                  <ModelCombobox
+                    id="model"
+                    groups={availableGroups}
+                    provider={providerId}
+                    modelId={modelId}
+                    onSelect={changeModel}
+                  />
+                ) : (
+                  <p className="rounded-lg border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+                    <span className="font-mono text-foreground">
+                      {modelCatalog.defaultModel || "Tanımlı model yok"}
+                    </span>{" "}
+                    kullanılacak.
+                  </p>
+                )}
+
+                {selectedGroup?.keyMissing ? (
+                  <p className="flex items-start gap-2 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning">
+                    <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    {selectedGroup.providerLabel} anahtarı tanımlı değil. Bu
+                    modeller yalnızca fiyat karşılaştırması için listeleniyor;
+                    üretim için sistem yöneticisi anahtarı tanımlamalı.
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    {modelCatalog.error
+                      ? modelCatalog.error
+                      : selectedModel?.cost
+                        ? `Seçilen model 10 soruda yaklaşık ${selectedModel.cost} tutar. Seçiminiz yalnızca bu üretim için geçerlidir.`
+                        : "Sistem yöneticisinin tanımladığı anahtarların eriştiği modeller listelenir. Seçiminiz yalnızca bu üretim için geçerlidir."}
+                  </p>
+                )}
               </div>
 
               {error ? (

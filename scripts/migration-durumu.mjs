@@ -154,6 +154,21 @@ const ADIMLAR = [
         new_mock_mode: null,
       })),
   ],
+  // Coklu saglayici anahtari. Tablo + kaydetme fonksiyonu birlikte kontrol
+  // ediliyor. Cagri GUVENLI: fonksiyonun ILK ifadesi `is_admin()` kontrolu ve
+  // bu betik service_role ile calisiyor, yani `auth.uid()` bos - cagri yetki
+  // hatasiyla doner, hicbir sey yazilmaz.
+  [
+    "coklu-saglayici-anahtari",
+    async () =>
+      (await sutun("ai_provider_keys", "provider")) &&
+      (await fonksiyon("save_ai_provider_key", {
+        target_provider: null,
+        new_api_key: null,
+        new_base_url: null,
+        new_model_generation: null,
+      })),
+  ],
 ];
 
 /**
