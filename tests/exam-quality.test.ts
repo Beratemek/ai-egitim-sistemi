@@ -257,16 +257,60 @@ test("atama, kazanım, ders ve zorluk eksiklerini uyarı olarak üretir", () => 
   );
 });
 
-test("dersi olmayan sınavı ayrıca uyarır ama her soruyu uyumsuz saymaz", () => {
+/*
+  Sinavin dersi SORULARINDAN turetilir (bkz. 2026-08-26-cok-dersli-sinav.sql).
+  Asagidaki uc test o modelin sinirlarini ciziyor; onceki surumde tek bir
+  kural vardi ve cok dersli sinavlarda yanlis alarm uretiyordu.
+*/
+
+test("sorulardan ders türetilebiliyorsa ders uyarısı verilmez", () => {
   const result = evaluateExamQuality({
+    // `exams.subject` bos ama sorunun dersi belli: sinavin dersi bellidir.
     exam: exam({ subject: null }),
     examQuestions: [link("q1", 0, 100)],
     questions: [question("q1")],
     assignmentCount: 1,
   });
 
-  assert.ok(codes(result).includes("sinav-dersi-eksik"));
+  assert.ok(!codes(result).includes("sinav-dersi-eksik"));
   assert.ok(!codes(result).includes("ders-uyusmazligi"));
+});
+
+test("iki dersli sınavda hiçbir soru uyumsuz sayılmaz", () => {
+  const result = evaluateExamQuality({
+    exam: exam({ subject: "Elektronik ve IoT" }),
+    examQuestions: [link("q1", 0, 50), link("q2", 1, 50)],
+    questions: [
+      question("q1", { subject: "Elektronik ve IoT" }),
+      question("q2", { subject: "Enerji Teknolojileri" }),
+    ],
+    assignmentCount: 1,
+  });
+
+  assert.ok(!codes(result).includes("sinav-dersi-eksik"));
+  assert.ok(!codes(result).includes("ders-uyusmazligi"));
+});
+
+test("hiçbir sorunun dersi yoksa ve yedek de boşsa uyarı verilir", () => {
+  const result = evaluateExamQuality({
+    exam: exam({ subject: null }),
+    examQuestions: [link("q1", 0, 100)],
+    questions: [question("q1", { subject: "" })],
+    assignmentCount: 1,
+  });
+
+  assert.ok(codes(result).includes("sinav-dersi-eksik"));
+});
+
+test("ders etiketi sorularının hiçbirinde geçmiyorsa bayat sayılır", () => {
+  const result = evaluateExamQuality({
+    exam: exam({ subject: "Tarih" }),
+    examQuestions: [link("q1", 0, 100)],
+    questions: [question("q1", { subject: "Fen Bilimleri" })],
+    assignmentCount: 1,
+  });
+
+  assert.ok(codes(result).includes("ders-uyusmazligi"));
 });
 
 test("zorluk ve doğru şık yoğunluğunu yeterli örneklemde uyarır", () => {

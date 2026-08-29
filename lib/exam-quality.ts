@@ -493,31 +493,66 @@ function addQuestionWarnings(
     );
   }
 
+  /*
+    DERS KONTROLU - sinavin dersi SORULARINDAN turetilir.
+
+    Onceden burada tek bir kural vardi: `exams.subject` bossa "ders
+    belirtilmemis" uyarisi, doluysa da o derse UYMAYAN her soru
+    "uyusmazlik" sayiliyordu. Bu kural, sinavin tek dersli olduguna inanan
+    eski surumden kalmisti.
+
+    2026-08-26-cok-dersli-sinav.sql ile model degisti: bir sinav birden fazla
+    dersten soru tasiyabiliyor ve dersleri veritabaninda `exam_subjects()`
+    sorularindan turetiyor; `exams.subject` yalnizca HENUZ SORUSU OLMAYAN
+    sinav icin yedek. Eski kural bu modelde iki yanlis alarm uretiyordu:
+
+      1. Iki dersten soru tasiyan, dersleri ekranda dogru gorunen bir sinav
+         "dersi belirtilmemis" diye uyariliyordu.
+      2. `exams.subject` dolu bir cok dersli sinavda, obur dersin butun
+         sorulari "uyusmayan sorular" olarak listeleniyordu.
+
+    Yeni kural asagidaki gibi:
+      - Sorulardan ders turetilebiliyorsa sinavin dersi BELLIDIR, uyari yok.
+      - Hicbir sorudan ders turetilemiyorsa (sinav bos ya da sorularin dersi
+        bos) yedege bakilir; o da bossa uyari verilir - cunku ders yetkisi
+        o durumda gercekten belirsiz kalir.
+      - `exams.subject` dolu ama sorularin HICBIRI o derste degilse etiket
+        bayattir; bu dar durum hala uyari uretir.
+  */
   const examSubject = exam.subject?.trim() ?? "";
-  if (!examSubject) {
-    warnings.push(
-      issue(
-        "sinav-dersi-eksik",
-        "warning",
-        "Sınavın dersi belirtilmemiş",
-        "Ders yetkisi, filtreler ve kazanım raporları için sınava bir ders seçin.",
-      ),
-    );
-  } else {
-    const mismatched = questions
-      .filter((question) => subjectKey(question.subject) !== subjectKey(examSubject))
-      .map((question) => question.id);
-    if (mismatched.length > 0) {
+  const derivedSubjects = [
+    ...new Set(
+      questions
+        .map((question) => question.subject?.trim())
+        .filter((subject): subject is string => Boolean(subject))
+        .map(subjectKey),
+    ),
+  ];
+
+  if (derivedSubjects.length === 0) {
+    if (!examSubject) {
       warnings.push(
         issue(
-          "ders-uyusmazligi",
+          "sinav-dersi-eksik",
           "warning",
-          "Sınavın dersiyle uyuşmayan sorular var",
-          "Soruların dersini kontrol edin veya sınavın dersini güncelleyin.",
-          mismatched,
+          "Sınavın dersi belirtilmemiş",
+          "Sınavın dersi sorularından türetilir; henüz dersi belli bir soru yok. " +
+            "Ders yetkisi ve filtreler için sınava bir ders seçin ya da dersi belli " +
+            "sorular ekleyin.",
         ),
       );
     }
+  } else if (examSubject && !derivedSubjects.includes(subjectKey(examSubject))) {
+    warnings.push(
+      issue(
+        "ders-uyusmazligi",
+        "warning",
+        "Sınavın ders etiketi sorularla uyuşmuyor",
+        `Sınav "${examSubject}" olarak etiketlenmiş ama sorularının hiçbiri bu derse ` +
+          "ait değil. Etiketi güncelleyin; sınavın dersleri sorularından türetilir.",
+        questions.map((question) => question.id),
+      ),
+    );
   }
 
   const invalidDifficulty = questions
