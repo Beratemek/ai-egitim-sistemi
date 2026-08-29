@@ -211,23 +211,16 @@ export function QuestionGeneratorForm({
    * Liste onu icermiyorsa (or. saglayici o modeli kapatmis) ilk secenege
    * dusulur - aksi halde kutu bos bir deger tasir ve sessizce bozulur.
    */
-  /*
-    Baslangicta ANAHTARI OLAN bir grup secilir.
-
-    OpenRouter anahtar olmadan da listeleniyor (fiyatlarini gormek icin);
-    forma varsayilan olarak onun bir modeli gelseydi kullanici hicbir sey
-    degistirmeden "Uret" deyip anahtar hatasi alirdi.
-  */
-  const initialGroup = React.useMemo(() => {
-    const usable = availableGroups.filter((group) => !group.keyMissing);
-    const pool = usable.length > 0 ? usable : availableGroups;
-
-    return (
-      pool.find((group) => group.provider === modelCatalog.defaultProvider) ??
-      pool[0] ??
-      null
-    );
-  }, [availableGroups, modelCatalog.defaultProvider]);
+  /** Baslangicta secili gelecek grup: panelde varsayilan olan, yoksa ilki. */
+  const initialGroup = React.useMemo(
+    () =>
+      availableGroups.find(
+        (group) => group.provider === modelCatalog.defaultProvider,
+      ) ??
+      availableGroups[0] ??
+      null,
+    [availableGroups, modelCatalog.defaultProvider],
+  );
 
   const [providerId, setProviderId] = React.useState<AiProvider>(
     () => initialGroup?.provider ?? modelCatalog.defaultProvider,
@@ -239,10 +232,10 @@ export function QuestionGeneratorForm({
       : (initialGroup?.models[0]?.id ?? modelCatalog.defaultModel),
   );
 
-  const selectedGroup =
-    availableGroups.find((group) => group.provider === providerId) ?? null;
   const selectedModel =
-    selectedGroup?.models.find((model) => model.id === modelId) ?? null;
+    availableGroups
+      .find((group) => group.provider === providerId)
+      ?.models.find((model) => model.id === modelId) ?? null;
 
   function changeModel(nextProvider: AiProvider, nextModel: string): void {
     setProviderId(nextProvider);
@@ -401,22 +394,6 @@ export function QuestionGeneratorForm({
         "Konu zorunlu. Havuz ders ve konu başlıkları altında kırılıyor.";
       setError(message);
       toast.error("Konu eksik", { description: message });
-      return;
-    }
-
-    /*
-      Anahtari olmayan saglayicinin modeli SECILEBILIR ama uretimde
-      kullanilamaz. OpenRouter'in model/fiyat listesi anahtar olmadan da
-      cekilebildigi icin liste doluyor; secim burada durduruluyor ki kullanici
-      60 saniye bekleyip sunucudan hata almasin.
-    */
-    if (selectedGroup?.keyMissing) {
-      const message =
-        `${selectedGroup.providerLabel} için kayıtlı API anahtarı yok. ` +
-        "Sistem yöneticisi Sistem > API Anahtarları ekranından anahtarı " +
-        "tanımlamalı ya da anahtarı olan başka bir sağlayıcının modelini seçin.";
-      setError(message);
-      toast.error("Anahtar eksik", { description: message });
       return;
     }
 
@@ -772,22 +749,13 @@ export function QuestionGeneratorForm({
                   </p>
                 )}
 
-                {selectedGroup?.keyMissing ? (
-                  <p className="flex items-start gap-2 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning">
-                    <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                    {selectedGroup.providerLabel} anahtarı tanımlı değil. Bu
-                    modeller yalnızca fiyat karşılaştırması için listeleniyor;
-                    üretim için sistem yöneticisi anahtarı tanımlamalı.
-                  </p>
-                ) : (
-                  <p className="text-xs text-muted-foreground">
-                    {modelCatalog.error
-                      ? modelCatalog.error
-                      : selectedModel?.cost
-                        ? `Seçilen model 10 soruda yaklaşık ${selectedModel.cost} tutar. Seçiminiz yalnızca bu üretim için geçerlidir.`
-                        : "Sistem yöneticisinin tanımladığı anahtarların eriştiği modeller listelenir. Seçiminiz yalnızca bu üretim için geçerlidir."}
-                  </p>
-                )}
+                <p className="text-xs text-muted-foreground">
+                  {modelCatalog.error
+                    ? modelCatalog.error
+                    : selectedModel?.cost
+                      ? `Seçilen model 10 soruda yaklaşık ${selectedModel.cost} tutar. Seçiminiz yalnızca bu üretim için geçerlidir.`
+                      : "Sistem yöneticisinin tanımladığı anahtarların eriştiği modeller listelenir. Seçiminiz yalnızca bu üretim için geçerlidir."}
+                </p>
               </div>
 
               {error ? (

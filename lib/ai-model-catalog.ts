@@ -98,15 +98,6 @@ export interface ModelGroup {
   provider: AiProvider;
   providerLabel: string;
   models: AvailableModel[];
-  /**
-   * Modeller listelenebiliyor ama ANAHTAR yok.
-   *
-   * Yalnizca OpenRouter'da olusabilir: onun model/fiyat listesi herkese acik,
-   * anahtar gerektirmiyor. Yonetici hangi modellere hangi fiyata
-   * erisebilecegini anahtari satin almadan gorebilsin diye grup yine
-   * gosteriliyor - ama secilirse uretim yapilmaz, arayuz uyarir.
-   */
-  keyMissing: boolean;
   /** Bu saglayicinin listesi alinamadiysa sebebi. */
   error: string | null;
 }
@@ -148,20 +139,22 @@ export const listAvailableModels = cache(async (): Promise<ModelCatalog> => {
   }
 
   /*
-    OpenRouter HER ZAMAN listeye giriyor.
+    YALNIZCA anahtari tanimli saglayicilar listelenir.
 
-    Sebep: model ve fiyat listesi herkese acik bir uctan geliyor, anahtar
-    gerektirmiyor. OpenRouter'i kullanmanin tek sebebi zaten "tek anahtarla
-    yuzlerce modele erismek"; hangi modellerin ne tuttugunu anahtari almadan
-    gorebilmek kararin kendisi icin gerekli. Anahtar yoksa grup `keyMissing`
-    ile isaretlenir ve uretimde kullanilamaz.
-
-    Diger saglayicilarda bu mumkun degil - onlarin model listesi ucu anahtar
-    istiyor.
+    OpenRouter'in model/fiyat listesi anahtarsiz da cekilebiliyor ve bir ara
+    "fiyatlari gormek icin" anahtarsiz da gosteriliyordu. Kaldirildi:
+    secilemeyecek bir modeli listede tutmak, kullaniciyi denemeye davet edip
+    sonra durdurmak demekti.
   */
-  const providers = [
-    ...new Set<AiProvider>([...(await configuredProviders()), "openrouter"]),
-  ];
+  const providers = await configuredProviders();
+
+  if (providers.length === 0) {
+    return {
+      ...base,
+      error:
+        "Tanımlı bir API anahtarı yok. Sistem yöneticisi Sistem > API Anahtarları ekranından anahtar tanımlamalı.",
+    };
+  }
 
   const groups = await Promise.all(providers.map(loadGroup));
   const total = groups.reduce((sum, group) => sum + group.models.length, 0);
@@ -173,9 +166,7 @@ export const listAvailableModels = cache(async (): Promise<ModelCatalog> => {
       total === 0
         ? (groups.find((group) => group.error)?.error ??
           "Sağlayıcılar kullanılabilir model döndürmedi.")
-        : groups.every((group) => group.keyMissing)
-          ? "Kayıtlı API anahtarı yok. Aşağıdaki modeller yalnızca fiyat karşılaştırması için listeleniyor; üretim için Sistem > API Anahtarları ekranından anahtar tanımlayın."
-          : null,
+        : null,
   };
 });
 
@@ -336,34 +327,12 @@ async function loadGroup(provider: AiProvider): Promise<ModelGroup> {
     provider,
     providerLabel: info.label,
     models: [],
-    keyMissing: false,
     error: null,
   };
 
   const config = await resolveAiConfigFor(provider);
-
   if (!config) {
-    if (provider !== "openrouter") {
-      return { ...group, error: `${info.label} için kayıtlı anahtar yok.` };
-    }
-
-    // Anahtarsiz OpenRouter: liste gosterilir, uretim icin kullanilamaz.
-    try {
-      return {
-        ...group,
-        models: markRecommended(await openRouterModels()),
-        keyMissing: true,
-      };
-    } catch (caught) {
-      return {
-        ...group,
-        keyMissing: true,
-        error:
-          caught instanceof Error
-            ? `${info.label} model listesi alınamadı: ${caught.message}`
-            : `${info.label} model listesi alınamadı.`,
-      };
-    }
+    return { ...group, error: `${info.label} için kayıtlı anahtar yok.` };
   }
 
   try {

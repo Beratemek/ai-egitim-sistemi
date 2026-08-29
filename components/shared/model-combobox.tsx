@@ -43,7 +43,6 @@ export interface ModelComboboxProps {
 interface VisibleGroup {
   provider: AiProvider;
   providerLabel: string;
-  keyMissing: boolean;
   /** Gruptaki toplam model (arama oncesi). */
   total: number;
   /** Aramaya uyanlar. */
@@ -88,7 +87,6 @@ export function ModelCombobox({
       return {
         provider: group.provider,
         providerLabel: group.providerLabel,
-        keyMissing: group.keyMissing,
         total: group.models.length,
         matches,
         // Arama sirasinda eslesen grup kendiliginden acilir.
@@ -279,11 +277,6 @@ export function ModelCombobox({
                       <span className="flex-1 text-sm font-semibold">
                         {group.providerLabel}
                       </span>
-                      {group.keyMissing ? (
-                        <Badge variant="warning" className="text-[0.65rem]">
-                          Anahtar gerekli
-                        </Badge>
-                      ) : null}
                       <span className="text-xs text-muted-foreground">
                         {searching
                           ? `${group.matches.length}/${group.total}`
