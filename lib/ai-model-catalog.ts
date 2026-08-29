@@ -38,7 +38,10 @@ import {
 } from "@/lib/openrouter-models";
 
 /** Bir saglayici bekletirse sayfa da bekler; kisa tutuyoruz. */
-const TIMEOUT_MS = 6000;
+const TIMEOUT_MS = 4000;
+
+/** Model listesi sunucu onbelleginde bu kadar saniye tutulur. */
+const CACHE_SECONDS = 600;
 
 /**
  * Saglayici basina listeye alinan model sayisi.
@@ -411,10 +414,22 @@ async function getJson(
   url: string,
   headers: Record<string, string>,
 ): Promise<unknown> {
+  /*
+    Onbellek AGDAN once gelir.
+
+    Onceden `cache: "no-store"` yaziyordu ve surec bellegindeki memo'ya
+    guveniliyordu. Vercel'de bu ise yaramiyor: her soguk baslangic yeni bir
+    surec demek, yani icerik uzmani sayfasi cogu acilista saglayicilara
+    gercekten gidiyordu - sayfa iki dis HTTP cagrisini bekliyordu.
+
+    `revalidate` ile liste sunucu tarafinda 10 dakika tutuluyor. Anahtar
+    yalnizca istegin kendisinde; onbellek sunucuda kaliyor, tarayiciya hicbir
+    sey gitmiyor.
+  */
   const response = await fetch(url, {
     headers: { accept: "application/json", ...headers },
     signal: AbortSignal.timeout(TIMEOUT_MS),
-    cache: "no-store",
+    next: { revalidate: CACHE_SECONDS },
   });
 
   if (!response.ok) {

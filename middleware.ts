@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import type { User } from "@supabase/supabase-js";
 
 import {
   ROLE_CACHE_COOKIE,
@@ -95,9 +96,25 @@ export async function middleware(request: NextRequest) {
   );
 
   // ONEMLI: getUser() cagrisi token'i dogrular ve tazeler. Kaldirmayin.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { user, unverified } = await getUserResilient(supabase, request);
+
+  /**
+   * Dogrulanamadi != oturum yok.
+   *
+   * `getUser()` Supabase'e giden bir AG CAGRISI. Yayinda bu cagri zaman zaman
+   * basarisiz oluyor (uzak bolge, soguk baslangic, gecici 5xx) ve supabase-js
+   * o durumda da `user: null` donuyor. Sonucu asagida "oturum yok" sayip
+   * /login'e atinca, giris yapmis kullanici once "giris yapilmamis" ekranina
+   * dusuyor, ikinci denemede iceri giriyordu - canlida gorulen tam olarak
+   * buydu.
+   *
+   * Artik gecici hata ile gercek oturumsuzluk ayriliyor: elde oturum cerezi
+   * varken cagri agdan dolayi basarisiz olduysa istek gecirilir. Bu bir
+   * guvenlik acigi degil - middleware yalnizca YONLENDIRME yapar; asil koruma
+   * dashboard layout'undaki kontrol ve veritabanindaki RLS politikalaridir.
+   * Oturum gercekten gecersizse sayfa yine /login'e dusurur.
+   */
+  if (unverified) return response;
 
   /**
    * Sinav cozme ekrani panel kabugunun disinda ama korumasi AYNI olmali:
@@ -222,6 +239,54 @@ export async function middleware(request: NextRequest) {
 }
 
 /**
+ * Oturum sahibini dogrular; gecici ag hatasini oturumsuzluktan AYIRIR.
+ *
+ * `unverified: true` -> "elde oturum cerezi var ama dogrulayamadim".
+ * Cagiran taraf bu durumda yonlendirme yapmaz.
+ *
+ * Bir kez yeniden deniyoruz: yayinda gorulen hatalarin cogu tek seferlik
+ * (soguk baslangic, gecici 5xx). Ikinci deneme genelde tutuyor ve kullanici
+ * hicbir sey fark etmiyor.
+ */
+async function getUserResilient(
+  supabase: ReturnType<typeof createServerClient<Database>>,
+  request: NextRequest,
+): Promise<{ user: User | null; unverified: boolean }> {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const { data, error } = await supabase.auth.getUser();
+
+    if (data.user) return { user: data.user, unverified: false };
+    if (!error) return { user: null, unverified: false };
+
+    // Gecersiz/suresi dolmus token gercek bir "oturum yok" cevabidir;
+    // yalnizca AG kaynakli hatalarda tekrar deniyoruz.
+    if (!isRetryableAuthError(error)) return { user: null, unverified: false };
+  }
+
+  return { user: null, unverified: hasAuthCookie(request) };
+}
+
+/** Ag/sunucu kaynakli, tekrar denemeye deger hata mi? */
+function isRetryableAuthError(error: { name?: string; status?: number }): boolean {
+  if (error.name === "AuthRetryableFetchError") return true;
+  // status 0 ya da tanimsiz: istek hic ulasmadi. 5xx: sunucu tarafi.
+  return !error.status || error.status >= 500;
+}
+
+/**
+ * Tarayicida Supabase oturum cerezi var mi?
+ *
+ * Cerezin VARLIGI oturumun gecerli oldugunu kanitlamaz - yalnizca "bu kisi
+ * giris yapmis gorunuyor" der. Gecici hatada yonlendirmeyi bastirmak icin bu
+ * kadari yeterli; gecerlilik karari sayfa katmaninda veriliyor.
+ */
+function hasAuthCookie(request: NextRequest): boolean {
+  return request.cookies
+    .getAll()
+    .some((cookie) => /^sb-.*-auth-token/.test(cookie.name));
+}
+
+/**
  * Rolu ve rol onay durumunu cozer; mumkunse cerez onbelleginden okur.
  *
  * Onbellek degeri "<userId>:<rol>" bicimindedir. Kullanici kimligini de
@@ -284,8 +349,13 @@ async function resolveProfile(
 export const config = {
   matcher: [
     /*
-     * Statik dosyalar ve resim optimizasyonu disindaki tum yollar.
+     * Statik dosyalar, resim optimizasyonu ve API uclari DISINDAKI tum yollar.
+     *
+     * `/api` neden disarida: her API ucu zaten `requireRole()` ile kendi
+     * yetkisini dogruluyor ve o da `getUser()` cagiriyor. Middleware'in ayni
+     * cagriyi bir kez daha yapmasi her istege fazladan bir ag gidis-donusu
+     * ekliyordu - soru uretimi gibi zaten yavas uclarda bosa gecen sure.
      */
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!api/|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

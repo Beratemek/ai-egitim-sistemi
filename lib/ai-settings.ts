@@ -66,7 +66,37 @@ type StoredSettings =
  * cagrisi bunu cagirabilir; veritabanina yalnizca bir kez gidilir. Onbellek
  * istek bitince silinir.
  */
+/**
+ * Ayar kaydinin SUREC ICI onbellegi.
+ *
+ * `cache()` yalnizca TEK bir istek boyunca dedupe ediyor. Ayarlar her dashboard
+ * sayfasinda okundugu icin (simulasyon uyarisi, model listesi) bu, her sayfa
+ * gecisine bir veritabani gidis-donusu ekliyordu - uzak bir Supabase orneginde
+ * gorunur bir gecikme.
+ *
+ * Sure KISA tutuluyor: panelden anahtar kaydeden yonetici sonucu hemen
+ * gormeli. On saniye, "her gecise bir sorgu" ile "ayar degisikligi gecikir"
+ * arasindaki dengede duruyor.
+ */
+const SETTINGS_TTL_MS = 10_000;
+let settingsCache: { at: number; value: StoredSettings } | null = null;
+
 const loadStoredSettings = cache(async (): Promise<StoredSettings> => {
+  if (settingsCache && Date.now() - settingsCache.at < SETTINGS_TTL_MS) {
+    return settingsCache.value;
+  }
+
+  const fresh = await readStoredSettings();
+  settingsCache = { at: Date.now(), value: fresh };
+  return fresh;
+});
+
+/** Panelden yazma yapildiginda onbellegi dusurur. */
+export function invalidateAiSettingsCache(): void {
+  settingsCache = null;
+}
+
+async function readStoredSettings(): Promise<StoredSettings> {
   if (!isSupabaseConfigured) {
     return { status: "unavailable", reason: "Supabase bağlantısı yapılandırılmamış." };
   }
@@ -114,7 +144,7 @@ const loadStoredSettings = cache(async (): Promise<StoredSettings> => {
       reason: caught instanceof Error ? caught.message : "Ayarlar okunamadı.",
     };
   }
-});
+}
 
 function normalizeSettings(data: unknown): AiSettingsRow | null {
   if (!data || typeof data !== "object") return null;

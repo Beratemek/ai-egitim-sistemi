@@ -13,7 +13,11 @@ import {
   providerInfo,
   type AiProvider,
 } from "@/lib/ai-providers";
-import { resolveAiConfigFor, type AiRuntimeConfig } from "@/lib/ai-settings";
+import {
+  invalidateAiSettingsCache,
+  resolveAiConfigFor,
+  type AiRuntimeConfig,
+} from "@/lib/ai-settings";
 import { isSupabaseConfigured } from "@/lib/env";
 import { grantedRoles } from "@/lib/roles";
 import { createServerSupabaseClient, getCurrentUser } from "@/lib/supabase-server";
@@ -113,6 +117,8 @@ function validate(input: ProviderKeyInput): ActionResult<CleanKeyInput> {
 
 /** Ayarlarin gorundugu her sayfayi tazeler. */
 function revalidateAiPaths(): void {
+  // Surec ici onbellek dusurulmezse panel 10 saniye eski degeri gosterirdi.
+  invalidateAiSettingsCache();
   revalidatePath("/dashboard/sistem/api");
   revalidatePath("/dashboard/egitmen");
   revalidatePath("/dashboard/icerik-uzmani");
