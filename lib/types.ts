@@ -4,6 +4,7 @@
  */
 
 import type { AiProvider } from "@/lib/ai-providers";
+import type { ExamSimulationReport } from "@/lib/exam-simulation";
 import type { QuestionVisual } from "@/lib/visual";
 
 /* -------------------------------------------------------------------------- */
@@ -500,6 +501,34 @@ export interface StyleGuide {
 }
 
 /* -------------------------------------------------------------------------- */
+/*  Sinav kestirimi kaydi                                                     */
+/* -------------------------------------------------------------------------- */
+
+export const SIMULATION_COHORT_KINDS = ["hazir", "elle", "ikiz"] as const;
+export type SimulationCohortKind = (typeof SIMULATION_COHORT_KINDS)[number];
+
+/**
+ * Yayindan once yapilmis bir kestirimin kaydi.
+ *
+ * Kayit DEGISTIRILEMEZ (tabloda update politikasi yok): kalibrasyonun anlami
+ * tahminin sonradan duzeltilememesinde.
+ */
+export type ExamSimulationRow = {
+  id: string;
+  exam_id: string;
+  created_by: string;
+  cohort_kind: SimulationCohortKind;
+  cohort_label: string;
+  /** Kadronun temsil ettigi ogrenci sayisi. */
+  student_count: number;
+  /** Kalibrasyonun karsilastirdigi sayi, 0-100. */
+  predicted_average: number;
+  /** Raporun tamami; sekli `lib/exam-simulation.ts` icinde. */
+  report: ExamSimulationReport;
+  created_at: string;
+};
+
+/* -------------------------------------------------------------------------- */
 /*  Yapay zeka cikti tipleri                                                  */
 /* -------------------------------------------------------------------------- */
 
@@ -877,6 +906,10 @@ export interface Database {
           | "updated_at"
           | "updated_by"
         >
+      >;
+      exam_simulations: TableDefinition<
+        ExamSimulationRow,
+        Insertable<ExamSimulationRow, "id" | "created_at" | "student_count">
       >;
       question_preferences: TableDefinition<
         QuestionPreference,

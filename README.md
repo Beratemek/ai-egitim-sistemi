@@ -192,6 +192,30 @@ Bulgular tek tikla revizyon talimatina cevrilir, soru yeniden yazilir ve
 **yeniden olculur**; iki skor yan yana gosterilir. Ayrinti icin
 [`docs/sanal-sinif.md`](docs/sanal-sinif.md).
 
+## Sinav kestirimi (sinif simulasyonu)
+
+Sinav yayina alinmadan once simule bir sinifa cozduruluyor: puan dagilimi,
+gecme orani, ust-alt ayrismasi, soru bazinda basari, kazanim kirilimi ve sure
+uyumu cikiyor. Kadro uc yoldan kurulabilir - hazir zit takim, egitmenin elle
+tarif ettigi sinif ya da **gercek bir sinifin dijital ikizi** (gecmis
+sonuclardan turetilir; ogrenci adi/kimligi modele gitmez).
+
+```ts
+import { simulateExam } from "@/lib/ai";
+
+const report = await simulateExam({ cohort, questions, durationMinutes, cohortLabel });
+// -> { distribution, separation, questions, outcomes, duration, warnings }
+```
+
+Her kestirim kaydediliyor; sinav gercekten yapilip puanlar onaylandiginda
+tahmin gercekle karsilastirilip **kalibrasyon** uretiliyor ("son 7 kestirimde
+ortalama sapma 6,4 puan"). Ayrinti icin
+[`docs/sinav-kestirimi.md`](docs/sinav-kestirimi.md).
+
+> Kestirim kaydi icin `supabase/migrations/BEKLEYEN-1-sinav-kestirimi.sql`
+> uygulanmali. Uygulanmazsa kestirim yine calisir, yalnizca kalibrasyon
+> birikmez.
+
 ## Guvenlik notlari
 
 - Tum tablolarda **RLS acik**. Rol kontrolu, politika ozyinelemesini onlemek

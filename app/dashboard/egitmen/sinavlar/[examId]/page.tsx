@@ -17,6 +17,7 @@ import { isSupabaseConfigured } from "@/lib/env";
 import { evaluateExamQuality } from "@/lib/exam-quality";
 import {
   getExamAssignedStudentIds,
+  getExamCalibration,
   getExamDetail,
   getQuestions,
   getSubjectOptions,
@@ -38,7 +39,7 @@ export default async function SinavDetayPage({
 }) {
   const { examId } = await params;
 
-  const [detail, pool, submissions, users, assignedIds, subjectOptions] =
+  const [detail, pool, submissions, users, assignedIds, subjectOptions, calibration] =
     await Promise.all([
       getExamDetail(examId),
       getQuestions({ status: "onayli" }),
@@ -46,6 +47,7 @@ export default async function SinavDetayPage({
       getUsers(),
       getExamAssignedStudentIds(examId),
       getSubjectOptions(),
+      getExamCalibration(examId),
     ]);
 
   if (!detail) notFound();
@@ -186,6 +188,7 @@ export default async function SinavDetayPage({
             subjects={derivedSubjects}
             questionCount={detail.questions.length}
             durationMinutes={detail.exam.duration_minutes}
+            calibration={calibration}
             canPersist={isSupabaseConfigured}
           />
         }

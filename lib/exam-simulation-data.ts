@@ -22,8 +22,9 @@ import {
 } from "./student-profiles.ts";
 import type { StudentPerformanceSample } from "@/lib/student-profiles";
 import type { ExamQualityBundle } from "@/lib/exam-quality-data";
-import type { SimulationQuestion } from "@/lib/exam-simulation";
+import type { ExamSimulationReport, SimulationQuestion } from "@/lib/exam-simulation";
 import type { TypedServerClient } from "@/lib/supabase-server";
+import type { SimulationCohortKind } from "@/lib/types";
 
 /**
  * Ikiz kurarken taranacak en fazla cevap sayisi.
@@ -241,4 +242,49 @@ export function buildPerformanceSamples(
 function average(values: readonly number[]): number {
   if (values.length === 0) return 0;
   return values.reduce((total, value) => total + value, 0) / values.length;
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Kestirim kaydi                                                            */
+/* -------------------------------------------------------------------------- */
+
+export interface RecordSimulationInput {
+  examId: string;
+  createdBy: string;
+  cohortKind: SimulationCohortKind;
+  report: ExamSimulationReport;
+}
+
+/**
+ * Kestirimi kaydeder - kalibrasyonun hammaddesi.
+ *
+ * KAYIT BASARISIZ OLURSA KESTIRIM DUSMEZ. Iki sebep var: (1) tablo henuz
+ * ortak veritabanina uygulanmamis olabilir (bkz.
+ * supabase/migrations/BEKLEYEN-1-sinav-kestirimi.sql), (2) kayit ozelligin
+ * KENDISI degil, uzerine kurulan olcum. Kullanicinin bekledigi raporu, arka
+ * plandaki bir kayit hatasi yuzunden goremez hale getirmek yanlis olur.
+ *
+ * Hata sessizce yutulmuyor, sunucu gunlugune yaziliyor.
+ */
+export async function recordExamSimulation(
+  supabase: TypedServerClient,
+  input: RecordSimulationInput,
+): Promise<void> {
+  try {
+    const { error } = await supabase.from("exam_simulations").insert({
+      exam_id: input.examId,
+      created_by: input.createdBy,
+      cohort_kind: input.cohortKind,
+      cohort_label: input.report.cohortLabel,
+      student_count: input.report.studentCount,
+      predicted_average: input.report.distribution.mean,
+      report: input.report,
+    });
+
+    if (error) {
+      console.warn("[kestirim] Kayit basarisiz:", error.message);
+    }
+  } catch (caught) {
+    console.warn("[kestirim] Kayit basarisiz:", caught);
+  }
 }

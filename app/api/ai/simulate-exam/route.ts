@@ -4,7 +4,11 @@ import { resolveAiConfigFor } from "@/lib/ai-settings";
 import { jsonError, jsonOk, readJson, requireRole } from "@/lib/api";
 import type { ExamSimulationReport } from "@/lib/exam-simulation";
 import { loadExamQualityBundle } from "@/lib/exam-quality-data";
-import { loadClassroomTwin, toSimulationQuestions } from "@/lib/exam-simulation-data";
+import {
+  loadClassroomTwin,
+  recordExamSimulation,
+  toSimulationQuestions,
+} from "@/lib/exam-simulation-data";
 import {
   createProfile,
   presetCohort,
@@ -83,6 +87,20 @@ export async function POST(request: Request) {
       cohortLabel: cohort.label,
       ...(model ? { modelId: model } : {}),
       ...(provider ? { providerId: provider } : {}),
+    });
+
+    /*
+      Tahmin KAYDEDILIYOR: sinav gercekten yapildiginda gercek ortalamayla yan
+      yana konacak. Kaydetmeseydik kestirimin tutup tutmadigi hicbir zaman
+      olculemezdi - ve olculemeyen bir tahmin bir sey ifade etmez.
+
+      Kayit hatasi yaniti dusurmez; bkz. `recordExamSimulation`.
+    */
+    await recordExamSimulation(supabase, {
+      examId,
+      createdBy: guard.user.user.id,
+      cohortKind: body.cohort.kind,
+      report,
     });
 
     return jsonOk<ExamSimulationReport>(report);

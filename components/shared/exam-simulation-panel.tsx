@@ -6,6 +6,7 @@ import {
   Clock,
   Loader2,
   Plus,
+  Target,
   Trash2,
   TrendingUp,
   Users,
@@ -45,6 +46,7 @@ import type {
   SimulatedQuestionResult,
   SimulationQuestionWarning,
 } from "@/lib/exam-simulation";
+import type { ExamCalibrationData } from "@/lib/queries";
 import type {
   ApiResponse,
   ManualProfileInput,
@@ -95,6 +97,8 @@ export interface ExamSimulationPanelProps {
   subjects: readonly string[];
   questionCount: number;
   durationMinutes: number | null;
+  /** Gecmis kestirimlerin gercek sonuclarla karsilastirmasi. */
+  calibration: ExamCalibrationData;
   canPersist?: boolean;
 }
 
@@ -117,6 +121,7 @@ export function ExamSimulationPanel({
   subjects,
   questionCount,
   durationMinutes,
+  calibration,
   canPersist = true,
 }: ExamSimulationPanelProps) {
   const [kadroTuru, setKadroTuru] = React.useState<"hazir" | "ikiz" | "elle">("hazir");
@@ -299,8 +304,115 @@ export function ExamSimulationPanel({
         </CardContent>
       </Card>
 
+      <KalibrasyonSeridi calibration={calibration} />
+
       {report ? <SonucGorunumu report={report} durationMinutes={durationMinutes} /> : null}
     </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Kalibrasyon                                                               */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Kestirimin gecmiste ne kadar tuttugu.
+ *
+ * OZELLIGIN KENDI DOGRULUGUNU GOSTERDIGI YER. Bir tahmin, tutup tutmadigi
+ * olculmedigi surece guvenilir de guvenilmez de sayilamaz; burada her kestirim
+ * sinav yapildiktan sonra gercek ortalamayla karsilastiriliyor ve ortalama
+ * sapma acikca yaziliyor. Sapma buyuk ciksa da gosteriliyor - gizlemek,
+ * kullanicinin tahmine hak etmedigi bir guven duymasina yol acardi.
+ */
+function KalibrasyonSeridi({ calibration }: { calibration: ExamCalibrationData }) {
+  if (!calibration.available) {
+    return (
+      <p className="rounded-lg border border-dashed p-3 text-xs text-muted-foreground">
+        Kalibrasyon kapalı: kestirim kayıtları için{" "}
+        <code className="rounded bg-muted px-1 py-0.5">
+          supabase/migrations/BEKLEYEN-1-sinav-kestirimi.sql
+        </code>{" "}
+        henüz uygulanmamış. Kestirim yine de çalışır, yalnızca tahmin-gerçek
+        karşılaştırması birikmez.
+      </p>
+    );
+  }
+
+  const { summary, latest } = calibration;
+  if (!summary && !latest) return null;
+
+  const sapma =
+    latest && latest.actual !== null
+      ? Math.round(Math.abs(latest.predicted - latest.actual) * 10) / 10
+      : null;
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Target className="h-4 w-4" />
+          Kestirim ne kadar tutuyor?
+        </CardTitle>
+        <CardDescription>
+          Yapılan tahminler, sınav gerçekleşip puanlar onaylandıktan sonra gerçek
+          ortalamayla karşılaştırılır.
+        </CardDescription>
+      </CardHeader>
+
+      <CardContent className="space-y-3">
+        {summary ? (
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <Metrik
+              baslik="Ortalama sapma"
+              deger={"\u00b1" + summary.meanAbsoluteError}
+              alt={summary.count + " ölçülmüş kestirim"}
+            />
+            <Metrik
+              baslik="10 puan içinde"
+              deger={"%" + Math.round(summary.within10 * 100)}
+              alt="isabetli sayılan tahminler"
+            />
+            <Metrik
+              baslik="Yönelim"
+              deger={summary.bias > 0 ? "+" + summary.bias : String(summary.bias)}
+              alt={
+                summary.bias > 1
+                  ? "fazla iyimser"
+                  : summary.bias < -1
+                    ? "fazla karamsar"
+                    : "yansız"
+              }
+            />
+            <Metrik baslik="En kötü sapma" deger={String(summary.worst)} alt="puan" />
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            Henüz ölçülmüş kestirim yok. Kestirim yapılan bir sınav uygulanıp puanları
+            onaylandığında tahmin ile gerçek burada yan yana görünecek.
+          </p>
+        )}
+
+        {latest ? (
+          <p className="rounded-lg bg-muted/50 p-3 text-sm">
+            <strong>Bu sınav:</strong>{" "}
+            {latest.actual === null || sapma === null ? (
+              <>
+                son tahmin %{latest.predicted} ({latest.cohortLabel}). Sonuçlar
+                onaylandığında karşılaştırma buraya düşecek.
+              </>
+            ) : (
+              <>
+                tahmin %{latest.predicted} → gerçek %{latest.actual} ({latest.studentCount}{" "}
+                öğrenci){" "}
+                <Badge variant={sapma < 10 ? "success" : "warning"} className="ml-1">
+                  {sapma} puan sapma
+                </Badge>
+              </>
+            )}
+          </p>
+        ) : null}
+      </CardContent>
+    </Card>
   );
 }
 
