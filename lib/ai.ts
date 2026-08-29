@@ -25,14 +25,16 @@ import { resolveAiConfig, resolveAiConfigFor } from "@/lib/ai-settings";
 import { normalizeOptionKey } from "@/lib/answer-normalization";
 import {
   buildVirtualClassReport,
-  STUDENT_PERSONA_IDS,
-  STUDENT_PERSONAS,
   type CueLeakProbe,
-  type PersonaRubricScore,
+  type ProfileRubricScore,
   type StudentAgentAnswer,
-  type StudentPersonaId,
   type VirtualClassReport,
 } from "@/lib/student-agents";
+import {
+  findProfile,
+  PRESET_PROFILES,
+  type StudentProfile,
+} from "@/lib/student-profiles";
 import { parseVisual, type QuestionVisual } from "@/lib/visual";
 import { searchWikimediaImages } from "@/lib/visual-search";
 import type {
@@ -1128,13 +1130,22 @@ function clampScore(value: number, max: number): number {
   return Math.max(0, Math.min(max, Math.round(value)));
 }
 
-const personaIdSchema = z.enum(STUDENT_PERSONA_IDS);
+/*
+  Profil kimligi sema tarafinda SERBEST METIN.
 
+  Onceden sabit bes personanin kimligi `z.enum` ile zorlaniyordu. Kadro artik
+  degisken - sinav kestiriminde profiller gercek siniftan turetiliyor ve
+  kimlikleri onceden bilinmiyor. Dogrulama kod tarafinda yapiliyor: kadroda
+  olmayan bir kimlik iceren cevap sessizce atiliyor (bkz.
+  `normalizeCohortAnswers`).
+*/
 const studentCohortSchema = z.object({
   answers: z
     .array(
       z.object({
-        personaId: personaIdSchema.describe("Cevabi veren ogrenci profilinin kimligi."),
+        profileId: z
+          .string()
+          .describe("Cevabi veren ogrenci profilinin kimligi; listede verilen deger."),
         answer: z
           .string()
           .describe(
@@ -1179,7 +1190,7 @@ const cohortRubricSchema = z.object({
   scores: z
     .array(
       z.object({
-        personaId: personaIdSchema,
+        profileId: z.string(),
         score: z.number().min(0).max(100).describe("Rubrige gore 0-100 arasi puan."),
         comment: z.string().describe("Puanin tek cumlelik gerekcesi."),
       }),
@@ -1192,6 +1203,13 @@ export interface VirtualClassOptions {
   kazanim?: string;
   /** Ders adi; simulasyonun ton ve seviye ayarini yapmasina yarar. */
   subject?: string;
+  /**
+   * Olcumu yapacak kadro. Verilmezse sabit zit takim kullanilir.
+   *
+   * Soru kalitesi olcumunde bu takim BILEREK sabittir: sorular arasi
+   * karsilastirma ancak ayni olcu aletiyle anlamli olur.
+   */
+  profiles?: readonly StudentProfile[];
   /** Bu pilot icin kullanilacak model. Verilmezse varsayilan model. */
   modelId?: string;
   /** Modelin saglayicisi; anahtari yoksa istek reddedilir. */
@@ -1203,9 +1221,9 @@ export interface VirtualClassOptions {
  *
  * UC CAGRI, IKISI PARALEL:
  *
- *   1. SINIF - bes ogrenci profili soruyu cozer. Tek cagri, cunku profillerin
+ *   1. SINIF - kadrodaki profiller soruyu cozer. Tek cagri, cunku profillerin
  *      ayni soruyu ayni kosullarda gormesi gerekiyor ve bes ayri cagri hem
- *      besedelli hem bes kat yavas olurdu.
+ *      bes bedelli hem bes kat yavas olurdu.
  *
  *   2. IPUCU SONDASI - konuyu bilmeyen bir ogrenci soruyu yalnizca siklarin
  *      bicimine bakarak cozmeye calisir. AYRI CAGRI OLMAK ZORUNDA: ayni
@@ -1226,6 +1244,7 @@ export async function runVirtualClass(
   options: VirtualClassOptions = {},
 ): Promise<VirtualClassReport> {
   const { kazanim, subject, modelId, providerId } = options;
+  const profiles = options.profiles ?? PRESET_PROFILES;
 
   if (!question.text.trim()) {
     throw new Error("[ai] runVirtualClass: soru metni bos olamaz.");
@@ -1241,7 +1260,7 @@ export async function runVirtualClass(
     );
   }
 
-  if (ai.mockMode) return mockVirtualClass(question);
+  if (ai.mockMode) return mockVirtualClass(question, profiles);
 
   const model = createAiModel(ai, modelId || ai.modelGeneration);
   const gorunenSoru = studentFacingQuestion(question);
@@ -1268,10 +1287,8 @@ export async function runVirtualClass(
         : "",
       `SORU TIPI: ${question.type === "test" ? "Coktan secmeli" : "Acik uclu"}`,
       `SORU (ogrencinin gordugu haliyle):\n${gorunenSoru}`,
-      `OGRENCI PROFILLERI:\n${STUDENT_PERSONAS.map(
-        (persona) => `- ${persona.id} (${persona.label}): ${persona.brief}`,
-      ).join("\n")}`,
-      `GOREV: Her profil icin bir cevap uret; toplam ${STUDENT_PERSONAS.length} cevap olmali.`,
+      `OGRENCI PROFILLERI:\n${describeRoster(profiles)}`,
+      `GOREV: Her profil icin bir cevap uret; toplam ${profiles.length} cevap olmali.`,
     ]
       .filter(Boolean)
       .join("\n\n"),
@@ -1305,7 +1322,7 @@ export async function runVirtualClass(
 
   const [cohort, probe] = await Promise.all([cohortCall, probeCall]);
 
-  const answers = normalizeCohortAnswers(cohort.object.answers, question);
+  const answers = normalizeCohortAnswers(cohort.object.answers, question, profiles);
 
   const cueProbe: CueLeakProbe | null = probe
     ? {
@@ -1320,7 +1337,20 @@ export async function runVirtualClass(
       ? await gradeCohortAnswers(model, question.rubric, question.text, answers)
       : null;
 
-  return buildVirtualClassReport({ question, answers, cueProbe, rubricScores });
+  return buildVirtualClassReport({
+    question,
+    profiles,
+    answers,
+    cueProbe,
+    rubricScores,
+  });
+}
+
+/** Kadroyu modele verilecek listeye cevirir. */
+export function describeRoster(profiles: readonly StudentProfile[]): string {
+  return profiles
+    .map((profile) => `- ${profile.id} (${profile.label}): ${profile.brief}`)
+    .join("\n");
 }
 
 /**
@@ -1331,7 +1361,7 @@ export async function runVirtualClass(
  * atlanirsa grafige dayanan sorularda butun profiller "veri eksik" der ve
  * olcum anlamini yitirir.
  */
-function studentFacingQuestion(question: GeneratedQuestion): string {
+export function studentFacingQuestion(question: GeneratedQuestion): string {
   const parts = [question.text];
 
   const visual = describeVisualForStudent(question.visual);
@@ -1372,23 +1402,27 @@ function describeVisualForStudent(visual: QuestionVisual | null): string | null 
 /**
  * Model ciktisini rapor katmaninin bekledigi bicime getirir.
  *
- * Iki sey garanti ediliyor: her personadan EN COK bir cevap (model bazen ayni
- * profil icin iki satir uretiyor) ve test sorusunda `answer` alaninin sik
- * anahtarina indirgenmesi ("B) ikinci secenek" -> "B").
+ * Uc sey garanti ediliyor: cevabin KADRODAKI bir profile ait olmasi, her
+ * profilden EN COK bir cevap (model bazen ayni profil icin iki satir uretiyor)
+ * ve test sorusunda `answer` alaninin sik anahtarina indirgenmesi
+ * ("B) Sifir" -> "B").
  */
 function normalizeCohortAnswers(
   raw: z.infer<typeof studentCohortSchema>["answers"],
   question: GeneratedQuestion,
+  profiles: readonly StudentProfile[],
 ): StudentAgentAnswer[] {
-  const seen = new Set<StudentPersonaId>();
+  const seen = new Set<string>();
   const answers: StudentAgentAnswer[] = [];
 
   for (const item of raw) {
-    if (seen.has(item.personaId)) continue;
-    seen.add(item.personaId);
+    const profileId = item.profileId.trim();
+    if (seen.has(profileId)) continue;
+    if (!findProfile(profiles, profileId)) continue;
+    seen.add(profileId);
 
     answers.push({
-      personaId: item.personaId,
+      profileId,
       answer:
         question.type === "test"
           ? normalizeOptionKey(item.answer)
@@ -1410,12 +1444,12 @@ function normalizeCohortAnswers(
  * cagri hem pahali hem yavas. Burada onemli olan mutlak puan degil ust ve alt
  * grubun AYRISIP ayrismadigi, bu da tek cagrida guvenilir sekilde olculuyor.
  */
-async function gradeCohortAnswers(
+export async function gradeCohortAnswers(
   model: LanguageModelV1,
   rubric: string,
   questionText: string,
   answers: readonly StudentAgentAnswer[],
-): Promise<PersonaRubricScore[]> {
+): Promise<ProfileRubricScore[]> {
   if (answers.length === 0) return [];
 
   const { object } = await generateObject({
@@ -1433,20 +1467,21 @@ async function gradeCohortAnswers(
       `SORU:\n${questionText}`,
       `RUBRIK (tam puan 100):\n${rubric}`,
       `OGRENCI CEVAPLARI:\n${answers
-        .map((answer) => `[${answer.personaId}] ${answer.answer}`)
+        .map((answer) => `[${answer.profileId}] ${answer.answer}`)
         .join("\n\n")}`,
       "GOREV: Her cevabi rubrige gore puanla ve tek cumlelik gerekce yaz.",
     ].join("\n\n"),
   });
 
-  const seen = new Set<StudentPersonaId>();
-  const scores: PersonaRubricScore[] = [];
+  const seen = new Set<string>();
+  const scores: ProfileRubricScore[] = [];
 
   for (const item of object.scores) {
-    if (seen.has(item.personaId)) continue;
-    seen.add(item.personaId);
+    const profileId = item.profileId.trim();
+    if (seen.has(profileId)) continue;
+    seen.add(profileId);
     scores.push({
-      personaId: item.personaId,
+      profileId,
       score: clampScore(item.score, 100),
       comment: item.comment.trim(),
     });
@@ -1458,12 +1493,15 @@ async function gradeCohortAnswers(
 /**
  * Mock modda sanal sinif.
  *
- * Deterministik ve GERCEKCI: guclu ile ortalama ogrenci dogru, zorlanan ile
- * yanilgili ogrenci farkli celdiricilere gider. Boylece anahtar olmadan
- * acilan demoda p degeri, ayirt edicilik ve celdirici dagilimi anlamli
+ * Deterministik ve GERCEKCI: kadronun yetkinlik siralamasina gore ust yaridaki
+ * profiller dogru, alt yaridakiler farkli celdiricilere gider. Boylece anahtar
+ * olmadan acilan demoda p degeri, ayirt edicilik ve celdirici dagilimi anlamli
  * gorunur - hepsi dogru ya da hepsi yanlis olsaydi panel bos bir kabuk olurdu.
  */
-function mockVirtualClass(question: GeneratedQuestion): VirtualClassReport {
+function mockVirtualClass(
+  question: GeneratedQuestion,
+  profiles: readonly StudentProfile[],
+): VirtualClassReport {
   const options = question.options ?? [];
   const correctKey = question.correct_answer
     ? normalizeOptionKey(question.correct_answer)
@@ -1472,83 +1510,48 @@ function mockVirtualClass(question: GeneratedQuestion): VirtualClassReport {
     .map((option) => normalizeOptionKey(option.key))
     .filter((key) => key !== correctKey);
 
-  const sik = (index: number): string => yanlisSiklar[index] ?? correctKey;
+  const answers: StudentAgentAnswer[] = profiles.map((profile, index) => {
+    // Yetkinlik esigi: 0,6 ustu profiller dogru bilir. Sabit bir esik yeterli,
+    // cunku burada amac gercekci bir DAGILIM gostermek.
+    const dogru = profile.ability >= 0.6;
+    const yanlisSik = yanlisSiklar[index % Math.max(1, yanlisSiklar.length)] ?? correctKey;
 
-  const plan: ReadonlyArray<{
-    personaId: StudentPersonaId;
-    dogru: boolean;
-    confidence: number;
-    reasoning: string;
-    ambiguous: boolean;
-  }> = [
-    {
-      personaId: "guclu",
-      dogru: true,
-      confidence: 92,
-      reasoning: "[MOCK] Kazanimi hatirlayip secenekleri tek tek eledim.",
-      ambiguous: false,
-    },
-    {
-      personaId: "ortalama",
-      dogru: true,
-      confidence: 68,
-      reasoning: "[MOCK] Iki secenek arasinda kaldim, tanidik olani sectim.",
-      ambiguous: false,
-    },
-    {
-      personaId: "zorlanan",
-      dogru: false,
-      confidence: 30,
-      reasoning: "[MOCK] Konuyu tam bilmiyorum, anahtar kelimeye gore tahmin ettim.",
-      ambiguous: true,
-    },
-    {
-      personaId: "yanilgili",
-      dogru: false,
-      confidence: 74,
-      reasoning: "[MOCK] Yaygin yanilgiya uyan secenegi dogru sandim.",
-      ambiguous: false,
-    },
-    {
-      personaId: "aceleci",
-      dogru: true,
-      confidence: 55,
-      reasoning: "[MOCK] Soruyu hizli okudum ama ifade netti.",
-      ambiguous: false,
-    },
-  ];
+    return {
+      profileId: profile.id,
+      answer:
+        question.type === "test"
+          ? dogru
+            ? correctKey
+            : yanlisSik
+          : `[MOCK] ${profile.label} profilinin cevabi.`,
+      confidence: Math.round(40 + profile.ability * 55),
+      reasoning: dogru
+        ? "[MOCK] Kazanimi hatirlayip secenekleri eledim."
+        : "[MOCK] Konuyu tam bilmedigim icin en makul gorduguma gittim.",
+      ambiguous: profile.diligence < 0.4,
+      ambiguityNote:
+        profile.diligence < 0.4
+          ? "[MOCK] Soru kokunde neyin istendigi bana net gelmedi."
+          : null,
+    };
+  });
 
-  const answers: StudentAgentAnswer[] = plan.map((item, index) => ({
-    personaId: item.personaId,
-    answer:
-      question.type === "test"
-        ? item.dogru
-          ? correctKey
-          : sik(index % Math.max(1, yanlisSiklar.length))
-        : `[MOCK] ${item.personaId} profilinin cevabi.`,
-    confidence: item.confidence,
-    reasoning: item.reasoning,
-    ambiguous: item.ambiguous,
-    ambiguityNote: item.ambiguous
-      ? "[MOCK] Soru kokunde neyin istendigi bana net gelmedi."
-      : null,
-  }));
-
-  const rubricScores: PersonaRubricScore[] | null =
+  const rubricScores: ProfileRubricScore[] | null =
     question.type === "acik_uclu"
-      ? plan.map((item) => ({
-          personaId: item.personaId,
-          score: item.dogru ? 82 : 41,
+      ? profiles.map((profile) => ({
+          profileId: profile.id,
+          score: Math.round(25 + profile.ability * 65),
           comment: "[MOCK] Rubrik maddelerine kismi deginme.",
         }))
       : null;
 
   return buildVirtualClassReport({
     question,
+    profiles,
     answers,
     cueProbe:
       question.type === "test"
-        ? { guess: sik(0), confidence: 25, cue: null }
+        ? { guess: yanlisSiklar[0] ?? correctKey, confidence: 25, cue: null }
         : null,
     rubricScores,
   });

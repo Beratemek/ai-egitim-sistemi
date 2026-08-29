@@ -7,23 +7,26 @@
  * hesaplanir. Ama pilot uygulama gercek ogrenci, gercek zaman ister; bir
  * kazanim icin bes soru ureten icerik uzmani bunu asla yapamaz.
  *
- * Bu modul pilot uygulamayi SIMULE eder: farkli bilissel profillerdeki
- * ogrenci agent'lari soruyu -CEVAP ANAHTARINI GORMEDEN- cozer, sonra ayni
- * madde analizi metrikleri onlarin cevaplarindan hesaplanir.
+ * Bu modul pilot uygulamayi SIMULE eder: farkli yetkinlikteki ogrenci
+ * profilleri soruyu -CEVAP ANAHTARINI GORMEDEN- cozer, sonra ayni madde
+ * analizi metrikleri onlarin cevaplarindan hesaplanir.
  *
- * IKI PARCA, BILEREK AYRI:
- *   - Bu dosya SAF: persona tanimlari + metrik/bulgu hesabi. Ag cagrisi yok,
- *     dolayisiyla birim testi yazilabiliyor (tests/student-agents.test.ts).
+ * UC PARCA, BILEREK AYRI:
+ *   - `lib/student-profiles.ts` ogrenci profili modelini tutar; buradaki
+ *     sabit takim (PRESET_PROFILES) da, sinav kestiriminin kadrosu da ayni
+ *     tipten.
+ *   - Bu dosya SAF: metrik ve bulgu hesabi. Ag cagrisi yok, dolayisiyla
+ *     birim testi yazilabiliyor (tests/student-agents.test.ts).
  *   - Model cagrilari `lib/ai.ts` icindeki `runVirtualClass()`de. Projedeki
  *     tum AI cagrilari orada toplaniyor: mock modu, anahtar cozumu ve hata
  *     cevirisi tek yerde kalsin diye.
  *
  * KRITIK TASARIM KARARI - CEVAP ANAHTARI MODELE VERILMEZ.
- * Verilseydi "guclu ogrenci" personasi anahtari kopyalar, p degeri her soruda
- * 1.0 cikardi ve olcum hicbir sey soylemezdi. Anahtar yalnizca BURADA,
- * cevaplar geldikten SONRA karsilastirmaya girer. Bu yuzden "guclu
- * ogrencinin yanlis yapmasi" gercek bir sinyaldir: ya cevap anahtari
- * hatalidir ya da soru belirsizdir.
+ * Verilseydi en guclu profil anahtari kopyalar, p degeri her soruda 1.0
+ * cikardi ve olcum hicbir sey soylemezdi. Anahtar yalnizca BURADA, cevaplar
+ * geldikten SONRA karsilastirmaya girer. Bu yuzden "kazanimi bilen profilin
+ * yanlis yapmasi" gercek bir sinyaldir: ya cevap anahtari hatalidir ya da
+ * soru belirsizdir.
  *
  * Metrikler `lib/question-analytics.ts` ile AYNI kavramlari kullaniyor
  * (p degeri, ayirt edicilik, celdirici dagilimi). Boylece soru gercek sinavda
@@ -31,106 +34,8 @@
  */
 
 import { normalizeOptionKey } from "./answer-normalization.ts";
+import { findProfile, type ProfileGroup, type StudentProfile } from "./student-profiles.ts";
 import type { GeneratedQuestion, QuestionDifficulty } from "@/lib/types";
-
-/* -------------------------------------------------------------------------- */
-/*  Personalar                                                                */
-/* -------------------------------------------------------------------------- */
-
-export const STUDENT_PERSONA_IDS = [
-  "guclu",
-  "ortalama",
-  "zorlanan",
-  "yanilgili",
-  "aceleci",
-] as const;
-
-export type StudentPersonaId = (typeof STUDENT_PERSONA_IDS)[number];
-
-/**
- * Ayirt edicilik hesabindaki grup.
- *
- * Klasik madde analizinde sinif basariya gore ust %27 / alt %27 diye ikiye
- * bolunur ve iki grubun dogru oranlari cikarilir. Burada grup personanin
- * TANIMINDAN geliyor: kimin "ust" kimin "alt" oldugunu simulasyon degil biz
- * biliyoruz. `notr` grup hesaba girmez - aceleci ogrenci bilgi duzeyini degil
- * DIKKATI olcer, ayirt edicilige karistirilirsa metrigi bozar.
- */
-export type PersonaGroup = "ust" | "alt" | "notr";
-
-export interface StudentPersona {
-  id: StudentPersonaId;
-  /** Arayuzde gorunen ad. */
-  label: string;
-  /** Persona kartinin altindaki tek cumlelik aciklama. */
-  summary: string;
-  group: PersonaGroup;
-  /** Modele verilen karakter tanimi. */
-  brief: string;
-}
-
-export const STUDENT_PERSONAS: readonly StudentPersona[] = [
-  {
-    id: "guclu",
-    label: "Güçlü öğrenci",
-    summary: "Kazanımı tam öğrenmiş; bu öğrenci yanılıyorsa soruda sorun var.",
-    group: "ust",
-    brief:
-      "Kazanimi tam ogrenmis, dikkatli ve sistemli calisan bir ogrenci. " +
-      "Soruyu bastan sona okur, gerekirse islem yapar, secenekleri tek tek eler. " +
-      "Bildigi konuda emin cevap verir; ama soru belirsizse ya da iki secenek de " +
-      "savunulabilirse bunu FARK EDER ve acikca belirtir.",
-  },
-  {
-    id: "ortalama",
-    label: "Ortalama öğrenci",
-    summary: "Konuyu genel hatlarıyla bilir, ayrıntıda tereddüt eder.",
-    group: "ust",
-    brief:
-      "Konuyu genel hatlariyla bilen, temel tanimlari hatirlayan ama ayrintida ve " +
-      "cok adimli islemde tereddut eden bir ogrenci. Tanidik gelen secenege yonelir; " +
-      "iki secenek arasinda kalirsa daha asina oldugunu secer.",
-  },
-  {
-    id: "zorlanan",
-    label: "Zorlanan öğrenci",
-    summary: "Ön bilgisi eksik; sorunun okunabilirliğini test eder.",
-    group: "alt",
-    brief:
-      "On bilgisi eksik, konunun temel kavramlarini yarim ogrenmis bir ogrenci. " +
-      "Uzun ve karmasik soru kokunde kaybolur, anahtar kelimelere tutunarak tahmin " +
-      "yurutur. Bilmiyorsa bilmedigini soyler ve en makul gorduguyle gider.",
-  },
-  {
-    id: "yanilgili",
-    label: "Kavram yanılgılı öğrenci",
-    summary: "Yaygın bir yanılgıyla düşünür; çeldiricilerin gücünü ölçer.",
-    group: "alt",
-    brief:
-      "Konuda YAYGIN bir kavram yanilgisi tasiyan ogrenci. Kendince tutarli ama " +
-      "temelde hatali bir modelle dusunur (or. 'agir cisim daha hizli duser', " +
-      "'buyuk paydali kesir daha buyuktur'). Once bu konudaki en yaygin yanilgiyi " +
-      "belirle, sonra o yanilgiyla cevap ver: hangi secenek o yanilgiyi karsiliyorsa " +
-      "onu sec.",
-  },
-  {
-    id: "aceleci",
-    label: "Aceleci öğrenci",
-    summary: "Soruyu hızlı okur; tuzaklı ve muğlak ifadeleri ortaya çıkarır.",
-    group: "notr",
-    brief:
-      "Konuyu bilen ama sinavda aceleci davranan bir ogrenci. Soru kokunu hizli " +
-      "okur; 'degildir', 'yanlistir', 'hangisi olamaz' gibi olumsuz kaliplari " +
-      "atlayabilir ve ilk makul secenege atlar. Ifade muglak ya da tuzakliysa hata " +
-      "yapar; ifade netse dogru cevabi verir.",
-  },
-];
-
-export function personaById(id: StudentPersonaId): StudentPersona {
-  const persona = STUDENT_PERSONAS.find((item) => item.id === id);
-  if (!persona) throw new Error(`[sanal-sinif] Bilinmeyen persona: ${id}`);
-  return persona;
-}
 
 /* -------------------------------------------------------------------------- */
 /*  Simulasyon ciktilari (modelin doldurdugu sekiller)                        */
@@ -138,7 +43,8 @@ export function personaById(id: StudentPersonaId): StudentPersona {
 
 /** Tek bir ogrenci agent'inin soruya verdigi cevap. */
 export interface StudentAgentAnswer {
-  personaId: StudentPersonaId;
+  /** Cevabi veren profilin kimligi. */
+  profileId: string;
   /** Test sorusunda sik anahtari ("B"), acik ucluda kisa cevap metni. */
   answer: string;
   /** Ogrencinin kendi eminlik duzeyi, 0-100. */
@@ -155,7 +61,7 @@ export interface StudentAgentAnswer {
  * "Test kurnazi" sondasi - soruyu KONUYU BILMEDEN cozmeye calisir.
  *
  * Ayri bir model cagrisi olmak zorunda: ayni cagrida sorulsaydi model soruyu
- * zaten guclu ogrenci olarak cozmus olurdu ve buradaki tahmin onun kopyasi
+ * zaten guclu profil olarak cozmus olurdu ve buradaki tahmin onun kopyasi
  * cikardi. Bu sonda yalnizca soru kokunu ve sikleri gorur; ders, konu ve
  * kazanim verilmez.
  *
@@ -172,9 +78,9 @@ export interface CueLeakProbe {
   cue: string | null;
 }
 
-/** Acik uclu soruda bir personanin cevabinin rubrige gore puani. */
-export interface PersonaRubricScore {
-  personaId: StudentPersonaId;
+/** Acik uclu soruda bir profilin cevabinin rubrige gore puani. */
+export interface ProfileRubricScore {
+  profileId: string;
   /** 0-100. */
   score: number;
   comment: string;
@@ -187,13 +93,13 @@ export interface PersonaRubricScore {
 export const VIRTUAL_CLASS_THRESHOLDS = {
   /** p degeri bunun ustundeyse soru cok kolay: herkes dogru bildi. */
   cokKolayP: 0.95,
-  /** p degeri bunun altindaysa soru cok zor: guclu ogrenci bile bilemedi. */
+  /** p degeri bunun altindaysa soru cok zor: guclu profil bile bilemedi. */
   cokZorP: 0.25,
   /** Ayirt edicilik bunun altindaysa madde sinifi ayristirmiyor. */
   dusukAyirtEdicilik: 0.25,
   /** Ayirt edicilik bunun altindaysa madde TERS calisiyor - agir bulgu. */
   tersAyirtEdicilik: 0,
-  /** Bu kadar persona belirsizlik isaretlerse ifade sorunu vardir. */
+  /** Bu kadar profil belirsizlik isaretlerse ifade sorunu vardir. */
   belirsizlikEsigi: 2,
   /** Kurnaz sonda bu guvenin uzerinde tutturduysa ipucu sizmis sayilir. */
   ipucuGuvenEsigi: 60,
@@ -245,7 +151,7 @@ export interface OptionUptake {
   /** 0-1. */
   rate: number;
   correct: boolean;
-  personaIds: StudentPersonaId[];
+  profileIds: string[];
 }
 
 export type VirtualClassVerdict = "hazir" | "gozden_gecir" | "revizyon";
@@ -253,6 +159,14 @@ export type VirtualClassVerdict = "hazir" | "gozden_gecir" | "revizyon";
 export interface VirtualClassReport {
   /** Soru tipi - rapor okunurken sik metrikleri var mi belli olsun diye. */
   questionType: GeneratedQuestion["type"];
+  /**
+   * Olcumu yapan kadro.
+   *
+   * Rapora GOMULU: arayuz profil adini ve grubunu gostermek icin ayrica bir
+   * listeye bagimli olmasin. Ileride kadro degisirse eski raporlar da kendi
+   * kadrosuyla dogru okunur.
+   */
+  profiles: StudentProfile[];
   /**
    * p degeri (madde guclugu): dogru cevaplayanlarin orani, 0-1.
    * Acik ucluda rubrik puanlarinin ortalamasinin yuzdeligi.
@@ -264,14 +178,14 @@ export interface VirtualClassReport {
    * calistigini, yani konuyu bilen ogrenciyi cezalandirdigini gosterir.
    */
   ayirtEdicilik: number | null;
-  /** Belirsizlik isaretleyen persona sayisi. */
+  /** Belirsizlik isaretleyen profil sayisi. */
   belirsizlikSayisi: number;
   /** Test sorusunda sik dagilimi; acik ucluda bos dizi. */
   siklar: OptionUptake[];
   /** Test sorusunda ipucu sondasi; acik ucluda null. */
   ipucuSondasi: (CueLeakProbe & { sizinti: boolean }) | null;
-  /** Acik ucluda persona bazinda rubrik puani; testte null. */
-  rubrikPuanlari: PersonaRubricScore[] | null;
+  /** Acik ucluda profil bazinda rubrik puani; testte null. */
+  rubrikPuanlari: ProfileRubricScore[] | null;
   cevaplar: StudentAgentAnswer[];
   bulgular: QualityFinding[];
   /** 0-100; bulgularin agirlikli cezasi 100'den dusulerek bulunur. */
@@ -300,18 +214,20 @@ function mean(values: readonly number[]): number | null {
   return values.reduce((total, value) => total + value, 0) / values.length;
 }
 
-/** Persona test sorusunu dogru cevaplamis mi? */
+/** Profil test sorusunu dogru cevaplamis mi? */
 function isCorrect(answer: StudentAgentAnswer, correctKey: string): boolean {
   return normalizeOptionKey(answer.answer) === normalizeOptionKey(correctKey);
 }
 
 export interface VirtualClassInput {
   question: GeneratedQuestion;
+  /** Olcumu yapan kadro; genelde `PRESET_PROFILES`. */
+  profiles: readonly StudentProfile[];
   answers: readonly StudentAgentAnswer[];
   /** Test sorusunda ipucu sondasi; acik uclu soruda null. */
   cueProbe: CueLeakProbe | null;
-  /** Acik ucluda persona cevaplarinin rubrik puanlari; testte null. */
-  rubricScores: readonly PersonaRubricScore[] | null;
+  /** Acik ucluda profil cevaplarinin rubrik puanlari; testte null. */
+  rubricScores: readonly ProfileRubricScore[] | null;
 }
 
 /**
@@ -322,12 +238,12 @@ export interface VirtualClassInput {
  * harcamadan test edilebiliyor.
  */
 export function buildVirtualClassReport(input: VirtualClassInput): VirtualClassReport {
-  const { question, answers, cueProbe, rubricScores } = input;
+  const { question, profiles, answers, cueProbe, rubricScores } = input;
   const isTest = question.type === "test";
 
-  const basari = successByPersona(question, answers, rubricScores);
+  const basari = successByProfile(question, answers, rubricScores);
   const pDegeri = mean([...basari.values()]);
-  const ayirtEdicilik = discrimination(basari);
+  const ayirtEdicilik = discrimination(basari, profiles);
 
   const siklar = isTest ? optionUptake(question, answers) : [];
   const ipucuSondasi = buildProbeVerdict(question, cueProbe);
@@ -335,6 +251,7 @@ export function buildVirtualClassReport(input: VirtualClassInput): VirtualClassR
 
   const bulgular = collectFindings({
     question,
+    profiles,
     answers,
     basari,
     pDegeri,
@@ -353,6 +270,7 @@ export function buildVirtualClassReport(input: VirtualClassInput): VirtualClassR
 
   return {
     questionType: question.type,
+    profiles: [...profiles],
     pDegeri: pDegeri === null ? null : round(pDegeri),
     ayirtEdicilik: ayirtEdicilik === null ? null : round(ayirtEdicilik),
     belirsizlikSayisi,
@@ -368,41 +286,52 @@ export function buildVirtualClassReport(input: VirtualClassInput): VirtualClassR
 }
 
 /**
- * Persona -> basari (0-1) haritasi.
+ * Profil -> basari (0-1) haritasi.
  *
  * Test sorusunda basari ikili (dogru/yanlis), acik ucluda rubrik puaninin
  * yuzdeligi. Ikisi ayni olcege indirildigi icin p degeri ve ayirt edicilik
  * her iki soru tipinde AYNI formulle hesaplanabiliyor.
  */
-function successByPersona(
+function successByProfile(
   question: GeneratedQuestion,
   answers: readonly StudentAgentAnswer[],
-  rubricScores: readonly PersonaRubricScore[] | null,
-): Map<StudentPersonaId, number> {
-  const result = new Map<StudentPersonaId, number>();
+  rubricScores: readonly ProfileRubricScore[] | null,
+): Map<string, number> {
+  const result = new Map<string, number>();
 
   if (question.type === "test") {
     const key = question.correct_answer;
     if (!key) return result;
     for (const answer of answers) {
-      result.set(answer.personaId, isCorrect(answer, key) ? 1 : 0);
+      result.set(answer.profileId, isCorrect(answer, key) ? 1 : 0);
     }
     return result;
   }
 
   for (const score of rubricScores ?? []) {
-    result.set(score.personaId, Math.max(0, Math.min(100, score.score)) / 100);
+    result.set(score.profileId, Math.max(0, Math.min(100, score.score)) / 100);
   }
   return result;
 }
 
-/** Ust grup ortalamasi eksi alt grup ortalamasi. `notr` personalar disarida. */
-function discrimination(basari: ReadonlyMap<StudentPersonaId, number>): number | null {
+/** Profil kimliginden grup; kadroda bulunamayan profil hesaba katilmaz. */
+function groupOf(
+  profiles: readonly StudentProfile[],
+  profileId: string,
+): ProfileGroup | null {
+  return findProfile(profiles, profileId)?.group ?? null;
+}
+
+/** Ust grup ortalamasi eksi alt grup ortalamasi. `notr` profiller disarida. */
+function discrimination(
+  basari: ReadonlyMap<string, number>,
+  profiles: readonly StudentProfile[],
+): number | null {
   const ust: number[] = [];
   const alt: number[] = [];
 
-  for (const [personaId, value] of basari) {
-    const group = personaById(personaId).group;
+  for (const [profileId, value] of basari) {
+    const group = groupOf(profiles, profileId);
     if (group === "ust") ust.push(value);
     else if (group === "alt") alt.push(value);
   }
@@ -422,12 +351,12 @@ function optionUptake(
   const options = question.options ?? [];
   if (options.length === 0) return [];
 
-  const secenler = new Map<string, StudentPersonaId[]>();
+  const secenler = new Map<string, string[]>();
   for (const answer of answers) {
     const key = normalizeOptionKey(answer.answer);
     const list = secenler.get(key);
-    if (list) list.push(answer.personaId);
-    else secenler.set(key, [answer.personaId]);
+    if (list) list.push(answer.profileId);
+    else secenler.set(key, [answer.profileId]);
   }
 
   const correctKey = question.correct_answer
@@ -436,14 +365,14 @@ function optionUptake(
 
   return options.map((option) => {
     const key = normalizeOptionKey(option.key);
-    const personaIds = secenler.get(key) ?? [];
+    const profileIds = secenler.get(key) ?? [];
     return {
       key: option.key,
       text: option.text,
-      count: personaIds.length,
-      rate: answers.length > 0 ? round(personaIds.length / answers.length) : 0,
+      count: profileIds.length,
+      rate: answers.length > 0 ? round(profileIds.length / answers.length) : 0,
       correct: correctKey !== null && key === correctKey,
-      personaIds,
+      profileIds,
     };
   });
 }
@@ -482,14 +411,15 @@ function buildProbeVerdict(
 
 interface FindingContext {
   question: GeneratedQuestion;
+  profiles: readonly StudentProfile[];
   answers: readonly StudentAgentAnswer[];
-  basari: ReadonlyMap<StudentPersonaId, number>;
+  basari: ReadonlyMap<string, number>;
   pDegeri: number | null;
   ayirtEdicilik: number | null;
   siklar: readonly OptionUptake[];
   ipucuSondasi: (CueLeakProbe & { sizinti: boolean }) | null;
   belirsizlikSayisi: number;
-  rubricScores: readonly PersonaRubricScore[] | null;
+  rubricScores: readonly ProfileRubricScore[] | null;
 }
 
 function collectFindings(context: FindingContext): QualityFinding[] {
@@ -512,29 +442,50 @@ function collectFindings(context: FindingContext): QualityFinding[] {
 }
 
 /**
+ * Kadronun REFERANS ogrencisi: yetkinligi en yuksek profil.
+ *
+ * Sabit bir kimlige ("guclu") baglanmiyor cunku kadro degisebilir - sinav
+ * kestiriminde kadro gercek siniftan gelir ve orada "guclu" diye bir profil
+ * yoktur. Referans her zaman "kazanimi en iyi bilen kim" sorusunun cevabi.
+ */
+function referenceProfile(profiles: readonly StudentProfile[]): StudentProfile | null {
+  return (
+    [...profiles].sort((a, b) => b.ability - a.ability)[0] ?? null
+  );
+}
+
+/**
  * Cevap anahtari suphesi - raporun en degerli bulgusu.
  *
- * Guclu ogrenci kazanimi bilen ogrencidir; onun cevabi anahtardan farkliysa ya
- * anahtar yanlistir ya da soru birden fazla dogru cevaba aciktir. Ikisi de
+ * Referans ogrenci kazanimi bilen ogrencidir; onun cevabi anahtardan farkliysa
+ * ya anahtar yanlistir ya da soru birden fazla dogru cevaba aciktir. Ikisi de
  * ogrenciye ulasmadan yakalanmasi gereken hatalardir: yayina cikarsa itiraza,
  * puan iptaline ve guven kaybina yol acar.
  */
 function keyErrorFinding(context: FindingContext): QualityFinding[] {
-  const { question, answers, basari } = context;
+  const { question, profiles, answers, basari } = context;
   if (question.type !== "test" || !question.correct_answer) return [];
 
-  const guclu = answers.find((answer) => answer.personaId === "guclu");
-  if (!guclu || basari.get("guclu") !== 0) return [];
+  const referans = referenceProfile(profiles);
+  if (!referans) return [];
 
-  const ortalamaDaYanlis = basari.get("ortalama") === 0;
-  const secilen = normalizeOptionKey(guclu.answer);
+  const cevap = answers.find((answer) => answer.profileId === referans.id);
+  if (!cevap || basari.get(referans.id) !== 0) return [];
 
   /*
-    Sinyalin gucu iki sarta bagli: guclu ogrenci EMIN miydi ve ortalama
-    ogrenci de ayni yone mi gitti. Ikisinden biri varsa yuksek oncelik.
+    Ikinci tanik: referanstan sonraki en yetkin profil. O da anahtari
+    bulamadiysa sinyal cok daha guclu - tek bir profilin dikkatsizligi degil,
+    sorunun kendisi soz konusudur.
   */
+  const ikinci = [...profiles]
+    .sort((a, b) => b.ability - a.ability)
+    .find((profile) => profile.id !== referans.id);
+  const ikincidDeYanlis = ikinci ? basari.get(ikinci.id) === 0 : false;
+
+  const secilen = normalizeOptionKey(cevap.answer);
+
   const severity: FindingSeverity =
-    guclu.confidence >= 70 || ortalamaDaYanlis ? "yuksek" : "orta";
+    cevap.confidence >= 70 || ikincidDeYanlis ? "yuksek" : "orta";
 
   return [
     {
@@ -542,14 +493,16 @@ function keyErrorFinding(context: FindingContext): QualityFinding[] {
       severity,
       title: "Cevap anahtarı şüpheli",
       detail:
-        `Kazanımı bilen öğrenci ${secilen} şıkkını seçti (güven %${Math.round(guclu.confidence)}), ` +
-        `anahtar ise ${normalizeOptionKey(question.correct_answer)}. ` +
-        (ortalamaDaYanlis ? "Ortalama öğrenci de anahtarı bulamadı. " : "") +
-        `Gerekçesi: ${guclu.reasoning}`,
+        `Kazanımı en iyi bilen profil (${referans.label}) ${secilen} şıkkını seçti ` +
+        `(güven %${Math.round(cevap.confidence)}), anahtar ise ` +
+        `${normalizeOptionKey(question.correct_answer)}. ` +
+        (ikincidDeYanlis && ikinci ? `${ikinci.label} de anahtarı bulamadı. ` : "") +
+        `Gerekçesi: ${cevap.reasoning}`,
       repairInstruction:
-        `Doğru cevabı yeniden denetle: güçlü bir öğrenci ${secilen} şıkkını savunulabilir buldu. ` +
-        "Ya anahtarı düzelt ya da o şıkkı tek doğru olmaktan çıkaracak biçimde soru kökünü " +
-        "netleştir. Geriye tek bir tartışmasız doğru cevap kalmalı.",
+        `Doğru cevabı yeniden denetle: kazanımı bilen bir öğrenci ${secilen} şıkkını ` +
+        "savunulabilir buldu. Ya anahtarı düzelt ya da o şıkkı tek doğru olmaktan " +
+        "çıkaracak biçimde soru kökünü netleştir. Geriye tek bir tartışmasız doğru " +
+        "cevap kalmalı.",
     },
   ];
 }
@@ -575,12 +528,15 @@ function cueLeakFinding(context: FindingContext): QualityFinding[] {
 }
 
 function ambiguityFinding(context: FindingContext): QualityFinding[] {
-  const { answers, belirsizlikSayisi } = context;
+  const { profiles, answers, belirsizlikSayisi } = context;
   if (belirsizlikSayisi < VIRTUAL_CLASS_THRESHOLDS.belirsizlikEsigi) return [];
 
   const notlar = answers
     .filter((answer) => answer.ambiguous && answer.ambiguityNote)
-    .map((answer) => `${personaById(answer.personaId).label}: ${answer.ambiguityNote}`);
+    .map((answer) => {
+      const profil = findProfile(profiles, answer.profileId);
+      return `${profil?.label ?? answer.profileId}: ${answer.ambiguityNote}`;
+    });
 
   return [
     {
@@ -761,19 +717,19 @@ function distractorFindings(context: FindingContext): QualityFinding[] {
 }
 
 function rubricFinding(context: FindingContext): QualityFinding[] {
-  const { question, rubricScores } = context;
+  const { question, profiles, rubricScores } = context;
   if (question.type !== "acik_uclu" || !rubricScores || rubricScores.length === 0) {
     return [];
   }
 
   const ust = mean(
     rubricScores
-      .filter((score) => personaById(score.personaId).group === "ust")
+      .filter((score) => groupOf(profiles, score.profileId) === "ust")
       .map((score) => score.score),
   );
   const alt = mean(
     rubricScores
-      .filter((score) => personaById(score.personaId).group === "alt")
+      .filter((score) => groupOf(profiles, score.profileId) === "alt")
       .map((score) => score.score),
   );
 

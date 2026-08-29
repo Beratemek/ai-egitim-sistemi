@@ -4,10 +4,10 @@ import test from "node:test";
 import {
   buildRepairInstruction,
   buildVirtualClassReport,
-  type PersonaRubricScore,
+  type ProfileRubricScore,
   type StudentAgentAnswer,
-  type StudentPersonaId,
 } from "../lib/student-agents.ts";
+import { PRESET_PROFILES } from "../lib/student-profiles.ts";
 import type { GeneratedQuestion } from "../lib/types.ts";
 
 /* -------------------------------------------------------------------------- */
@@ -48,15 +48,15 @@ function acikUcluSoru(patch: Partial<GeneratedQuestion> = {}): GeneratedQuestion
 }
 
 function cevap(
-  personaId: StudentPersonaId,
+  profileId: string,
   answer: string,
   patch: Partial<StudentAgentAnswer> = {},
 ): StudentAgentAnswer {
   return {
-    personaId,
+    profileId,
     answer,
     confidence: 70,
-    reasoning: `${personaId} gerekcesi`,
+    reasoning: `${profileId} gerekcesi`,
     ambiguous: false,
     ambiguityNote: null,
     ...patch,
@@ -85,6 +85,7 @@ function saglikliCevaplar(): StudentAgentAnswer[] {
 
 test("saglikli soru bulgusuz gecer ve tam puan alir", () => {
   const report = buildVirtualClassReport({
+    profiles: PRESET_PROFILES,
     question: testSorusu(),
     answers: saglikliCevaplar(),
     cueProbe: { guess: "A", confidence: 20, cue: null },
@@ -107,6 +108,7 @@ test("p degeri butun profilleri, ayirt edicilik yalniz ust/alt grubu sayar", () 
     dusuruyor.
   */
   const report = buildVirtualClassReport({
+    profiles: PRESET_PROFILES,
     question: testSorusu({ difficulty: "orta" }),
     answers: [
       cevap("guclu", "B"),
@@ -125,6 +127,7 @@ test("p degeri butun profilleri, ayirt edicilik yalniz ust/alt grubu sayar", () 
 
 test("sik dagilimi kimin hangi sikki sectigini tasir", () => {
   const report = buildVirtualClassReport({
+    profiles: PRESET_PROFILES,
     question: testSorusu(),
     answers: saglikliCevaplar(),
     cueProbe: null,
@@ -135,7 +138,7 @@ test("sik dagilimi kimin hangi sikki sectigini tasir", () => {
   assert.ok(dogruSik);
   assert.equal(dogruSik.correct, true);
   assert.equal(dogruSik.count, 2);
-  assert.deepEqual(dogruSik.personaIds, ["guclu", "ortalama"]);
+  assert.deepEqual(dogruSik.profileIds, ["guclu", "ortalama"]);
 });
 
 /* -------------------------------------------------------------------------- */
@@ -144,6 +147,7 @@ test("sik dagilimi kimin hangi sikki sectigini tasir", () => {
 
 test("guclu ogrenci anahtardan saparsa cevap anahtari supheli sayilir", () => {
   const report = buildVirtualClassReport({
+    profiles: PRESET_PROFILES,
     question: testSorusu(),
     answers: [
       cevap("guclu", "C", { confidence: 90 }),
@@ -166,6 +170,7 @@ test("guclu ogrenci anahtardan saparsa cevap anahtari supheli sayilir", () => {
 
 test("alt grup ust gruptan basariliysa madde ters calisiyor", () => {
   const report = buildVirtualClassReport({
+    profiles: PRESET_PROFILES,
     question: testSorusu(),
     answers: [
       cevap("guclu", "C"),
@@ -187,6 +192,7 @@ test("ipucu sizintisi yalniz gerekce ADI KONDUGUNDA isaretlenir", () => {
   const answers = saglikliCevaplar();
 
   const gerekcesiz = buildVirtualClassReport({
+    profiles: PRESET_PROFILES,
     question,
     answers,
     // Dogru sikki tutturuyor ve emin, ama dayandigi bicimsel ipucu yok:
@@ -199,6 +205,7 @@ test("ipucu sizintisi yalniz gerekce ADI KONDUGUNDA isaretlenir", () => {
   assert.ok(!gerekcesiz.bulgular.some((item) => item.code === "ipucu_sizintisi"));
 
   const gerekceli = buildVirtualClassReport({
+    profiles: PRESET_PROFILES,
     question,
     answers,
     cueProbe: {
@@ -217,6 +224,7 @@ test("ipucu sizintisi yalniz gerekce ADI KONDUGUNDA isaretlenir", () => {
 
 test("ipucu sondasi yanlis sikki tuttururken sizinti isaretlenmez", () => {
   const report = buildVirtualClassReport({
+    profiles: PRESET_PROFILES,
     question: testSorusu(),
     answers: saglikliCevaplar(),
     cueProbe: { guess: "D", confidence: 95, cue: "en uzun sik" },
@@ -228,6 +236,7 @@ test("ipucu sondasi yanlis sikki tuttururken sizinti isaretlenmez", () => {
 
 test("iki ogrenci belirsizlik isaretlerse ifade bulgusu cikar", () => {
   const report = buildVirtualClassReport({
+    profiles: PRESET_PROFILES,
     question: testSorusu(),
     answers: [
       cevap("guclu", "B", { ambiguous: true, ambiguityNote: "B ve D birlikte dogru" }),
@@ -248,6 +257,7 @@ test("iki ogrenci belirsizlik isaretlerse ifade bulgusu cikar", () => {
 
 test("hicbir ogrencinin secmedigi celdirici isaretlenir", () => {
   const report = buildVirtualClassReport({
+    profiles: PRESET_PROFILES,
     question: testSorusu({ difficulty: "orta" }),
     answers: [
       cevap("guclu", "B"),
@@ -267,6 +277,7 @@ test("hicbir ogrencinin secmedigi celdirici isaretlenir", () => {
 
 test("etiketlenen zorluk olculen zorlukla uyusmazsa uyari verilir", () => {
   const report = buildVirtualClassReport({
+    profiles: PRESET_PROFILES,
     // Herkes dogru cevapliyor ama soru "zor" diye etiketlenmis.
     question: testSorusu({ difficulty: "zor" }),
     answers: [
@@ -290,12 +301,13 @@ test("etiketlenen zorluk olculen zorlukla uyusmazsa uyari verilir", () => {
 /*  Acik uclu                                                                 */
 /* -------------------------------------------------------------------------- */
 
-function rubrikPuani(personaId: StudentPersonaId, score: number): PersonaRubricScore {
-  return { personaId, score, comment: "gerekce" };
+function rubrikPuani(profileId: string, score: number): ProfileRubricScore {
+  return { profileId, score, comment: "gerekce" };
 }
 
 test("acik ucluda p degeri ve ayirt edicilik rubrik puanlarindan gelir", () => {
   const report = buildVirtualClassReport({
+    profiles: PRESET_PROFILES,
     question: acikUcluSoru(),
     answers: [
       cevap("guclu", "Ayrintili cevap"),
@@ -323,6 +335,7 @@ test("acik ucluda p degeri ve ayirt edicilik rubrik puanlarindan gelir", () => {
 
 test("ust ve alt grup benzer puan alirsa rubrik ayristirmiyor sayilir", () => {
   const report = buildVirtualClassReport({
+    profiles: PRESET_PROFILES,
     question: acikUcluSoru(),
     answers: [
       cevap("guclu", "Ayrintili cevap"),
@@ -352,6 +365,7 @@ test("ust ve alt grup benzer puan alirsa rubrik ayristirmiyor sayilir", () => {
 
 test("onarim talimati yalniz yuksek ve orta oncelikli bulgulari tasir", () => {
   const report = buildVirtualClassReport({
+    profiles: PRESET_PROFILES,
     question: testSorusu({ difficulty: "kolay" }),
     answers: [
       // Guclu ogrenci saparsa yuksek oncelikli bulgu; zorluk uyusmazligi ise
@@ -376,6 +390,7 @@ test("onarim talimati yalniz yuksek ve orta oncelikli bulgulari tasir", () => {
 
 test("bulgu yoksa onarim talimati uretilmez", () => {
   const report = buildVirtualClassReport({
+    profiles: PRESET_PROFILES,
     question: testSorusu(),
     answers: saglikliCevaplar(),
     cueProbe: null,

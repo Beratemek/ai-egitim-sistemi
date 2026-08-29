@@ -28,13 +28,13 @@ import {
 import { normalizeOptionKey } from "@/lib/answer-normalization";
 import {
   buildRepairInstruction,
-  personaById,
   type FindingSeverity,
   type QualityFinding,
   type StudentAgentAnswer,
   type VirtualClassReport,
   type VirtualClassVerdict,
 } from "@/lib/student-agents";
+import { findProfile, type StudentProfile } from "@/lib/student-profiles";
 import type { ApiResponse, GeneratedQuestion } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -316,13 +316,14 @@ export function VirtualClassDialog({
               <h3 className="text-sm font-semibold">Sınıfın cevapları</h3>
               <ul className="grid gap-2 sm:grid-cols-2">
                 {aktifRapor.cevaplar.map((cevap) => (
-                  <PersonaKarti
-                    key={cevap.personaId}
+                  <ProfilKarti
+                    key={cevap.profileId}
                     cevap={cevap}
+                    profil={findProfile(aktifRapor.profiles, cevap.profileId)}
                     question={aktifSoru}
                     rubrikPuani={
                       aktifRapor.rubrikPuanlari?.find(
-                        (puan) => puan.personaId === cevap.personaId,
+                        (puan) => puan.profileId === cevap.profileId,
                       )?.score ?? null
                     }
                   />
@@ -522,23 +523,25 @@ function BulguSatiri({ bulgu }: { bulgu: QualityFinding }) {
 }
 
 /**
- * Tek bir ogrencinin cevabi.
+ * Tek bir profilin cevabi.
  *
  * Dogru/yanlis isareti test sorusunda anahtar karsilastirmasindan, acik uclu
  * soruda rubrik puanindan geliyor. Gerekce her zaman gosteriliyor: bulgunun
  * KANITI o metinde, "guclu ogrenci B dedi" cumlesi tek basina bir sey
  * anlatmiyor.
  */
-function PersonaKarti({
+function ProfilKarti({
   cevap,
+  profil,
   question,
   rubrikPuani,
 }: {
   cevap: StudentAgentAnswer;
+  /** Kadroda bulunamazsa null - kart yine cizilir, yalniz adi kimlik olur. */
+  profil: StudentProfile | null;
   question: GeneratedQuestion;
   rubrikPuani: number | null;
 }) {
-  const persona = personaById(cevap.personaId);
   const dogru =
     question.type === "test" && question.correct_answer
       ? normalizeOptionKey(cevap.answer) === normalizeOptionKey(question.correct_answer)
@@ -560,7 +563,9 @@ function PersonaKarti({
         ) : (
           <X className="h-4 w-4 shrink-0 text-destructive" />
         )}
-        <span className="min-w-0 flex-1 truncate text-sm font-medium">{persona.label}</span>
+        <span className="min-w-0 flex-1 truncate text-sm font-medium">
+          {profil?.label ?? cevap.profileId}
+        </span>
 
         {question.type === "test" ? (
           <Badge variant="outline" className="font-mono">
@@ -573,7 +578,9 @@ function PersonaKarti({
         ) : null}
       </div>
 
-      <p className="mt-1 text-xs text-muted-foreground">{persona.summary}</p>
+      {profil ? (
+        <p className="mt-1 text-xs text-muted-foreground">{profil.summary}</p>
+      ) : null}
 
       {question.type === "acik_uclu" ? (
         <p className="mt-2 rounded-md bg-muted/60 p-2 text-xs leading-relaxed">
