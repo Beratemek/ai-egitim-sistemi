@@ -41,11 +41,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type {
-  ExamSimulationReport,
-  SimulatedQuestionResult,
-  SimulationQuestionWarning,
+import {
+  estimateSimulationCalls,
+  type ExamSimulationReport,
+  type SimulatedQuestionResult,
+  type SimulationQuestionWarning,
 } from "@/lib/exam-simulation";
+import { PRESET_PROFILES, TWIN_DEFAULTS } from "@/lib/student-profiles";
 import type { ExamCalibrationData } from "@/lib/queries";
 import type {
   ApiResponse,
@@ -96,6 +98,8 @@ export interface ExamSimulationPanelProps {
   /** Sinavin dersleri; elle profilde ders bazli yetkinlik icin. */
   subjects: readonly string[];
   questionCount: number;
+  /** Acik uclu soru sayisi; her biri bir puanlama cagrisi ekler. */
+  openEndedCount: number;
   durationMinutes: number | null;
   /** Gecmis kestirimlerin gercek sonuclarla karsilastirmasi. */
   calibration: ExamCalibrationData;
@@ -120,6 +124,7 @@ export function ExamSimulationPanel({
   classrooms,
   subjects,
   questionCount,
+  openEndedCount,
   durationMinutes,
   calibration,
   canPersist = true,
@@ -138,6 +143,28 @@ export function ExamSimulationPanel({
     if (kadroTuru === "elle") return { kind: "elle", profiles: profiller };
     return { kind: "hazir" };
   }
+
+  /*
+    Kestirim, tek bir soru uretiminden ON KAT pahalidir: her profil sinavi
+    bastan sona cozer. Kullanici bunu dugmeye BASMADAN once bilmeli - aksi
+    halde ucretsiz katmanda kotasinin neden bittigini anlayamaz.
+
+    Profil sayisi kadro turune gore: hazir takim sabit, elle kurulanda satir
+    sayisi, ikizde dilim sayisi kadar (gercek sayi sunucuda cikiyor, burada
+    varsayilan dilim sayisi kullaniliyor).
+  */
+  const profilSayisi =
+    kadroTuru === "elle"
+      ? profiller.length
+      : kadroTuru === "ikiz"
+        ? TWIN_DEFAULTS.size
+        : PRESET_PROFILES.length;
+
+  const tahminiCagri = estimateSimulationCalls({
+    profileCount: profilSayisi,
+    questionCount,
+    openEndedCount,
+  });
 
   async function calistir() {
     if (!canPersist) {
@@ -288,19 +315,34 @@ export function ExamSimulationPanel({
             </p>
           ) : null}
 
-          <Button
-            className="gap-1.5"
-            disabled={pending || questionCount === 0}
-            title={questionCount === 0 ? "Önce sınava soru ekleyin" : undefined}
-            onClick={() => void calistir()}
-          >
-            {pending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Wand2 className="h-4 w-4" />
-            )}
-            {pending ? "Sınıf sınavı çözüyor…" : report ? "Yeniden çalıştır" : "Kestirimi çalıştır"}
-          </Button>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              className="gap-1.5"
+              disabled={pending || questionCount === 0}
+              title={questionCount === 0 ? "Önce sınava soru ekleyin" : undefined}
+              onClick={() => void calistir()}
+            >
+              {pending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Wand2 className="h-4 w-4" />
+              )}
+              {pending
+                ? "Sınıf sınavı çözüyor…"
+                : report
+                  ? "Yeniden çalıştır"
+                  : "Kestirimi çalıştır"}
+            </Button>
+
+            {questionCount > 0 ? (
+              <span className="text-xs text-muted-foreground">
+                Yaklaşık <strong>{tahminiCagri}</strong> yapay zekâ isteği yapılacak
+                {profilSayisi > 5
+                  ? " — profil sayısını azaltarak düşürebilirsiniz."
+                  : "."}
+              </span>
+            ) : null}
+          </div>
         </CardContent>
       </Card>
 

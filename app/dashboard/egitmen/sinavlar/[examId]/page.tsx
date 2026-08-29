@@ -187,6 +187,9 @@ export default async function SinavDetayPage({
             classrooms={classrooms}
             subjects={derivedSubjects}
             questionCount={detail.questions.length}
+            openEndedCount={
+              detail.questions.filter((question) => question.type === "acik_uclu").length
+            }
             durationMinutes={detail.exam.duration_minutes}
             calibration={calibration}
             canPersist={isSupabaseConfigured}

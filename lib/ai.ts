@@ -32,6 +32,7 @@ import {
 } from "@/lib/student-agents";
 import {
   buildExamSimulationReport,
+  SIMULATION_CALL_MODEL,
   type ExamSimulationReport,
   type SimulatedAnswer,
   type SimulationQuestion,
@@ -1574,24 +1575,14 @@ function mockVirtualClass(
 /*  simulateExam - sinav kestirimi                                            */
 /* -------------------------------------------------------------------------- */
 
-/**
- * Bir cagrida sorulacak soru sayisi.
- *
- * Butun sinavi tek istekte sormak cazip ama uzun ciktida model kayiyor: son
- * sorularda gerekce kisaliyor, bazen sorular atlaniyor. Ona parcalar halinde
- * sinav vermek hem ciktiyi saglam tutuyor hem de bir parca basarisiz olursa
- * digerlerini dusurmuyor.
- */
-const EXAM_CHUNK_SIZE = 10;
-
-/**
- * Ayni anda kac model cagrisi acilacak.
- *
- * Cagrilar (profil x parca) carpimindan cikiyor ve hepsi bagimsiz. Sinirsiz
- * paralel calistirmak saglayicinin dakikalik istek sinirina takiliyor;
- * sirayla calistirmak ise 20 soruluk bir sinavda dakikalar suruyor.
- */
-const EXAM_CONCURRENCY = 4;
+/*
+  Parca boyu ve paralellik `lib/exam-simulation.ts` icindeki
+  SIMULATION_CALL_MODEL sabitinden geliyor - arayuz de ayni sayilardan cagri
+  tahminini hesapliyor. Iki yerde ayri tutulsaydi ekranda yazan tahmin ile
+  gercekte yapilan cagri sayisi zamanla ayrisirdi.
+*/
+const EXAM_CHUNK_SIZE = SIMULATION_CALL_MODEL.chunkSize;
+const EXAM_CONCURRENCY = SIMULATION_CALL_MODEL.concurrency;
 
 /** Kestirimin ust sinirlari - tek istekte kotanin tukenmemesi icin. */
 export const SIMULATION_LIMITS = {

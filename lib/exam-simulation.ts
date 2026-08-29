@@ -221,6 +221,60 @@ export const SIMULATION_THRESHOLDS = {
 } as const;
 
 /* -------------------------------------------------------------------------- */
+/*  Cagri maliyeti                                                            */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Kestirimin kac model cagrisi edecegini belirleyen sayilar.
+ *
+ * BURADA, SAF KATMANDA duruyor cunku arayuz de bunu bilmek zorunda:
+ * kullanici dugmeye basmadan once "bu islem yaklasik kac istek yapacak"
+ * yazisini goruyor. Sayilar tek yerde olmazsa ekranda yazan tahmin ile
+ * gercekte yapilan cagri sayisi zamanla ayrisir.
+ */
+export const SIMULATION_CALL_MODEL = {
+  /**
+   * Bir cagrida sorulacak soru sayisi.
+   *
+   * Butun sinavi tek istekte sormak cazip ama uzun ciktida model kayiyor:
+   * son sorularda gerekce kisaliyor, bazen sorular atlaniyor. Ote yandan
+   * parcayi kucuk tutmak cagri sayisini katliyor - 15 soruluk bir sinav
+   * 10'arli bolununce iki parca, yani her profil icin IKI istek demek.
+   *
+   * 15 ikisinin ortasi: tipik bir sinav (10-20 soru) cogu zaman TEK parcaya
+   * siginiyor, cikti da modelin saglikla ureteceginin icinde kaliyor.
+   */
+  chunkSize: 15,
+  /**
+   * Ayni anda acilacak istek sayisi.
+   *
+   * Once 4'tu; ucretsiz katmanlarin DAKIKALIK istek siniri cok dusuk oldugu
+   * icin dort esli istek tek basina 429 uretiyordu - gunluk hak dolmamis
+   * olsa bile. 2, ucretsiz katmanda calisirken makul bir hizi koruyor.
+   */
+  concurrency: 2,
+} as const;
+
+export interface SimulationCallEstimateInput {
+  profileCount: number;
+  questionCount: number;
+  /** Acik uclu soru sayisi; her biri bir puanlama cagrisi ekler. */
+  openEndedCount: number;
+}
+
+/**
+ * Kestirimin yapacagi yaklasik model cagrisi sayisi.
+ *
+ * Kullaniciya dugmeye basmadan ONCE gosteriliyor. Bir kestirimin tek bir soru
+ * uretiminden on kat pahali oldugunu bilmeden tiklayan kullanici, kotasinin
+ * neden bittigini de anlayamaz.
+ */
+export function estimateSimulationCalls(input: SimulationCallEstimateInput): number {
+  const chunks = Math.max(1, Math.ceil(input.questionCount / SIMULATION_CALL_MODEL.chunkSize));
+  return input.profileCount * chunks + input.openEndedCount;
+}
+
+/* -------------------------------------------------------------------------- */
 /*  Sure kestirimi                                                            */
 /* -------------------------------------------------------------------------- */
 
