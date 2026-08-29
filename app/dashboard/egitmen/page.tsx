@@ -15,7 +15,7 @@ import { PendingByClassroom } from "@/components/shared/pending-by-classroom";
 import { QuickActions } from "@/components/shared/quick-actions";
 import { StatCard } from "@/components/shared/stat-card";
 import { buttonVariants } from "@/components/ui/button";
-import { serverEnv } from "@/lib/env";
+import { resolveAiConfig } from "@/lib/ai-settings";
 import {
   getClassroomExamReviews,
   getExamSummaries,
@@ -27,12 +27,13 @@ import { cn } from "@/lib/utils";
 export const metadata: Metadata = { title: "Eğitmen" };
 
 export default async function EgitmenPage() {
-  const [questions, exams, submissions, classroomReviews] =
+  const [questions, exams, submissions, classroomReviews, aiConfig] =
     await Promise.all([
       getQuestions(),
       getExamSummaries(),
       getSubmissions(),
       getClassroomExamReviews(),
+      resolveAiConfig(),
     ]);
 
   // Eğitmen yalnızca havuza dusmus (onaylı) sorularla ilgilenir; taslak
@@ -129,7 +130,7 @@ export default async function EgitmenPage() {
         />
       </div>
 
-      {serverEnv.aiMockMode ? <AiMockNotice capability="puanlama" /> : null}
+      {aiConfig.mockMode ? <AiMockNotice capability="puanlama" /> : null}
 
       <PendingByClassroom reviews={classroomReviews} />
 

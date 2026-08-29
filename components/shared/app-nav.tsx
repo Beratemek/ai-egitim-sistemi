@@ -10,6 +10,7 @@ import {
   ChartNoAxesColumnIncreasing,
   GraduationCap,
   HeartHandshake,
+  KeyRound,
   LayoutDashboard,
   Library,
   ListChecks,
@@ -187,6 +188,12 @@ export const ROLE_NAV: Record<UserRole, readonly NavItem[]> = {
       label: "Kullanıcılar",
       icon: Users,
       description: "Rol, sınıf ve ders yetkisi düzenle",
+    },
+    {
+      href: "/dashboard/sistem/api",
+      label: "API Anahtarları",
+      icon: KeyRound,
+      description: "Yapay zeka sağlayıcısını ve modeli bağla",
     },
   ],
 };

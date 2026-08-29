@@ -8,19 +8,19 @@
  * Cikti sekli Zod semalari ile zorunlu kilinir (`generateObject`), boylece
  * "JSON parse edilemedi" hatalari yerine dogrulanmis nesneler doner.
  *
- * `AI_MOCK_MODE=true` ise (veya OPENAI_API_KEY yoksa) gercek bir API cagrisi
- * yapilmadan deterministik sahte veri dondurulur - hackathon demolari icin.
+ * Saglayici, anahtar ve model CALISMA ANINDA cozulur (`resolveAiConfig`):
+ * once sistem yoneticisinin panelden girdigi ayar, o yoksa `.env`. Anahtar
+ * hicbir yerde yoksa -ya da panelde simulasyon isaretliyse- gercek bir API
+ * cagrisi yapilmadan deterministik sahte veri dondurulur.
  *
  * Bu modul yalnizca sunucu tarafinda calistirilmalidir (API route / server action).
  */
 
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
-import { createOpenAI } from "@ai-sdk/openai";
 import { generateObject } from "ai";
-import type { LanguageModelV1 } from "ai";
 import { z } from "zod";
 
-import { serverEnv } from "@/lib/env";
+import { createAiModel } from "@/lib/ai-model";
+import { resolveAiConfig } from "@/lib/ai-settings";
 import { parseVisual, type QuestionVisual } from "@/lib/visual";
 import { searchWikimediaImages } from "@/lib/visual-search";
 import type {
@@ -30,34 +30,6 @@ import type {
   QuestionType,
   StyleGuide,
 } from "@/lib/types";
-
-/* -------------------------------------------------------------------------- */
-/*  Saglayici                                                                 */
-/* -------------------------------------------------------------------------- */
-
-/**
- * Istenen modeli secilen saglayicidan dondurur.
- *
- * `AI_PROVIDER` (ya da anahtarin oneki) "google" ise Gemini, aksi halde
- * OpenAI kullanilir. OpenAI yolu `OPENAI_BASE_URL` ile OpenAI-uyumlu baska
- * saglayicilara (Groq, OpenRouter, yerel LLM) da yonlendirilebilir.
- *
- * Iki saglayici da sema zorlamali cikti (structured output) destekler; bu
- * yuzden `generateObject` cagrilari saglayiciya gore degismez.
- */
-function getModel(modelId: string): LanguageModelV1 {
-  if (serverEnv.aiProvider === "google") {
-    const google = createGoogleGenerativeAI({ apiKey: serverEnv.openaiApiKey });
-    return google(modelId);
-  }
-
-  const openai = createOpenAI({
-    apiKey: serverEnv.openaiApiKey,
-    ...(serverEnv.openaiBaseUrl ? { baseURL: serverEnv.openaiBaseUrl } : {}),
-  });
-
-  return openai(modelId);
-}
 
 /* -------------------------------------------------------------------------- */
 /*  Saglayici hatalarini okunabilir hale getirme                              */
@@ -89,23 +61,24 @@ export function describeAiError(caught: unknown): string {
 
     return (
       `Yapay zeka saglayicisinin kota siniri doldu. ${when} ` +
-      "Ucretsiz katmanda gunluk istek hakki sinirlidir; " +
-      "faturalandirmayi acarak ya da AI_MOCK_MODE=true ile simulasyon moduna " +
-      "gecerek calismaya devam edebilirsiniz."
+      "Ucretsiz katmanda gunluk istek hakki sinirlidir; faturalandirmayi " +
+      "acarak, baska bir saglayiciya gecerek ya da Sistem > API Anahtarlari " +
+      "ekranindan simulasyon modunu acarak calismaya devam edebilirsiniz."
     );
   }
 
   if (/API key|API_KEY_INVALID|unauthenticated|401|403/i.test(raw)) {
     return (
-      "Yapay zeka anahtari gecersiz ya da yetkisiz. .env dosyasindaki " +
-      "OPENAI_API_KEY degerini kontrol edip sunucuyu yeniden baslatin."
+      "Yapay zeka anahtari gecersiz ya da yetkisiz. Sistem yoneticisi " +
+      "Sistem > API Anahtarlari ekranindan anahtari kontrol edip yeniden " +
+      "kaydetmeli."
     );
   }
 
   if (/model|not found|404/i.test(raw)) {
     return (
-      "Secilen model bulunamadi. .env dosyasindaki AI_MODEL_GENERATION / " +
-      "AI_MODEL_GRADING degerlerini kontrol edin."
+      "Secilen model bulunamadi. Sistem > API Anahtarlari ekranindaki model " +
+      "adlarini kontrol edin; saglayici o modeli kapatmis olabilir."
     );
   }
 
@@ -581,7 +554,9 @@ export async function generateQuestions(
     throw new Error("[ai] generateQuestions: context ve kazanim bos olamaz.");
   }
 
-  if (serverEnv.aiMockMode) {
+  const ai = await resolveAiConfig();
+
+  if (ai.mockMode) {
     return mockGenerateQuestions(kazanim, { count, type, topic, styleGuide });
   }
 
@@ -604,7 +579,7 @@ export async function generateQuestions(
   */
   const { object } = await generateObject({
     maxRetries: 0,
-    model: getModel(serverEnv.aiModelGeneration),
+    model: createAiModel(ai, ai.modelGeneration),
     schema: generateQuestionsSchema,
     system: [
       "Sen deneyimli bir olcme-degerlendirme uzmanisin ve Turkce sinav sorulari yazarsin.",
@@ -656,7 +631,7 @@ export async function generateQuestions(
   try {
     const result = await generateObject({
     maxRetries: 0,
-    model: getModel(serverEnv.aiModelGeneration),
+    model: createAiModel(ai, ai.modelGeneration),
     schema: generateQuestionsSchema,
     system: [
       "Sen deneyimli bir olcme-degerlendirme uzmanisin ve Turkce sinav sorulari yazarsin.",
@@ -840,7 +815,9 @@ export async function reviseQuestion(
     throw new Error("[ai] reviseQuestion: talimat bos olamaz.");
   }
 
-  if (serverEnv.aiMockMode) {
+  const ai = await resolveAiConfig();
+
+  if (ai.mockMode) {
     return mockReviseQuestion(question, trimmed);
   }
 
@@ -853,7 +830,7 @@ export async function reviseQuestion(
 
   const { object } = await generateObject({
     maxRetries: 0,
-    model: getModel(serverEnv.aiModelGeneration),
+    model: createAiModel(ai, ai.modelGeneration),
     schema: generatedQuestionSchema,
     system: [
       "Sen deneyimli bir olcme-degerlendirme uzmanisin.",
@@ -934,13 +911,15 @@ export async function gradeAnswer(
     };
   }
 
-  if (serverEnv.aiMockMode) {
+  const ai = await resolveAiConfig();
+
+  if (ai.mockMode) {
     return mockGradeAnswer(studentAnswer, rubric, maxScore);
   }
 
   const { object } = await generateObject({
     maxRetries: 0,
-    model: getModel(serverEnv.aiModelGrading),
+    model: createAiModel(ai, ai.modelGrading),
     schema: gradingResultSchema,
     system: [
       "Sen tarafsiz bir sinav degerlendiricisisin.",
@@ -991,11 +970,12 @@ export async function coachMistake(
     throw new Error("[ai] coachMistake: soru metni bos olamaz.");
   }
 
-  if (serverEnv.aiMockMode) return mockCoachMistake(normalized);
+  const ai = await resolveAiConfig();
+  if (ai.mockMode) return mockCoachMistake(normalized);
 
   const { object } = await generateObject({
     maxRetries: 0,
-    model: getModel(serverEnv.aiModelGeneration),
+    model: createAiModel(ai, ai.modelGeneration),
     schema: mistakeCoachSchema,
     system: [
       "Sen sabırlı ve ölçme-değerlendirme konusunda deneyimli bir öğrenme koçusun.",
@@ -1055,11 +1035,12 @@ export async function reviewExamQuality(
     })),
   };
 
-  if (serverEnv.aiMockMode) return mockReviewExamQuality(normalized);
+  const ai = await resolveAiConfig();
+  if (ai.mockMode) return mockReviewExamQuality(normalized);
 
   const { object } = await generateObject({
     maxRetries: 0,
-    model: getModel(serverEnv.aiModelGeneration),
+    model: createAiModel(ai, ai.modelGeneration),
     schema: examAiReviewSchema,
     system: [
       "Sen deneyimli bir ölçme-değerlendirme ve eğitim programları uzmanısın.",

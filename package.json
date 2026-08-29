@@ -20,6 +20,7 @@
     "app:ios": "npx cap open ios"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^1.2.12",
     "@ai-sdk/google": "^1.2.22",
     "@ai-sdk/openai": "^1.3.22",
     "@capacitor/android": "^8.5.0",

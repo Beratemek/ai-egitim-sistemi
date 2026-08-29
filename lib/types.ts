@@ -3,6 +3,7 @@
  * `supabase/schema.sql` ile birebir hizali tutulmalidir.
  */
 
+import type { AiProvider } from "@/lib/ai-providers";
 import type { QuestionVisual } from "@/lib/visual";
 
 /* -------------------------------------------------------------------------- */
@@ -619,6 +620,38 @@ type TableDefinition<Row, Insert> = {
   Relationships: [];
 };
 
+/* -------------------------------------------------------------------------- */
+/*  Yapay zeka ayarlari                                                       */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * `public.ai_settings` - TEK SATIRLIK tablo.
+ *
+ * Sistem yoneticisinin panelden girdigi saglayici/anahtar burada durur.
+ * `id` sutunu daima `true`; birincil anahtar oldugu icin ikinci bir satir
+ * acilamaz, yani "hangi kayit gecerli" sorusu hic dogmaz.
+ *
+ * `api_key` ARAYUZE HIC GITMEZ: tablo RLS ile tumuyle kapalidir ve yalnizca
+ * service_role okuyabilir (bkz. lib/ai-settings.ts).
+ *
+ * `interface` DEGIL `type` olarak yaziliyor - dosyadaki diger satir tipleri
+ * gibi. Sebep teknik: postgrest-js `Row: Record<string, unknown>` bekliyor,
+ * TypeScript'te ise bir `interface` ortuk indeks imzasi almadigi icin bu
+ * kisiti karsilamiyor. Interface yazilirsa `Database` sessizce gecersiz
+ * sayilir ve TUM tablolarin sorgulari `never` tipine duser.
+ */
+export type AiSettingsRecord = {
+  id: boolean;
+  provider: AiProvider;
+  api_key: string;
+  base_url: string;
+  model_generation: string;
+  model_grading: string;
+  mock_mode: boolean;
+  updated_at: string;
+  updated_by: string | null;
+};
+
 export interface Database {
   /** supabase-js'in PostgREST surumunu cozmesi icin kullandigi ic alan. */
   __InternalSupabase: { PostgrestVersion: "12" };
@@ -737,6 +770,19 @@ export interface Database {
           "id" | "anonymous" | "created_at" | "updated_at"
         >
       >;
+      ai_settings: TableDefinition<
+        AiSettingsRecord,
+        Insertable<
+          AiSettingsRecord,
+          | "id"
+          | "base_url"
+          | "model_generation"
+          | "model_grading"
+          | "mock_mode"
+          | "updated_at"
+          | "updated_by"
+        >
+      >;
       question_preferences: TableDefinition<
         QuestionPreference,
         Insertable<
@@ -762,6 +808,26 @@ export interface Database {
       };
     };
     Functions: {
+      /*
+        Yapay zeka ayarlari. Ikisi de `security definer`: yetkiyi kendi
+        govdesinde `is_admin()` ile dogrular, yani bu ekrani atlayip PostgREST'e
+        dogrudan istek atmak ise yaramaz.
+      */
+      save_ai_settings: {
+        Args: {
+          new_provider: string;
+          new_api_key: string | null;
+          new_base_url: string;
+          new_model_generation: string;
+          new_model_grading: string;
+          new_mock_mode: boolean;
+        };
+        Returns: null;
+      };
+      clear_ai_api_key: {
+        Args: Record<string, never>;
+        Returns: null;
+      };
       current_user_role: {
         Args: Record<string, never>;
         Returns: UserRole;
