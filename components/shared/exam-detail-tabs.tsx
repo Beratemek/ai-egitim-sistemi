@@ -10,6 +10,7 @@ import {
   Printer,
   Send,
   ShieldCheck,
+  TrendingUp,
   Users,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -50,11 +51,12 @@ export interface ExamDetailTabsProps {
   /** Sekme icerikleri; sunucuda cizilip buraya gecirilir. */
   kurulum: React.ReactNode;
   kalite: React.ReactNode;
+  kestirim: React.ReactNode;
   siniflar: React.ReactNode;
   kagit: React.ReactNode;
 }
 
-type Sekme = "kurulum" | "kalite" | "siniflar" | "kagit";
+type Sekme = "kurulum" | "kalite" | "kestirim" | "siniflar" | "kagit";
 
 export function ExamDetailTabs({
   exam,
@@ -67,6 +69,7 @@ export function ExamDetailTabs({
   canPersist = true,
   kurulum,
   kalite,
+  kestirim,
   siniflar,
   kagit,
 }: ExamDetailTabsProps) {
@@ -217,6 +220,16 @@ export function ExamDetailTabs({
               </span>
             ) : null}
           </TabsTrigger>
+          {/*
+            Kestirim, Kalite Kontrolu ile Siniflar arasinda: kalite kontrolu
+            sinavin KENDI ic tutarliligina bakar, kestirim onu bir SINIFLA
+            karsilastirir, siniflar sekmesi de sinavi gercek sinifa atar.
+            Sekme sirasi bu akisi izliyor.
+          */}
+          <TabsTrigger value="kestirim" className="gap-1.5">
+            <TrendingUp className="h-3.5 w-3.5" />
+            Kestirim
+          </TabsTrigger>
           <TabsTrigger value="siniflar" className="gap-1.5">
             <Users className="h-3.5 w-3.5" />
             Sınıflar
@@ -234,6 +247,10 @@ export function ExamDetailTabs({
 
       <TabsContent value="kalite" className="mt-0">
         {kalite}
+      </TabsContent>
+
+      <TabsContent value="kestirim" className="mt-0">
+        {kestirim}
       </TabsContent>
 
       <TabsContent value="siniflar" className="mt-0">

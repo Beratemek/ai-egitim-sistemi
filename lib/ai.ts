@@ -31,8 +31,15 @@ import {
   type VirtualClassReport,
 } from "@/lib/student-agents";
 import {
+  buildExamSimulationReport,
+  type ExamSimulationReport,
+  type SimulatedAnswer,
+  type SimulationQuestion,
+} from "@/lib/exam-simulation";
+import {
   findProfile,
   PRESET_PROFILES,
+  type CohortMember,
   type StudentProfile,
 } from "@/lib/student-profiles";
 import { parseVisual, type QuestionVisual } from "@/lib/visual";
@@ -1448,7 +1455,12 @@ export async function gradeCohortAnswers(
   model: LanguageModelV1,
   rubric: string,
   questionText: string,
-  answers: readonly StudentAgentAnswer[],
+  /*
+    En dar sekil: yalnizca "kim, ne yazdi". `StudentAgentAnswer` bu sekli zaten
+    karsiliyor, sinav kestirimi de ayni fonksiyonu kendi cevap tipiyle
+    cagirabiliyor - iki ayri puanlama yolu tutmaya gerek kalmiyor.
+  */
+  answers: readonly { profileId: string; answer: string }[],
 ): Promise<ProfileRubricScore[]> {
   if (answers.length === 0) return [];
 
@@ -1557,6 +1569,326 @@ function mockVirtualClass(
   });
 }
 
+
+/* -------------------------------------------------------------------------- */
+/*  simulateExam - sinav kestirimi                                            */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Bir cagrida sorulacak soru sayisi.
+ *
+ * Butun sinavi tek istekte sormak cazip ama uzun ciktida model kayiyor: son
+ * sorularda gerekce kisaliyor, bazen sorular atlaniyor. Ona parcalar halinde
+ * sinav vermek hem ciktiyi saglam tutuyor hem de bir parca basarisiz olursa
+ * digerlerini dusurmuyor.
+ */
+const EXAM_CHUNK_SIZE = 10;
+
+/**
+ * Ayni anda kac model cagrisi acilacak.
+ *
+ * Cagrilar (profil x parca) carpimindan cikiyor ve hepsi bagimsiz. Sinirsiz
+ * paralel calistirmak saglayicinin dakikalik istek sinirina takiliyor;
+ * sirayla calistirmak ise 20 soruluk bir sinavda dakikalar suruyor.
+ */
+const EXAM_CONCURRENCY = 4;
+
+/** Kestirimin ust sinirlari - tek istekte kotanin tukenmemesi icin. */
+export const SIMULATION_LIMITS = {
+  maxQuestions: 30,
+  maxProfiles: 8,
+} as const;
+
+const examAttemptSchema = z.object({
+  answers: z
+    .array(
+      z.object({
+        questionNumber: z
+          .number()
+          .int()
+          .describe("Cevaplanan sorunun sinavdaki numarasi."),
+        answer: z
+          .string()
+          .describe(
+            'Coktan secmeli soruda YALNIZCA sik anahtari ("A", "B", "C", "D"); ' +
+              "acik uclu soruda ogrencinin yazacagi cevap.",
+          ),
+        confidence: z
+          .number()
+          .min(0)
+          .max(100)
+          .describe("Ogrencinin bu cevaba duydugu guven, 0-100."),
+      }),
+    )
+    .describe("Verilen her soru icin bir cevap."),
+});
+
+export interface SimulateExamOptions {
+  cohort: readonly CohortMember[];
+  questions: readonly SimulationQuestion[];
+  /** Sinav suresi (dakika); yoksa sure uyumu hesaplanmaz. */
+  durationMinutes: number | null;
+  /** Kadronun adi - rapora ve kayda yazilir. */
+  cohortLabel: string;
+  modelId?: string;
+  providerId?: AiProvider;
+}
+
+/**
+ * Kadroya sinavi cozdurur ve kestirim raporu uretir.
+ *
+ * CAGRI DUZENI - profil basina sinav, soru basina degil:
+ *
+ *   Soru basina cagri yapsaydik (her soru icin butun kadro) 20 soruluk sinav
+ *   20 cagri ederdi ve her cagrida profil tanimlari bastan gonderilirdi. Profil
+ *   basina cagri hem daha ucuz hem daha gercekci: ogrenci sinavi bastan sona
+ *   tek oturusta cozer, onceki sorulari hatirlar.
+ *
+ *   Sorular parcalara bolunuyor (EXAM_CHUNK_SIZE) cunku uzun ciktida model
+ *   kayiyor; parcalar ve profiller birlikte tek bir gorev listesine cikip
+ *   sinirli paralellikle calistiriliyor.
+ *
+ * ACIK UCLU PUANLAMA: her acik uclu soru icin TEK bir puanlama cagrisi - o
+ * sorunun butun profil cevaplari birlikte rubrige vurulur.
+ *
+ * CEVAP ANAHTARI VE RUBRIK cozum cagrilarina verilmez; yalnizca puanlama
+ * cagrisinda ve saf hesap katmaninda kullanilir.
+ */
+export async function simulateExam(
+  options: SimulateExamOptions,
+): Promise<ExamSimulationReport> {
+  const { durationMinutes, cohortLabel, modelId, providerId } = options;
+
+  const cohort = options.cohort.slice(0, SIMULATION_LIMITS.maxProfiles);
+  const questions = options.questions.slice(0, SIMULATION_LIMITS.maxQuestions);
+
+  if (cohort.length === 0) throw new Error("[ai] simulateExam: kadro bos olamaz.");
+  if (questions.length === 0) {
+    throw new Error("[ai] simulateExam: sinavda soru yok.");
+  }
+
+  const ai = providerId
+    ? await resolveAiConfigFor(providerId)
+    : await resolveAiConfig();
+
+  if (!ai) {
+    throw new Error(
+      `[ai] "${providerId}" saglayicisinin kayitli anahtari yok. Sistem > API Anahtarlari ekranindan tanimlayin.`,
+    );
+  }
+
+  if (ai.mockMode) {
+    return buildExamSimulationReport({
+      cohort,
+      questions,
+      answers: mockExamAnswers(cohort, questions),
+      durationMinutes,
+      cohortLabel,
+    });
+  }
+
+  const model = createAiModel(ai, modelId || ai.modelGeneration);
+  const chunks = chunk(questions, EXAM_CHUNK_SIZE);
+  const byPosition = new Map(questions.map((question) => [question.position, question]));
+
+  /* Gorev listesi: her profil her parcayi bir kez cozer. */
+  const tasks = cohort.flatMap((member) =>
+    chunks.map((parca) => async (): Promise<SimulatedAnswer[]> => {
+      const { object } = await generateObject({
+        maxRetries: 0,
+        model,
+        schema: examAttemptSchema,
+        system: [
+          "Sen bir SINAV SIMULATORUSUN: verilen ogrenci profilinin gozunden bir sinavi cozersin.",
+          "SANA DOGRU CEVAPLAR VERILMEDI. Sorulari gercekten cozmen gerekiyor.",
+          "Rol yapmiyorsun, taklit ediyorsun: profilin bilgi duzeyi hangi cevaba goturuyorsa onu yaz.",
+          "Bilerek yanlis yapma; ama profil konuyu bilmiyorsa dogru cevabi da uydurma.",
+          "Her sorunun DERSI yaziyor; profilin o dersteki duzeyi neyse onu uygula.",
+          "Coktan secmeli soruda `answer` alanina YALNIZCA sik anahtarini yaz.",
+          "Acik uclu soruda o ogrencinin gercekten yazacagi cevabi yaz: yetkin ogrenci gerekceli ve eksiksiz, zorlanan ogrenci kisa ve yuzeysel yazar.",
+          "Bos birakmayi secebilirsin: bilmiyorsa ve tahmin de yurutemiyorsa `answer` alanini bos birak.",
+          "Verilen butun sorulari cevapla; hicbirini atlama.",
+          "Turkce yanit ver.",
+        ].join(" "),
+        prompt: [
+          `OGRENCI PROFILI (${member.profile.label}):\n${member.profile.brief}`,
+          `SINAV SORULARI:\n${parca.map(examQuestionForStudent).join("\n\n")}`,
+          `GOREV: ${parca.length} sorunun her biri icin bu ogrencinin verecegi cevabi uret.`,
+        ].join("\n\n"),
+      });
+
+      const seen = new Set<number>();
+      const answers: SimulatedAnswer[] = [];
+
+      for (const item of object.answers) {
+        if (seen.has(item.questionNumber)) continue;
+        const question = byPosition.get(item.questionNumber);
+        if (!question) continue;
+        // Bos birakilan soru cevap sayilmaz: rapor "cevaplanan soru" sayisini
+        // ayri gosteriyor ve bos birakma sure/dikkat sinyali.
+        const answer = item.answer.trim();
+        if (!answer) continue;
+        seen.add(item.questionNumber);
+
+        answers.push({
+          profileId: member.profile.id,
+          questionId: question.questionId,
+          answer:
+            question.type === "test" ? normalizeOptionKey(answer) : answer,
+          confidence: clampScore(item.confidence, 100),
+          rubricScore: null,
+        });
+      }
+
+      return answers;
+    }),
+  );
+
+  const answers = (await mapWithConcurrency(tasks, EXAM_CONCURRENCY)).flat();
+
+  /*
+    Acik uclu sorularin rubrik puanlari.
+
+    Soru basina TEK cagri: o sorunun butun profil cevaplari birlikte
+    puanlaniyor. Ayri ayri puanlamak hem N kat pahali olurdu hem de
+    degerlendirici her seferinde sifirdan baslayacagi icin cevaplar arasi
+    tutarlilik zayiflardi - oysa burada onemli olan mutlak puan degil ust ve
+    alt grubun AYRISMASI.
+  */
+  const openEnded = questions.filter(
+    (question) => question.type === "acik_uclu" && question.rubric,
+  );
+
+  const gradingTasks = openEnded.map((question) => async () => {
+    const soruCevaplari = answers.filter(
+      (answer) => answer.questionId === question.questionId,
+    );
+    if (soruCevaplari.length === 0) return;
+
+    const scores = await gradeCohortAnswers(
+      model,
+      question.rubric ?? "",
+      question.text,
+      soruCevaplari.map((answer) => ({
+        profileId: answer.profileId,
+        answer: answer.answer,
+      })),
+    );
+
+    const scoreByProfile = new Map(scores.map((score) => [score.profileId, score.score]));
+    for (const answer of soruCevaplari) {
+      answer.rubricScore = scoreByProfile.get(answer.profileId) ?? 0;
+    }
+  });
+
+  await mapWithConcurrency(gradingTasks, EXAM_CONCURRENCY);
+
+  return buildExamSimulationReport({
+    cohort,
+    questions,
+    answers,
+    durationMinutes,
+    cohortLabel,
+  });
+}
+
+/** Sinav sorusunu ogrencinin gordugu bicime cevirir; anahtar ve rubrik girmez. */
+function examQuestionForStudent(question: SimulationQuestion): string {
+  const parts = [
+    `${question.position}) [${question.subject}] ${question.text}`,
+    question.type === "test"
+      ? (question.options ?? [])
+          .map((option) => `   ${option.key}) ${option.text}`)
+          .join("\n")
+      : "   (Acik uclu - yaziyla cevaplayin)",
+  ];
+
+  return parts.filter(Boolean).join("\n");
+}
+
+function chunk<T>(items: readonly T[], size: number): T[][] {
+  const result: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    result.push(items.slice(index, index + size));
+  }
+  return result;
+}
+
+/**
+ * Gorevleri sinirli paralellikle calistirir ve SIRAYI KORUR.
+ *
+ * `Promise.all` hepsini ayni anda acardi; saglayicinin dakikalik istek siniri
+ * bunu 429 ile karsilar ve simulasyonun tamami duser. Havuz mantigi ile en
+ * fazla `limit` istek acik kaliyor.
+ */
+async function mapWithConcurrency<T>(
+  tasks: readonly (() => Promise<T>)[],
+  limit: number,
+): Promise<T[]> {
+  const results: T[] = new Array(tasks.length);
+  let cursor = 0;
+
+  const workers = Array.from({ length: Math.min(limit, tasks.length) }, async () => {
+    for (;;) {
+      const index = cursor;
+      cursor += 1;
+      const task = tasks[index];
+      if (!task) return;
+      results[index] = await task();
+    }
+  });
+
+  await Promise.all(workers);
+  return results;
+}
+
+/**
+ * Mock modda sinav kestirimi.
+ *
+ * Yetkinlik ile soru zorlugunu karsilastiran deterministik bir kural: yuksek
+ * yetkinlikli profil zor soruyu da cozer, dusuk yetkinlikli yalnizca kolayi.
+ * Amac anahtarsiz demoda dagilimin, ayrismanin ve kazanim kiriliminin GERCEKCI
+ * gorunmesi - hepsi ayni puani alsaydi panel hicbir sey anlatmazdi.
+ */
+function mockExamAnswers(
+  cohort: readonly CohortMember[],
+  questions: readonly SimulationQuestion[],
+): SimulatedAnswer[] {
+  const zorlukEsigi: Record<string, number> = { kolay: 0.3, orta: 0.55, zor: 0.8 };
+
+  return cohort.flatMap((member) =>
+    questions.map((question): SimulatedAnswer => {
+      const esik = zorlukEsigi[question.difficulty ?? "orta"] ?? 0.55;
+      const dersYetkinligi =
+        member.profile.subjectAbility?.[question.subject] ?? member.profile.ability;
+      const dogru = dersYetkinligi >= esik;
+
+      const dogruKey = question.correctAnswer
+        ? normalizeOptionKey(question.correctAnswer)
+        : "A";
+      const yanlisSiklar = (question.options ?? [])
+        .map((option) => normalizeOptionKey(option.key))
+        .filter((key) => key !== dogruKey);
+
+      return {
+        profileId: member.profile.id,
+        questionId: question.questionId,
+        answer:
+          question.type === "test"
+            ? dogru
+              ? dogruKey
+              : yanlisSiklar[question.position % Math.max(1, yanlisSiklar.length)] ??
+                dogruKey
+            : `[MOCK] ${member.profile.label} cevabi.`,
+        confidence: Math.round(35 + dersYetkinligi * 60),
+        rubricScore:
+          question.type === "acik_uclu"
+            ? Math.round(Math.max(0, Math.min(100, dersYetkinligi * 110 - 10)))
+            : null,
+      };
+    }),
+  );
+}
 
 /* -------------------------------------------------------------------------- */
 /*  Normalizasyon                                                             */

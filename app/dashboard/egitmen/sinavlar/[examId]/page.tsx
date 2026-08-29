@@ -8,6 +8,7 @@ import { ExamClassroomAssign } from "@/components/shared/exam-classroom-assign";
 import { ExamDetailTabs } from "@/components/shared/exam-detail-tabs";
 import { ExamPaperPanel } from "@/components/shared/exam-paper-panel";
 import { ExamQualityPanel } from "@/components/shared/exam-quality-panel";
+import { ExamSimulationPanel } from "@/components/shared/exam-simulation-panel";
 import { ExamSettingsPanel } from "@/components/shared/exam-settings-panel";
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -175,6 +176,16 @@ export default async function SinavDetayPage({
             examId={examId}
             report={qualityReport}
             questionNumbers={qualityQuestionNumbers}
+            canPersist={isSupabaseConfigured}
+          />
+        }
+        kestirim={
+          <ExamSimulationPanel
+            examId={examId}
+            classrooms={classrooms}
+            subjects={derivedSubjects}
+            questionCount={detail.questions.length}
+            durationMinutes={detail.exam.duration_minutes}
             canPersist={isSupabaseConfigured}
           />
         }

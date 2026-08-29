@@ -629,6 +629,40 @@ export interface VirtualClassRequest {
   provider?: string;
 }
 
+/**
+ * Egitmenin elle kurdugu tek bir ogrenci profili.
+ *
+ * Yetkinlik ve dikkat 0-1 arasi oran; `count` bu profilden kac ogrenci
+ * oldugunu soyler ve kestirimde agirlik olarak kullanilir.
+ */
+export interface ManualProfileInput {
+  label: string;
+  /** Genel yetkinlik, 0-1. */
+  ability: number;
+  /** Dikkat, 0-1: 1 titiz, 0 aceleci. */
+  diligence: number;
+  /** Bu profilden kac ogrenci var. */
+  count: number;
+  /** Ders bazinda yetkinlik ezmesi (ders adi -> 0-1). */
+  subjectAbility?: Record<string, number>;
+  /** Tasidigi kavram yanilgisi. */
+  misconception?: string | null;
+}
+
+/** Sinav kestiriminde kullanilacak kadro. */
+export type SimulationCohortInput =
+  | { kind: "hazir" }
+  | { kind: "elle"; profiles: ManualProfileInput[] }
+  | { kind: "ikiz"; classroom: string };
+
+export interface SimulateExamRequest {
+  examId: string;
+  cohort: SimulationCohortInput;
+  /** Bu kestirimde kullanilacak model; verilmezse varsayilan model. */
+  model?: string;
+  provider?: string;
+}
+
 export interface GradeAnswerRequest {
   studentAnswer: string;
   rubric: string;
