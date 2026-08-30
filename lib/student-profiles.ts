@@ -205,14 +205,24 @@ export function describeProfile(input: DescribeProfileInput): string {
   return parts.join(" ");
 }
 
+/** Dikkat bunun altindaysa profil ayirt edicilik hesabina alinmaz. */
+export const DILIGENCE_ANCHOR_FLOOR = 0.4;
+
 /**
  * Yetkinlige gore ust/alt grup atamasi.
  *
  * Elle profil kuran egitmen grup kavramini bilmek zorunda kalmasin diye var:
  * "%85 seviyesinde bir ogrenci" denince o profil kendiliginden ust gruba
  * girer ve ayirt edicilik hesabina dogru tarafta katilir.
+ *
+ * DIKKATI DUSUK PROFIL HICBIR ZAMAN CAPA OLMAZ. Ayirt edicilik "konuyu bilen
+ * ile bilmeyen ayrisiyor mu" sorusunu olcer; konuyu bilen ama aceleci bir
+ * ogrencinin yanlisi BILGI eksikliginden degil DIKKAT dagilmasindan gelir.
+ * Onu ust gruba koymak, sorunun ayirt ediciligini oldugundan dusuk gosterir.
+ * Hazir takimdaki "aceleci" profil de bu yuzden `notr`.
  */
-export function groupFromAbility(ability: number): ProfileGroup {
+export function groupFromAbility(ability: number, diligence = 1): ProfileGroup {
+  if (diligence < DILIGENCE_ANCHOR_FLOOR) return "notr";
   if (ability >= 0.7) return "ust";
   if (ability <= 0.45) return "alt";
   return "notr";
@@ -241,7 +251,7 @@ export function createProfile(input: CreateProfileInput): StudentProfile {
     ...(input.subjectAbility ? { subjectAbility: input.subjectAbility } : {}),
     diligence,
     misconception: input.misconception ?? null,
-    group: input.group ?? groupFromAbility(ability),
+    group: input.group ?? groupFromAbility(ability, diligence),
     brief:
       input.brief ??
       describeProfile({

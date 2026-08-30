@@ -43,6 +43,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   estimateSimulationCalls,
+  type DifficultyVerdictCode,
   type ExamSimulationReport,
   type SimulatedQuestionResult,
   type SimulationQuestionWarning,
@@ -69,6 +70,14 @@ const QUESTION_WARNING_LABELS: Readonly<
   dusuk_ayirt_edicilik: { label: "Ayırt etmiyor", variant: "warning" },
 };
 
+/** Zorluk yargisinin ekranda gorunen karsiligi. */
+const ZORLUK_ETIKET: Readonly<Record<DifficultyVerdictCode, string>> = {
+  ideal: "İdeal",
+  kolay: "Kolay",
+  zor: "Zor",
+  belirsiz: "Belirsiz",
+};
+
 const SEVERITY_VARIANT: Readonly<
   Record<"yuksek" | "orta" | "dusuk", "danger" | "warning" | "soft">
 > = {
@@ -85,10 +94,33 @@ const YENI_PROFIL: ManualProfileInput = {
   count: 5,
 };
 
+/**
+ * Elle kadronun baslangic ayari - tipik bir sinif.
+ *
+ * DORT PROFIL, 24 OGRENCI. Sayilar rastgele degil, kestirimin cevaplamasi
+ * gereken soruya gore secildi: "bu sinav ideal zorlukta mi?"
+ *
+ *   Guclu (4 kisi)    - TAVAN olcer. Bu grup da dusuyorsa sinav kazanimin
+ *                       otesini soruyordur.
+ *   Ortalama (12 kisi)- REFERANS. Zorluk yargisi bu profilin puanina bakar
+ *                       (bkz. REFERENCE_ABILITY); sinif ortalamasi kadronun
+ *                       bilesimine gore kayar, bu kaymaz. Sinifin govdesi
+ *                       oldugu icin agirligi da en yuksek.
+ *   Zorlanan (6 kisi) - TABAN olcer. Bu grup basariliysa sinav kolaydir;
+ *                       ayrica ayirt ediciligin alt capasi.
+ *   Aceleci (2 kisi)  - TUZAK olcer. Konuyu bilir ama hizli okur; yalnizca
+ *                       ifadesi mugklak ya da tuzakli sorularda duser.
+ *                       Dikkati dusuk oldugu icin ayirt edicilik hesabina
+ *                       girmez (bkz. groupFromAbility).
+ *
+ * Kullanici bunlari serbestce degistirebilir; satir silmek cagri sayisini da
+ * dusurur ve o sayi dugmenin yaninda canli yazar.
+ */
 const VARSAYILAN_PROFILLER: ManualProfileInput[] = [
-  { label: "Güçlü öğrenciler", ability: 0.85, diligence: 0.85, count: 5 },
-  { label: "Orta düzey", ability: 0.6, diligence: 0.7, count: 12 },
-  { label: "Desteğe ihtiyacı olanlar", ability: 0.35, diligence: 0.55, count: 5 },
+  { label: "Güçlü öğrenciler", ability: 0.85, diligence: 0.85, count: 4 },
+  { label: "Ortalama öğrenciler", ability: 0.6, diligence: 0.7, count: 12 },
+  { label: "Zorlanan öğrenciler", ability: 0.32, diligence: 0.55, count: 6 },
+  { label: "Aceleci öğrenciler", ability: 0.72, diligence: 0.25, count: 2 },
 ];
 
 export interface ExamSimulationPanelProps {
@@ -629,7 +661,23 @@ function SonucGorunumu({
         </CardHeader>
 
         <CardContent className="space-y-5">
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+            {/*
+              ZORLUK YARGISI EN BASTA: kestirimin cevapladigi asil soru
+              "sinav ideal mi". Referans ogrencinin puanina bakiyor, sinif
+              ortalamasina degil - ortalama kadroya kac zayif ogrenci
+              konduguna gore kayar, sinav degismedigi halde.
+            */}
+            <Metrik
+              baslik="Zorluk"
+              deger={ZORLUK_ETIKET[report.difficultyCheck.code]}
+              alt={
+                report.difficultyCheck.referenceLabel
+                  ? `${report.difficultyCheck.referenceLabel}: %${report.difficultyCheck.referenceScore}`
+                  : "referans profil yok"
+              }
+              tone={report.difficultyCheck.code === "ideal" ? "default" : "warning"}
+            />
             <Metrik
               baslik="Tahmini ortalama"
               deger={`%${report.distribution.mean}`}

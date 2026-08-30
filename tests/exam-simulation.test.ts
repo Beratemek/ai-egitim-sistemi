@@ -85,6 +85,16 @@ test("yetkinlik grup atamasini belirler", () => {
   assert.equal(groupFromAbility(0.3), "alt");
 });
 
+test("dikkati dusuk profil ayirt edicilik capasi olmaz", () => {
+  /*
+    Konuyu bilen ama aceleci ogrencinin yanlisi BILGI eksikliginden degil
+    dikkat dagilmasindan gelir; ust gruba konsaydi sorunun ayirt ediciligini
+    oldugundan dusuk gosterirdi.
+  */
+  assert.equal(groupFromAbility(0.9, 0.2), "notr");
+  assert.equal(groupFromAbility(0.9, 0.8), "ust");
+});
+
 test("profil tanimi parametrelerden uretilir", () => {
   const brief = describeProfile({
     ability: 0.3,
@@ -405,4 +415,69 @@ test("saglikli sinavda uyari cikmaz", () => {
   assert.equal(report.distribution.mean, 50);
   assert.equal(report.separation, 100);
   assert.deepEqual(report.warnings, []);
+});
+
+
+/* -------------------------------------------------------------------------- */
+/*  Ideal zorluk yargisi                                                      */
+/* -------------------------------------------------------------------------- */
+
+/** Referans ogrenciye istenen puani aldiran tek soruluk sinav kurar. */
+function zorlukRaporu(referansPuani: number, ekKadro: CohortMember[] = []) {
+  return buildExamSimulationReport({
+    cohortLabel: "Test",
+    durationMinutes: null,
+    cohort: [uye("orta", 0.6, 10), ...ekKadro],
+    questions: [
+      soru(1, {
+        type: "acik_uclu",
+        options: null,
+        correctAnswer: null,
+        rubric: "1. madde (100)",
+        points: 100,
+      }),
+    ],
+    answers: [
+      cevap("orta", "q1", "Cevap", referansPuani),
+      ...ekKadro.map((member) => cevap(member.profile.id, "q1", "Cevap", 50)),
+    ],
+  });
+}
+
+test("zorluk yargisi referans ogrencinin puanina bakar", () => {
+  assert.equal(zorlukRaporu(60).difficultyCheck.code, "ideal");
+  assert.equal(zorlukRaporu(90).difficultyCheck.code, "kolay");
+  assert.equal(zorlukRaporu(20).difficultyCheck.code, "zor");
+});
+
+test("zorluk yargisi kadronun bilesiminden etkilenmez", () => {
+  /*
+    ASIL MESELE BU: ayni sinav, kadroya on zayif ogrenci eklendiginde sinif
+    ortalamasi coker ama SINAV DEGISMEDI. Yargi referans ogrenciye baktigi
+    icin "ideal" kalir; ortalama ise duser.
+  */
+  const yalin = zorlukRaporu(60);
+  const zayifAgirlikli = zorlukRaporu(60, [uye("zayif", 0.2, 40, { group: "alt" })]);
+
+  assert.equal(yalin.difficultyCheck.code, "ideal");
+  assert.equal(zayifAgirlikli.difficultyCheck.code, "ideal");
+  assert.ok(zayifAgirlikli.distribution.mean < yalin.distribution.mean);
+  assert.ok(
+    !zayifAgirlikli.warnings.some((warning) => warning.code === "sinav_cok_zor"),
+    "kadroya zayif ogrenci eklemek sinavi 'cok zor' yapmamali",
+  );
+});
+
+test("ortalama duzeye yakin profil yoksa yargi belirsiz kalir", () => {
+  const report = buildExamSimulationReport({
+    cohortLabel: "Test",
+    durationMinutes: null,
+    // 0.95 ve 0.1 - ikisi de referans bandina uzak.
+    cohort: [uye("ust1", 0.95, 1, { group: "ust" }), uye("alt1", 0.1, 1, { group: "alt" })],
+    questions: [soru(1, { points: 100 })],
+    answers: [cevap("ust1", "q1", "B"), cevap("alt1", "q1", "A")],
+  });
+
+  assert.equal(report.difficultyCheck.code, "belirsiz");
+  assert.equal(report.difficultyCheck.referenceLabel, null);
 });

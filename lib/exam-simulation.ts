@@ -150,6 +150,42 @@ export interface ScoreDistribution {
   buckets: Array<{ from: number; to: number; count: number }>;
 }
 
+/**
+ * Sinavin zorlugunun IDEAL bantta olup olmadigi.
+ *
+ * NEDEN SINIF ORTALAMASI DEGIL: genel ortalama, kadroya kac zayif ogrenci
+ * konduguna gore kayar. Ayni sinav, zayif agirlikli bir sinifta "cok zor",
+ * secme bir sinifta "cok kolay" gorunur - oysa sinav degismedi. Zorluk
+ * yargisi bu yuzden REFERANS OGRENCIYE bakiyor: yetkinligi ortalama duzeye
+ * (REFERENCE_ABILITY) en yakin profil.
+ *
+ * Referans ogrencinin puani sinavin kendi zorlugunun olcusudur:
+ *   - cok yuksekse sinav ayrim uretmiyor (tavan etkisi),
+ *   - cok dusukse sinav kazanimin otesini olcuyor,
+ *   - bandin icindeyse sinav konuyu ORTA duzeyde bilen ogrenciyi ne
+ *     odullendiriyor ne de eziyor.
+ *
+ * Kadroda ortalama duzeye yakin profil yoksa yargi "belirsiz" olur ve uyari
+ * uretimi sinif ortalamasina geri doner.
+ */
+export const REFERENCE_ABILITY = 0.6;
+
+/** Referans ogrencinin puani bu bantta ise sinav ideal zorlukta sayilir. */
+export const IDEAL_SCORE_BAND = { min: 45, max: 75 } as const;
+
+/** Referans sayilabilmek icin yetkinligin ortalamaya en fazla uzakligi. */
+export const REFERENCE_TOLERANCE = 0.25;
+
+export type DifficultyVerdictCode = "kolay" | "ideal" | "zor" | "belirsiz";
+
+export interface DifficultyVerdict {
+  code: DifficultyVerdictCode;
+  /** Referans alinan profilin adi; yoksa null. */
+  referenceLabel: string | null;
+  /** Referans ogrencinin 100 uzerinden puani; yoksa null. */
+  referenceScore: number | null;
+}
+
 export interface DurationForecast {
   /** Sinav suresi; tanimsizsa null. */
   examMinutes: number | null;
@@ -192,6 +228,8 @@ export interface ExamSimulationReport {
   questions: SimulatedQuestionResult[];
   outcomes: OutcomeForecast[];
   distribution: ScoreDistribution;
+  /** Sinav ideal zorlukta mi - referans ogrencinin puanina gore. */
+  difficultyCheck: DifficultyVerdict;
   /**
    * Sinavin ayrisma gucu: ust grup ortalamasi - alt grup ortalamasi (0-100).
    * Gruplardan biri yoksa null.
@@ -510,6 +548,7 @@ export function buildExamSimulationReport(
   }));
 
   const distribution = buildDistribution(scoreItems);
+  const difficultyCheck = buildDifficultyVerdict(cohort, students);
   const separation = groupDifference(
     students.map((student) => ({
       profileId: student.profileId,
@@ -542,15 +581,62 @@ export function buildExamSimulationReport(
     questions: questionResults,
     outcomes: forecastOutcomes(questions, questionResults),
     distribution,
+    difficultyCheck,
     separation: separation === null ? null : round(separation),
     duration,
     warnings: buildWarnings({
       distribution,
+      difficultyCheck,
       separation,
       duration,
       questions: questionResults,
     }),
   };
+}
+
+/**
+ * Referans ogrenciyi bulup zorluk yargisini kurar.
+ *
+ * Referans, yetkinligi `REFERENCE_ABILITY`'ye EN YAKIN profildir. Agirlik
+ * hesaba katilmaz: aranan sey sinifin ortalamasi degil, "konuyu orta duzeyde
+ * bilen bir ogrenci bu sinavdan kac alir" sorusunun cevabi.
+ */
+function buildDifficultyVerdict(
+  cohort: readonly CohortMember[],
+  students: readonly SimulatedStudentResult[],
+): DifficultyVerdict {
+  const scoreByProfile = new Map(
+    students.map((student) => [student.profileId, student.score]),
+  );
+
+  let referans: CohortMember | null = null;
+  let enYakin = Number.POSITIVE_INFINITY;
+
+  for (const member of cohort) {
+    const uzaklik = Math.abs(member.profile.ability - REFERENCE_ABILITY);
+    if (uzaklik < enYakin) {
+      enYakin = uzaklik;
+      referans = member;
+    }
+  }
+
+  if (!referans || enYakin > REFERENCE_TOLERANCE) {
+    return { code: "belirsiz", referenceLabel: null, referenceScore: null };
+  }
+
+  const score = scoreByProfile.get(referans.profile.id);
+  if (score === undefined) {
+    return { code: "belirsiz", referenceLabel: null, referenceScore: null };
+  }
+
+  const code: DifficultyVerdictCode =
+    score > IDEAL_SCORE_BAND.max
+      ? "kolay"
+      : score < IDEAL_SCORE_BAND.min
+        ? "zor"
+        : "ideal";
+
+  return { code, referenceLabel: referans.profile.label, referenceScore: score };
 }
 
 function answerKey(profileId: string, questionId: string): string {
@@ -708,35 +794,59 @@ function buildDistribution(items: readonly Weighted[]): ScoreDistribution {
 
 function buildWarnings(input: {
   distribution: ScoreDistribution;
+  difficultyCheck: DifficultyVerdict;
   separation: number | null;
   duration: DurationForecast;
   questions: readonly SimulatedQuestionResult[];
 }): SimulationWarning[] {
-  const { distribution, separation, duration, questions } = input;
+  const { distribution, difficultyCheck, separation, duration, questions } = input;
   const warnings: SimulationWarning[] = [];
 
-  if (distribution.mean <= SIMULATION_THRESHOLDS.cokZorOrtalama) {
+  /*
+    Zorluk yargisi REFERANS OGRENCIYE bakar, sinif ortalamasina degil.
+    Ortalama kadronun bilesimine gore kayar: ayni sinav, kadroya on zayif
+    ogrenci eklenince "cok zor" gorunur. Referans ogrenci ise kadro nasil
+    kurulursa kurulsun ayni sey olur - konuyu orta duzeyde bilen ogrenci.
+
+    Kadroda ortalama duzeye yakin profil yoksa yargi "belirsiz" doner ve
+    olcut olarak sinif ortalamasina geri donulur.
+  */
+  const olcut =
+    difficultyCheck.referenceScore ?? distribution.mean;
+  const olcutAdi =
+    difficultyCheck.referenceLabel ?? "sınıf ortalaması";
+  const cokZor =
+    difficultyCheck.code === "belirsiz"
+      ? distribution.mean <= SIMULATION_THRESHOLDS.cokZorOrtalama
+      : difficultyCheck.code === "zor";
+  const cokKolay =
+    difficultyCheck.code === "belirsiz"
+      ? distribution.mean >= SIMULATION_THRESHOLDS.cokKolayOrtalama
+      : difficultyCheck.code === "kolay";
+
+  if (cokZor) {
     warnings.push({
       code: "sinav_cok_zor",
       severity: "yuksek",
-      title: "Sınav bu sınıf için çok zor",
+      title: "Sınav çok zor",
       detail:
-        `Tahmini ortalama %${distribution.mean}, geçme oranı %${Math.round(distribution.passRate * 100)}. ` +
-        "Bu düzeyde bir sonuç sınıfı ayrıştırmaz, yalnızca herkesi aşağı çeker.",
+        `${olcutAdi} %${olcut} alıyor; sınıf ortalaması %${distribution.mean}, ` +
+        `geçme oranı %${Math.round(distribution.passRate * 100)}. Konuyu orta düzeyde ` +
+        "bilen öğrencinin bu kadar düşük alması, sınavın kazanımın ötesini ölçtüğünü gösterir.",
       questionNumbers: questions
         .filter((question) => question.warnings.includes("cok_zor"))
         .map((question) => question.position),
     });
   }
 
-  if (distribution.mean >= SIMULATION_THRESHOLDS.cokKolayOrtalama) {
+  if (cokKolay) {
     warnings.push({
       code: "sinav_cok_kolay",
       severity: "orta",
-      title: "Sınav bu sınıf için çok kolay",
+      title: "Sınav çok kolay",
       detail:
-        `Tahmini ortalama %${distribution.mean}. Tavan etkisi var: iyi öğrenciyle çok iyi ` +
-        "öğrenci arasındaki fark ölçülemiyor.",
+        `${olcutAdi} %${olcut} alıyor. Tavan etkisi var: iyi öğrenciyle çok iyi öğrenci ` +
+        "arasındaki fark ölçülemiyor.",
       questionNumbers: questions
         .filter((question) => question.warnings.includes("cok_kolay"))
         .map((question) => question.position),
