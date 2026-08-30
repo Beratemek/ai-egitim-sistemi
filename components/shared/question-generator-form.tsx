@@ -930,6 +930,8 @@ export function QuestionGeneratorForm({
                           {...(context ? { context } : {})}
                           {...(outcomeId ? { outcomeId } : {})}
                           {...(subject ? { subject } : {})}
+                          model={modelId}
+                          provider={providerId}
                         />
                       </li>
                     ))}

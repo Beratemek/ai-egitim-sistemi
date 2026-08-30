@@ -8,6 +8,7 @@ import { ExamClassroomAssign } from "@/components/shared/exam-classroom-assign";
 import { ExamDetailTabs } from "@/components/shared/exam-detail-tabs";
 import { ExamPaperPanel } from "@/components/shared/exam-paper-panel";
 import { ExamQualityPanel } from "@/components/shared/exam-quality-panel";
+import { ExamSimulationPanel } from "@/components/shared/exam-simulation-panel";
 import { ExamSettingsPanel } from "@/components/shared/exam-settings-panel";
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +17,7 @@ import { isSupabaseConfigured } from "@/lib/env";
 import { evaluateExamQuality } from "@/lib/exam-quality";
 import {
   getExamAssignedStudentIds,
+  getExamCalibration,
   getExamDetail,
   getQuestions,
   getSubjectOptions,
@@ -37,7 +39,7 @@ export default async function SinavDetayPage({
 }) {
   const { examId } = await params;
 
-  const [detail, pool, submissions, users, assignedIds, subjectOptions] =
+  const [detail, pool, submissions, users, assignedIds, subjectOptions, calibration] =
     await Promise.all([
       getExamDetail(examId),
       getQuestions({ status: "onayli" }),
@@ -45,6 +47,7 @@ export default async function SinavDetayPage({
       getUsers(),
       getExamAssignedStudentIds(examId),
       getSubjectOptions(),
+      getExamCalibration(examId),
     ]);
 
   if (!detail) notFound();
@@ -175,6 +178,20 @@ export default async function SinavDetayPage({
             examId={examId}
             report={qualityReport}
             questionNumbers={qualityQuestionNumbers}
+            canPersist={isSupabaseConfigured}
+          />
+        }
+        kestirim={
+          <ExamSimulationPanel
+            examId={examId}
+            classrooms={classrooms}
+            subjects={derivedSubjects}
+            questionCount={detail.questions.length}
+            openEndedCount={
+              detail.questions.filter((question) => question.type === "acik_uclu").length
+            }
+            durationMinutes={detail.exam.duration_minutes}
+            calibration={calibration}
             canPersist={isSupabaseConfigured}
           />
         }
