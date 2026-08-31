@@ -25,7 +25,7 @@ import {
   CardContent,
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { serverEnv } from "@/lib/env";
+import { resolveAiConfig } from "@/lib/ai-settings";
 import { effectiveDeadline } from "@/lib/exam-time";
 import { getStudentExamDetail } from "@/lib/queries";
 import { getCurrentUser } from "@/lib/supabase-server";
@@ -49,9 +49,10 @@ export default async function OgrenciSinavPage({
   params: Promise<{ examId: string }>;
 }) {
   const { examId } = await params;
-  const [detail, current] = await Promise.all([
+  const [detail, current, aiConfig] = await Promise.all([
     getStudentExamDetail(examId),
     getCurrentUser(),
+    resolveAiConfig(),
   ]);
 
   if (!detail || !current) notFound();
@@ -156,7 +157,7 @@ export default async function OgrenciSinavPage({
         </Card>
       ) : null}
 
-      {serverEnv.aiMockMode && canAnswer && !requiresStart ? (
+      {aiConfig.mockMode && canAnswer && !requiresStart ? (
         <AiMockNotice capability="puanlama" audience="student" />
       ) : null}
 

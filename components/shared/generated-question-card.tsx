@@ -9,6 +9,7 @@ import { QuestionTypeBadge } from "@/components/shared/status-badge";
 import { QuestionVisual } from "@/components/shared/question-visual";
 import { Badge } from "@/components/ui/badge";
 import { QuestionReviseDialog } from "@/components/shared/question-revise-dialog";
+import { VirtualClassDialog } from "@/components/shared/virtual-class-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -52,6 +53,15 @@ export interface GeneratedQuestionCardProps {
    * baglama gore (taslak listesi, havuz onizlemesi vb.) degisebilir.
    */
   cardClassName?: string;
+  /**
+   * Uretimde secilen model ve saglayici.
+   *
+   * Sanal sinif pilotu ayni modelle calissin diye tasiniyor: uretimi guclu bir
+   * modelle yapip pilotu varsayilan modelle olcmek, olculen seyle uretilen sey
+   * arasinda gorunmez bir fark birakirdi.
+   */
+  model?: string;
+  provider?: string;
 }
 
 /**
@@ -72,6 +82,8 @@ export function GeneratedQuestionCard({
   outcomeId,
   subject,
   cardClassName,
+  model,
+  provider,
 }: GeneratedQuestionCardProps) {
   const [verdict, setVerdict] = React.useState<PreferenceVerdict | null>(null);
   const [pending, setPending] = React.useState<PreferenceVerdict | null>(null);
@@ -269,6 +281,23 @@ export function GeneratedQuestionCard({
               {...(context ? { context } : {})}
             />
           ) : null}
+
+          {/*
+            Sanal sinif: soruyu havuza gondermeden once simule ogrencilerle
+            olcer. Begeni/red INSAN geri bildirimi, bu ise OLCUM - ikisi ayni
+            satirda duruyor cunku uzman ikisine de karar vermeden taslagi
+            onaylamamali.
+          */}
+          <VirtualClassDialog
+            question={question}
+            index={index}
+            {...(kazanim ? { kazanim } : {})}
+            {...(context ? { context } : {})}
+            {...(subject ? { subject } : {})}
+            {...(model ? { model } : {})}
+            {...(provider ? { provider } : {})}
+            {...(onReplace ? { onReplace } : {})}
+          />
 
           <span className="ml-auto text-xs text-muted-foreground">
             Geri bildirim AI&apos;in bir sonraki uretimini sekillendirir

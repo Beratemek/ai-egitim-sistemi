@@ -120,6 +120,9 @@ export default async function KullanicilarPage() {
             currentUserId={current?.user.id ?? ""}
             subjectOptions={subjectOptions}
             subjectsByUser={subjectsByUser}
+            canDelete={
+              current ? grantedRoles(current.profile).includes("admin") : false
+            }
           />
         </CardContent>
       </Card>

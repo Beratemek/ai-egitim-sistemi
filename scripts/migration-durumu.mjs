@@ -134,6 +134,41 @@ const ADIMLAR = [
   // Cok dersli sinav. Iz olarak exam_subjects yeterli: teaches_exam_subjects
   // ve politika ayni dosyada, biri varsa digeri de vardir.
   ["cok-dersli-sinav", async () => fonksiyon("exam_subjects", { target_exam: BOS_ID })],
+  // Yapay zeka anahtarlari. Tablo + kaydetme fonksiyonu birlikte kontrol
+  // ediliyor; ikisi ayni dosyada ve tek transaction icinde olusuyor.
+  //
+  // `save_ai_settings` cagrisi GUVENLI: fonksiyonun ILK ifadesi `is_admin()`
+  // kontrolu ve bu betik service_role ile calisiyor, yani `auth.uid()` bos.
+  // Cagri yetki hatasiyla doner - hicbir sey yazilmaz, yalnizca fonksiyonun
+  // var oldugu anlasilir.
+  [
+    "yapay-zeka-anahtarlari",
+    async () =>
+      (await sutun("ai_settings", "provider")) &&
+      (await fonksiyon("save_ai_settings", {
+        new_provider: null,
+        new_api_key: null,
+        new_base_url: null,
+        new_model_generation: null,
+        new_model_grading: null,
+        new_mock_mode: null,
+      })),
+  ],
+  // Coklu saglayici anahtari. Tablo + kaydetme fonksiyonu birlikte kontrol
+  // ediliyor. Cagri GUVENLI: fonksiyonun ILK ifadesi `is_admin()` kontrolu ve
+  // bu betik service_role ile calisiyor, yani `auth.uid()` bos - cagri yetki
+  // hatasiyla doner, hicbir sey yazilmaz.
+  [
+    "coklu-saglayici-anahtari",
+    async () =>
+      (await sutun("ai_provider_keys", "provider")) &&
+      (await fonksiyon("save_ai_provider_key", {
+        target_provider: null,
+        new_api_key: null,
+        new_base_url: null,
+        new_model_generation: null,
+      })),
+  ],
 ];
 
 /**

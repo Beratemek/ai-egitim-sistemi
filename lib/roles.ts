@@ -143,6 +143,38 @@ export function grantedRoles(user: RoleBearer): [UserRole, ...UserRole[]] {
 }
 
 /**
+ * Sistem yoneticisi kendi panelinde SABITTIR.
+ *
+ * `admin` gizli bir roldur ve hesaba genellikle baska roller de atanmis olur
+ * (bkz. ROLE_DEFINITIONS - admin, SELECTABLE_ROLES disindadir). Bu durumda ust
+ * cubukta rol degistirici cikiyor ve sistem yoneticisi kendini bir bakiyor
+ * Egitmen panelinde buluyordu; hangi hesapla nerede oldugu bulaniklasiyordu.
+ *
+ * Kural: admin rolu verilmis bir hesabin varsayilan paneli HER ZAMAN Sistem
+ * Yoneticisi'dir ve rol degistirici o hesapta gosterilmez.
+ *
+ * Bu bir YETKI kurali DEGILDIR - yalnizca hangi panelin varsayilan oldugunu
+ * soyler. Erisim yine yalnizca verilmis rollerden gelir; admin icin gizli bir
+ * "her seye erisim" kapisi burada da acilmaz.
+ */
+export function isAdminPinned(roles: readonly UserRole[]): boolean {
+  return roles.includes("admin");
+}
+
+/**
+ * Hesabin ACILIS paneli: admin verilmisse Sistem Yoneticisi, degilse verilen rol.
+ *
+ * `/dashboard` kok yolu, oturum acilisi ve yetkisiz bir panele gidilmesi -
+ * ucu de buradan gecer ki uc yerde uc ayri sonuc cikmasin.
+ */
+export function landingRole(
+  roles: readonly UserRole[],
+  fallback: UserRole,
+): UserRole {
+  return isAdminPinned(roles) ? "admin" : fallback;
+}
+
+/**
  * VARSAYILAN rol: kisiye atanan ILK rol.
  *
  * Aktif rolden (`user.role`) ayri bir kavramdir. Kullanici rol degistiricisiyle

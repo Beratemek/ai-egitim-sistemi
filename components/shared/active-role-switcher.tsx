@@ -16,7 +16,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ROLE_DEFINITIONS } from "@/lib/roles";
+import { isAdminPinned, ROLE_DEFINITIONS } from "@/lib/roles";
 import type { UserRole } from "@/lib/types";
 
 /**
@@ -27,7 +27,7 @@ import type { UserRole } from "@/lib/types";
  * calisildigini secer. Gelistirici rol taklidiyle karistirilmamali: burada
  * gercek roller arasinda gecis yapilir, taklit yoktur.
  *
- * Tek rolu olan kullanicida hic render edilmez.
+ * Tek rolu olan kullanicida ve sistem yoneticisinde hic render edilmez.
  */
 
 export interface ActiveRoleSwitcherProps {
@@ -42,6 +42,12 @@ export function ActiveRoleSwitcher({ activeRole, roles }: ActiveRoleSwitcherProp
   const [pending, setPending] = React.useState(false);
 
   if (roles.length < 2) return null;
+
+  /*
+    Sistem yoneticisi kendi panelinde sabit: hesaba baska roller de atanmis
+    olsa bile burada gecis sunulmaz (bkz. lib/roles.ts isAdminPinned).
+  */
+  if (isAdminPinned(roles)) return null;
 
   async function change(role: UserRole) {
     if (role === activeRole) return;

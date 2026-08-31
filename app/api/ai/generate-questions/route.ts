@@ -1,5 +1,7 @@
 import { generateQuestions } from "@/lib/ai";
 import { describeAiError } from "@/lib/ai";
+import { isAiProvider, providerInfo } from "@/lib/ai-providers";
+import { resolveAiConfigFor } from "@/lib/ai-settings";
 import { jsonError, jsonOk, readJson, requireRole } from "@/lib/api";
 import { getStyleGuide } from "@/lib/queries";
 import type { GenerateQuestionsRequest, GeneratedQuestion } from "@/lib/types";
@@ -11,7 +13,8 @@ export const maxDuration = 60;
 /**
  * POST /api/ai/generate-questions
  *
- * Govde: { context, kazanim, subject?, topic?, count?, type?, difficulty? }
+ * Govde: { context, kazanim, subject?, topic?, count?, type?, difficulty?,
+ *          model?, provider? }
  * Yanit: { ok: true, data: GeneratedQuestion[] }
  *
  * Yetki: icerik uzmani ve egitmen.
@@ -39,6 +42,33 @@ export async function POST(request: Request) {
     const count = Math.min(Math.max(body.count ?? 5, 1), 20);
 
     /*
+      Model adi bicim olarak dogrulaniyor, listeye karsi DEGIL.
+
+      Listeye karsi dogrulamak her uretimde saglayiciya fazladan bir istek
+      demekti. Yanlis bir ad zaten saglayicidan 404 doner ve `describeAiError`
+      bunu "secilen model bulunamadi" diye acikliyor; bicim kontrolu ise
+      beklenmedik girdinin istek govdesine sizmasini engelliyor.
+    */
+    const model =
+      typeof body.model === "string" && /^[A-Za-z0-9._:\/-]{1,120}$/.test(body.model.trim())
+        ? body.model.trim()
+        : undefined;
+
+    /*
+      Saglayici model adiyla BIRLIKTE geliyor ve burada anahtari olup olmadigi
+      dogrulaniyor. Dogrulamasak, anahtari silinmis bir saglayicinin modeli
+      istendiginde uretim sessizce VARSAYILAN saglayiciya duser: kullanici
+      sectiginden baska bir modelle, baska bir fiyatla soru uretmis olur.
+    */
+    const provider = isAiProvider(body.provider) ? body.provider : undefined;
+
+    if (provider && !(await resolveAiConfigFor(provider))) {
+      return jsonError(
+        `${providerInfo(provider).label} için kayıtlı bir API anahtarı yok. Sistem yöneticisi bu sağlayıcıyı tanımlamalı.`,
+      );
+    }
+
+    /*
       Tarz hafizasi KAPSAMLI okunuyor: once bu ders + bu konu, yeterli ornek
       yoksa bu ders, o da yoksa genel. Onceden kapsam yoktu ve baska bir
       dersteki geri bildirim buraya karisiyordu.
@@ -57,6 +87,8 @@ export async function POST(request: Request) {
         difficulty: body.difficulty ?? "karisik",
         styleGuide,
         ...(body.topic ? { topic: body.topic } : {}),
+        ...(model ? { modelId: model } : {}),
+        ...(provider ? { providerId: provider } : {}),
       },
     );
 

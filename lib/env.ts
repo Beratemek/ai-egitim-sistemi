@@ -6,6 +6,16 @@
  * (`process.env[key]`) erisilmez; her biri acikca yazilir.
  */
 
+import {
+  detectProvider,
+  isAiProvider,
+  looksLikeRealKey,
+  providerInfo,
+  type AiProvider,
+} from "@/lib/ai-providers";
+
+export { AI_PROVIDERS, type AiProvider } from "@/lib/ai-providers";
+
 function required(value: string | undefined, name: string): string {
   if (!value || value.length === 0) {
     throw new Error(
@@ -66,46 +76,28 @@ export function requireSupabaseEnv(): { url: string; anonKey: string } {
  * Gercek bir API anahtari (OpenAI, Gemini, Groq...) her zaman 20 karakterden
  * uzundur; kisa degerleri "tanimlanmamis" sayiyoruz.
  */
-function looksLikeRealKey(value: string | undefined): value is string {
-  return typeof value === "string" && value.trim().length > 20;
-}
-
-const openaiApiKey = looksLikeRealKey(process.env.OPENAI_API_KEY)
-  ? process.env.OPENAI_API_KEY.trim()
-  : "";
+const rawApiKey = process.env.OPENAI_API_KEY?.trim() ?? "";
+const openaiApiKey = looksLikeRealKey(rawApiKey) ? rawApiKey : "";
 
 /* -------------------------------------------------------------------------- */
 /*  Yapay zeka saglayicisi                                                    */
 /* -------------------------------------------------------------------------- */
 
-export const AI_PROVIDERS = ["openai", "google"] as const;
-export type AiProvider = (typeof AI_PROVIDERS)[number];
-
-/**
- * Google AI Studio anahtar onekleri.
- *
- * Google iki bicim dagitiyor: eski "AIza..." ve yeni "AQ.Ab8..." bicimi.
- * Ikincisi de gecerli bir Gemini API anahtaridir; yalnizca "AIza" kontrolu
- * yapan kod yeni anahtarlari yanlislikla OpenAI'a yonlendiriyordu.
- */
-const GOOGLE_KEY_PREFIXES = ["AIza", "AQ."] as const;
-
 /**
  * Hangi saglayici kullanilacak?
  *
  * `AI_PROVIDER` acikca yazilmissa o gecerlidir. Yazilmamissa anahtarin
- * onekinden tahmin edilir; OpenAI ve OpenAI-uyumlu saglayicilar (Groq,
- * OpenRouter) bu oneklerle baslamaz. Boylece ekipten biri sadece anahtari
- * degistirdiginde de dogru saglayici secilir.
+ * onekinden tahmin edilir (bkz. `detectProvider`); boylece ekipten biri
+ * sadece anahtari degistirdiginde de dogru saglayici secilir.
+ *
+ * NOT: Bu yalnizca .ENV yolu icindir. Sistem yoneticisi panelden bir anahtar
+ * kaydettiginde saglayici oradan gelir ve buradaki tahmin devreye girmez
+ * (bkz. lib/ai-settings.ts).
  */
 function resolveProvider(key: string): AiProvider {
   const explicit = process.env.AI_PROVIDER?.trim().toLocaleLowerCase("en");
-  if (explicit && (AI_PROVIDERS as readonly string[]).includes(explicit)) {
-    return explicit as AiProvider;
-  }
-  return GOOGLE_KEY_PREFIXES.some((prefix) => key.startsWith(prefix))
-    ? "google"
-    : "openai";
+  if (isAiProvider(explicit)) return explicit;
+  return detectProvider(key) ?? "openai";
 }
 
 const aiProvider = resolveProvider(openaiApiKey);
@@ -118,10 +110,7 @@ const aiProvider = resolveProvider(openaiApiKey);
  * "gemini-flash-latest" takma adini kullanin. Kullanilabilir modeller:
  *   curl "https://generativelanguage.googleapis.com/v1beta/models?key=ANAHTAR"
  */
-const DEFAULT_MODEL: Record<AiProvider, string> = {
-  openai: "gpt-4o-mini",
-  google: "gemini-3.6-flash",
-};
+const defaultModel = providerInfo(aiProvider).defaultModel;
 
 /**
  * Yalnizca sunucu tarafinda okunmali. Bu modulu bir Client Component'ten
@@ -133,11 +122,8 @@ export const serverEnv = {
   openaiApiKey,
   openaiBaseUrl: process.env.OPENAI_BASE_URL ?? "",
   aiProvider,
-  aiModelGeneration: optional(
-    process.env.AI_MODEL_GENERATION,
-    DEFAULT_MODEL[aiProvider],
-  ),
-  aiModelGrading: optional(process.env.AI_MODEL_GRADING, DEFAULT_MODEL[aiProvider]),
+  aiModelGeneration: optional(process.env.AI_MODEL_GENERATION, defaultModel),
+  aiModelGrading: optional(process.env.AI_MODEL_GRADING, defaultModel),
   /**
    * Gecerli bir API anahtari yoksa veya AI_MOCK_MODE=true ise sahte cevap
    * uretilir. Anahtar yokken AI_MOCK_MODE=false yazmak mock modu kapatmaz -

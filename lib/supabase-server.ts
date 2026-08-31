@@ -27,6 +27,10 @@ export interface ServerSupabaseClientOptions {
    * kapatilmis bir keep-alive soketi yeniden kullanilirsa Node `fetch failed`
    * uretebilir. Yalnizca tekrar edilmesi guvenli auth isteklerinde yeni baglanti
    * ve tek tekrar denemesi kullanilir.
+   *
+   * YALNIZCA GELISTIRMEDE devreye girer. Yayinda `connection: close` her giris
+   * isteginde yeni bir TLS el sikismasi demek - cozdugu sorun orada yokken
+   * girisi gozle gorulur bicimde yavaslatiyordu.
    */
   resilientAuthFetch?: boolean;
 }
@@ -69,9 +73,10 @@ export async function createServerSupabaseClient(
   const cookieStore = await cookies();
 
   return createServerClient<Database>(url, anonKey, {
-    global: options.resilientAuthFetch
-      ? { fetch: resilientAuthFetch }
-      : undefined,
+    global:
+      options.resilientAuthFetch && process.env.NODE_ENV !== "production"
+        ? { fetch: resilientAuthFetch }
+        : undefined,
     cookies: {
       getAll() {
         return cookieStore.getAll();

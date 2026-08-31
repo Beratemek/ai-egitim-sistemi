@@ -2,8 +2,27 @@
 --  YAPAY ZEKA DESTEKLI EGITIM SISTEMI - VERITABANI SEMASI
 --  Supabase / PostgreSQL
 --
---  Kullanim: Supabase Dashboard > SQL Editor icine bu dosyanin tamamini
---  yapistirip calistirin. Dosya idempotent'tir (tekrar calistirilabilir).
+--  !!! BU DOSYAYI CALISTIRMAYIN !!!
+--
+--  Eskiden "tamamini SQL Editor'e yapistirip calistirin" diyordu. ARTIK
+--  DOGRU DEGIL: dosya semanin gerisinde kaldi ve calistirmak sistemi geriye
+--  alir. Somut ornekler:
+--
+--    * `roles` sutunu bu dosyada HIC YOK - coklu rol ozelligi (bkz.
+--      migrations/uygulandi/2026-08-22-coklu-rol.sql) burada yok sayilir.
+--    * `handle_new_user` ve `request_role` ESKI kurali tasiyor: ogrenci
+--      secen kullanici dogrudan 'onayli' oluyor. Oysa gecerli kural
+--      "her rol onaya duser" (tum-roller-onaya-dussun.sql). Bu dosyayi
+--      calistirmak yeni kayitlarin onay kuyruguna DUSMEMESINE yol acar.
+--
+--  SEMANIN GERCEK KAYDI: supabase/migrations/ klasoru.
+--    - Bekleyen isler: BEKLEYEN-*.sql (numara sirasiyla calistirilir)
+--    - Gecmis: uygulandi/ (calistirilmis, tarihsel kayit)
+--    Ayrintili anlatim icin migrations/OKUBENI.md.
+--
+--  Bu dosya yalnizca bir REFERANS olarak duruyor: tablolarin ve politikalarin
+--  NEDEN oyle yazildigini anlatan uzun gerekceler burada. Okumak icin acin,
+--  calistirmak icin degil.
 -- ===========================================================================
 
 create extension if not exists "pgcrypto";
@@ -274,6 +293,11 @@ create trigger submissions_set_updated_at
 --   * ogrenci secilmisse dogrudan onaylanir.
 --   * diger roller egitim yoneticisi onayina dusulur; onaya kadar etkin rol
 --     'ogrenci' kalir, boylece onay beklerken yetkili alanlara giremez.
+-- BAYAT - GECERLI DEGIL. Guncel hali icin:
+--   migrations/uygulandi/tum-roller-onaya-dussun.sql
+--   migrations/BEKLEYEN-2-kayit-onayi-garanti.sql
+-- Buradaki surum ogrenciyi dogrudan 'onayli' yapar; gecerli kural her rolu
+-- onay kuyruguna dusurmektir. `roles` sutununu da doldurmuyor.
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
@@ -390,6 +414,7 @@ create trigger users_guard_role_columns
  * Kullanicinin kendi adina rol talep etmesi.
  * Ogrenci dogrudan onaylanir; diger roller egitim yoneticisi onayina duser.
  */
+-- BAYAT - GECERLI DEGIL; bkz. handle_new_user ustundeki not.
 create or replace function public.request_role(target public.user_role)
 returns public.role_status
 language plpgsql
@@ -763,6 +788,10 @@ create table if not exists public.exam_attempts (
   constraint exam_attempt_final_score_range check (
     final_score is null or (final_score >= 0 and final_score <= 100)
   ),
+  -- Nihai not TAM SAYI; gerekcesi submissions'taki ayni adli kisitta.
+  constraint exam_attempts_final_score_tam_sayi check (
+    final_score is null or final_score = round(final_score)
+  ),
   constraint exam_attempt_result_consistency check (
     status <> 'sonuclandi'
     or (
@@ -986,9 +1015,12 @@ begin
     status = 'sonuclandi',
     submitted_at = coalesce(submitted_at, now()),
     completed_at = now(),
-    earned_points = round(earned, 2),
-    total_points = round(total, 2),
-    final_score = round(earned / total * 100.0, 2)
+    -- Ogrenciye "25 / 30 puan" diye gosterilen sayilar; ikisi de tam.
+    earned_points = round(earned),
+    total_points = round(total),
+    -- BIREYSEL not TAM SAYI: 83.33 gibi bir puan ogrenciye bir sey anlatmiyor.
+    -- Ondalik yalnizca sinif/topluluk ortalamasinda anlamli.
+    final_score = round(earned / total * 100.0)
   where exam_id = target_exam and student_id = target_student;
 
   return found;
@@ -1061,9 +1093,9 @@ set
   status = 'sonuclandi',
   submitted_at = coalesce(a.submitted_at, a.updated_at),
   completed_at = coalesce(a.completed_at, a.updated_at),
-  earned_points = round(r.earned, 2),
-  total_points = round(r.total, 2),
-  final_score = round(r.earned / r.total * 100.0, 2)
+  earned_points = round(r.earned),
+  total_points = round(r.total),
+  final_score = round(r.earned / r.total * 100.0)
 from existing_results r
 where a.exam_id = r.exam_id
   and a.student_id = r.student_id

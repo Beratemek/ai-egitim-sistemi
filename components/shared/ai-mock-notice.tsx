@@ -57,15 +57,10 @@ export function AiMockNotice({
           Yapay zeka simülasyon modunda çalışıyor
         </p>
         <p className="leading-relaxed text-warning/90">
-          {MESSAGE[capability]} Gerçek modele bağlanmak için{" "}
-          <code className="rounded bg-warning/15 px-1 py-0.5 font-mono text-xs">
-            .env.local
-          </code>{" "}
-          dosyasındaki{" "}
-          <code className="rounded bg-warning/15 px-1 py-0.5 font-mono text-xs">
-            OPENAI_API_KEY
-          </code>{" "}
-          alanına geçerli bir anahtar yazıp sunucuyu yeniden başlatın.
+          {MESSAGE[capability]} Gerçek modele bağlanmak için sistem yöneticisi{" "}
+          <strong className="font-semibold">Sistem &rsaquo; API Anahtarları</strong>{" "}
+          ekranından geçerli bir API anahtarı tanımlamalı. Anahtar kaydedildiği
+          an geçerli olur; sunucuyu yeniden başlatmak gerekmez.
         </p>
       </div>
     </div>

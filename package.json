@@ -13,12 +13,14 @@
     "seed": "node scripts/test-verisi.mjs",
     "seed:sorular": "node scripts/soru-havuzu.mjs",
     "seed:demo": "node scripts/demo-verisi.mjs",
+    "vercel:env": "node scripts/vercel-env.mjs",
     "migration:durum": "node scripts/migration-durumu.mjs",
     "app:sync": "npx cap sync",
     "app:android": "npx cap open android",
     "app:ios": "npx cap open ios"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^1.2.12",
     "@ai-sdk/google": "^1.2.22",
     "@ai-sdk/openai": "^1.3.22",
     "@capacitor/android": "^8.5.0",

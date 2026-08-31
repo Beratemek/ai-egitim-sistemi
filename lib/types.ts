@@ -3,6 +3,8 @@
  * `supabase/schema.sql` ile birebir hizali tutulmalidir.
  */
 
+import type { AiProvider } from "@/lib/ai-providers";
+import type { ExamSimulationReport } from "@/lib/exam-simulation";
 import type { QuestionVisual } from "@/lib/visual";
 
 /* -------------------------------------------------------------------------- */
@@ -499,6 +501,34 @@ export interface StyleGuide {
 }
 
 /* -------------------------------------------------------------------------- */
+/*  Sinav kestirimi kaydi                                                     */
+/* -------------------------------------------------------------------------- */
+
+export const SIMULATION_COHORT_KINDS = ["hazir", "elle", "ikiz"] as const;
+export type SimulationCohortKind = (typeof SIMULATION_COHORT_KINDS)[number];
+
+/**
+ * Yayindan once yapilmis bir kestirimin kaydi.
+ *
+ * Kayit DEGISTIRILEMEZ (tabloda update politikasi yok): kalibrasyonun anlami
+ * tahminin sonradan duzeltilememesinde.
+ */
+export type ExamSimulationRow = {
+  id: string;
+  exam_id: string;
+  created_by: string;
+  cohort_kind: SimulationCohortKind;
+  cohort_label: string;
+  /** Kadronun temsil ettigi ogrenci sayisi. */
+  student_count: number;
+  /** Kalibrasyonun karsilastirdigi sayi, 0-100. */
+  predicted_average: number;
+  /** Raporun tamami; sekli `lib/exam-simulation.ts` icinde. */
+  report: ExamSimulationReport;
+  created_at: string;
+};
+
+/* -------------------------------------------------------------------------- */
 /*  Yapay zeka cikti tipleri                                                  */
 /* -------------------------------------------------------------------------- */
 
@@ -577,6 +607,23 @@ export interface GenerateQuestionsRequest {
   type?: QuestionType | "karisik";
   /** Talep edilen zorluk. Verilmezse "karisik". */
   difficulty?: DifficultyChoice;
+  /**
+   * Bu uretimde kullanilacak model.
+   *
+   * Verilmezse sistem yoneticisinin panelde sectigi varsayilan model gecerli
+   * olur. Icerik uzmani formdan yalnizca ANAHTARIN ERISEBILDIGI modeller
+   * arasindan secebilir (bkz. lib/ai-model-catalog.ts).
+   */
+  model?: string;
+  /**
+   * Modelin ait oldugu saglayici.
+   *
+   * Model adiyla BIRLIKTE tasiniyor cunku ayni anda birden fazla saglayicinin
+   * anahtari tanimli olabiliyor; "gpt-4o-mini" hem OpenAI hem OpenRouter
+   * listesinde gecebilir ve hangi anahtarla cagrilacagi yalnizca buradan
+   * anlasilir.
+   */
+  provider?: string;
 }
 
 export interface ReviseQuestionRequest {
@@ -590,6 +637,59 @@ export interface ReviseQuestionRequest {
   kazanim?: string;
   /** Kaynak metin - model bilgi uydurmasin. */
   context?: string;
+}
+
+/**
+ * Sanal sinif pilot uygulamasi istegi.
+ *
+ * Soru GOVDEDE tasiniyor cunku pilot, taslak henuz veritabanina yazilmadan
+ * uretim ekraninda calisiyor.
+ */
+export interface VirtualClassRequest {
+  /** Pilot uygulamaya sokulacak taslak. */
+  question: GeneratedQuestion;
+  /** Sorunun olctugu kazanim - simule ogrencilerin "derste ogrendigi" sey. */
+  kazanim?: string;
+  /** Ders adi. */
+  subject?: string;
+  /** Bu pilot icin kullanilacak model; verilmezse varsayilan model. */
+  model?: string;
+  /** Modelin saglayicisi. */
+  provider?: string;
+}
+
+/**
+ * Egitmenin elle kurdugu tek bir ogrenci profili.
+ *
+ * Yetkinlik ve dikkat 0-1 arasi oran; `count` bu profilden kac ogrenci
+ * oldugunu soyler ve kestirimde agirlik olarak kullanilir.
+ */
+export interface ManualProfileInput {
+  label: string;
+  /** Genel yetkinlik, 0-1. */
+  ability: number;
+  /** Dikkat, 0-1: 1 titiz, 0 aceleci. */
+  diligence: number;
+  /** Bu profilden kac ogrenci var. */
+  count: number;
+  /** Ders bazinda yetkinlik ezmesi (ders adi -> 0-1). */
+  subjectAbility?: Record<string, number>;
+  /** Tasidigi kavram yanilgisi. */
+  misconception?: string | null;
+}
+
+/** Sinav kestiriminde kullanilacak kadro. */
+export type SimulationCohortInput =
+  | { kind: "hazir" }
+  | { kind: "elle"; profiles: ManualProfileInput[] }
+  | { kind: "ikiz"; classroom: string };
+
+export interface SimulateExamRequest {
+  examId: string;
+  cohort: SimulationCohortInput;
+  /** Bu kestirimde kullanilacak model; verilmezse varsayilan model. */
+  model?: string;
+  provider?: string;
 }
 
 export interface GradeAnswerRequest {
@@ -617,6 +717,56 @@ type TableDefinition<Row, Insert> = {
   Insert: Insert;
   Update: Partial<Row>;
   Relationships: [];
+};
+
+/* -------------------------------------------------------------------------- */
+/*  Yapay zeka ayarlari                                                       */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * `public.ai_settings` - TEK SATIRLIK tablo.
+ *
+ * Sistem yoneticisinin panelden girdigi saglayici/anahtar burada durur.
+ * `id` sutunu daima `true`; birincil anahtar oldugu icin ikinci bir satir
+ * acilamaz, yani "hangi kayit gecerli" sorusu hic dogmaz.
+ *
+ * `api_key` ARAYUZE HIC GITMEZ: tablo RLS ile tumuyle kapalidir ve yalnizca
+ * service_role okuyabilir (bkz. lib/ai-settings.ts).
+ *
+ * `interface` DEGIL `type` olarak yaziliyor - dosyadaki diger satir tipleri
+ * gibi. Sebep teknik: postgrest-js `Row: Record<string, unknown>` bekliyor,
+ * TypeScript'te ise bir `interface` ortuk indeks imzasi almadigi icin bu
+ * kisiti karsilamiyor. Interface yazilirsa `Database` sessizce gecersiz
+ * sayilir ve TUM tablolarin sorgulari `never` tipine duser.
+ */
+export type AiSettingsRecord = {
+  id: boolean;
+  provider: AiProvider;
+  api_key: string;
+  base_url: string;
+  model_generation: string;
+  model_grading: string;
+  mock_mode: boolean;
+  updated_at: string;
+  updated_by: string | null;
+};
+
+/**
+ * `public.ai_provider_keys` - SAGLAYICI BASINA anahtar.
+ *
+ * `ai_settings` tek satirlik oldugu icin ayni anda tek anahtar tutabiliyordu;
+ * bu tablo her saglayiciya kendi satirini verir ve hepsi ayni anda tanimli
+ * kalabilir. Icerik uzmani model listesinde hepsini bir arada gorur.
+ *
+ * `interface` degil `type`: bkz. [[AiSettingsRecord]] uzerindeki not.
+ */
+export type AiProviderKeyRecord = {
+  provider: AiProvider;
+  api_key: string;
+  base_url: string;
+  model_generation: string;
+  updated_at: string;
+  updated_by: string | null;
 };
 
 export interface Database {
@@ -737,6 +887,30 @@ export interface Database {
           "id" | "anonymous" | "created_at" | "updated_at"
         >
       >;
+      ai_provider_keys: TableDefinition<
+        AiProviderKeyRecord,
+        Insertable<
+          AiProviderKeyRecord,
+          "api_key" | "base_url" | "model_generation" | "updated_at" | "updated_by"
+        >
+      >;
+      ai_settings: TableDefinition<
+        AiSettingsRecord,
+        Insertable<
+          AiSettingsRecord,
+          | "id"
+          | "base_url"
+          | "model_generation"
+          | "model_grading"
+          | "mock_mode"
+          | "updated_at"
+          | "updated_by"
+        >
+      >;
+      exam_simulations: TableDefinition<
+        ExamSimulationRow,
+        Insertable<ExamSimulationRow, "id" | "created_at" | "student_count">
+      >;
       question_preferences: TableDefinition<
         QuestionPreference,
         Insertable<
@@ -762,6 +936,48 @@ export interface Database {
       };
     };
     Functions: {
+      /*
+        Yapay zeka ayarlari. Ikisi de `security definer`: yetkiyi kendi
+        govdesinde `is_admin()` ile dogrular, yani bu ekrani atlayip PostgREST'e
+        dogrudan istek atmak ise yaramaz.
+      */
+      save_ai_provider_key: {
+        Args: {
+          target_provider: string;
+          new_api_key: string;
+          new_base_url: string;
+          new_model_generation: string;
+        };
+        Returns: null;
+      };
+      clear_ai_provider_key: {
+        Args: { target_provider: string };
+        Returns: null;
+      };
+      save_ai_defaults: {
+        Args: {
+          new_provider: string;
+          new_model_generation: string;
+          new_model_grading: string;
+          new_mock_mode: boolean;
+        };
+        Returns: null;
+      };
+      save_ai_settings: {
+        Args: {
+          new_provider: string;
+          new_api_key: string | null;
+          new_base_url: string;
+          new_model_generation: string;
+          new_model_grading: string;
+          new_mock_mode: boolean;
+        };
+        Returns: null;
+      };
+      clear_ai_api_key: {
+        Args: Record<string, never>;
+        Returns: null;
+      };
       current_user_role: {
         Args: Record<string, never>;
         Returns: UserRole;
