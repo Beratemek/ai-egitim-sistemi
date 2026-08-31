@@ -235,7 +235,7 @@ export function AnswerForm({
         */}
         {type === "test" ? (
           <fieldset className="space-y-2">
-            <legend className="mb-2 text-sm font-medium">Dogru sikki secin</legend>
+            <legend className="mb-2 text-sm font-medium">Doğru şıkkı seçiniz</legend>
             {(options ?? []).map((option) => {
               const isSelected = answer === option.key;
 

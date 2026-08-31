@@ -299,6 +299,34 @@ export interface StudentExamCard extends Exam {
 }
 
 /**
+ * Oturum acmis ogrencinin tum sinav denemeleri.
+ *
+ * Ogrenci ana sayfasi ayni render icinde hem sinav listesini hem sonuclari
+ * ister. Bu iki okuma ayri ayri `exam_attempts` sorgusu yaptiginda ayni veri
+ * uzak Supabase'ten iki kez tasiniyordu. React `cache`, sonucu yalnizca mevcut
+ * sunucu istegi boyunca paylastirir; kullanicilar veya sonraki istekler arasinda
+ * veri tutulmaz.
+ */
+const getCurrentStudentAttempts = cache(
+  async function getCurrentStudentAttempts(): Promise<ExamAttempt[]> {
+    if (!isSupabaseConfigured) return [];
+
+    const [supabase, current] = await Promise.all([
+      createServerSupabaseClient(),
+      getCurrentUser(),
+    ]);
+    if (!current) return [];
+
+    const { data, error } = await supabase
+      .from("exam_attempts")
+      .select("*")
+      .eq("student_id", current.user.id);
+
+    return error ? [] : (data ?? []);
+  },
+);
+
+/**
  * Ogrencinin girebilecegi (yayindaki) sinavlar.
  * `submissions` uzerindeki RLS politikasi ogrencinin yalnizca kendi
  * cevaplarini gormesini sagladigi icin sayim dogrudan kendi ilerlemesidir.
@@ -334,6 +362,7 @@ export async function getStudentExams(): Promise<StudentExamCard[]> {
 
   // Kimlik filtresi ACIKCA veriliyor; RLS ayricalikli hesaplarda daha genis
   // oldugu icin baskasinin atamasi bu listeye karisabiliyordu.
+  const attemptsPromise = getCurrentStudentAttempts();
   const assignmentResult = await supabase
     .from("exam_assignments")
     .select("*")
@@ -351,14 +380,10 @@ export async function getStudentExams(): Promise<StudentExamCard[]> {
   if (visibleExams.length === 0) return [];
   const examIds = visibleExams.map((exam) => exam.id);
 
-  const [links, submissions, attemptsResult] = await Promise.all([
+  const [links, submissions, attempts] = await Promise.all([
     supabase.from("exam_questions").select("exam_id").in("exam_id", examIds),
     getOwnSubmissions(supabase),
-    supabase
-      .from("exam_attempts")
-      .select("*")
-      .in("exam_id", examIds)
-      .eq("student_id", current.user.id),
+    attemptsPromise,
   ]);
 
   const countBy = (rows: { exam_id: string }[] | null): Map<string, number> => {
@@ -378,7 +403,9 @@ export async function getStudentExams(): Promise<StudentExamCard[]> {
     submissions.filter((row) => row.status === "egitmen_onayli"),
   );
   const attemptByExam = new Map(
-    (attemptsResult.data ?? []).map((attempt) => [attempt.exam_id, attempt]),
+    attempts
+      .filter((attempt) => examIds.includes(attempt.exam_id))
+      .map((attempt) => [attempt.exam_id, attempt]),
   );
 
   return visibleExams.map((exam) => ({
@@ -671,9 +698,10 @@ export interface StudentResultSummary {
 export async function getStudentResults(): Promise<StudentResultSummary[]> {
   if (!isSupabaseConfigured) return [];
 
-  const [supabase, current] = await Promise.all([
+  const [supabase, current, allAttempts] = await Promise.all([
     createServerSupabaseClient(),
     getCurrentUser(),
+    getCurrentStudentAttempts(),
   ]);
 
   if (!current) return [];
@@ -684,14 +712,15 @@ export async function getStudentResults(): Promise<StudentResultSummary[]> {
     "Sonuclarim" ekraninda gorurdu - exam_attempts politikasi o roller icin
     sinifin tamamini aciyor.
   */
-  const { data: attempts, error } = await supabase
-    .from("exam_attempts")
-    .select("*")
-    .eq("student_id", current.user.id)
-    .eq("status", "sonuclandi")
-    .order("completed_at", { ascending: false });
+  const attempts = allAttempts
+    .filter((attempt) => attempt.status === "sonuclandi")
+    .sort(
+      (a, b) =>
+        new Date(b.completed_at ?? 0).getTime() -
+        new Date(a.completed_at ?? 0).getTime(),
+    );
 
-  if (error || !attempts || attempts.length === 0) return [];
+  if (attempts.length === 0) return [];
 
   const examIds = [...new Set(attempts.map((attempt) => attempt.exam_id))];
   const [{ data: exams }, feedbackResult] = await Promise.all([
@@ -803,16 +832,20 @@ export interface StudentGrowthTopic {
 /** Egitmen onayli cevaplardan kazanim (yoksa konu) bazli gelisimi hesaplar. */
 export async function getStudentGrowth(): Promise<StudentGrowthTopic[]> {
   if (!isSupabaseConfigured) return [];
-  const current = await getCurrentUser();
+  const [current, allAttempts] = await Promise.all([
+    getCurrentUser(),
+    getCurrentStudentAttempts(),
+  ]);
   if (!current) return [];
 
   const supabase = await createServerSupabaseClient();
-  const { data: completedAttempts, error: attemptError } = await supabase
-    .from("exam_attempts")
-    .select("exam_id, completed_at")
-    .eq("student_id", current.user.id)
-    .eq("status", "sonuclandi");
-  if (attemptError || !completedAttempts?.length) return [];
+  const completedAttempts = allAttempts
+    .filter((attempt) => attempt.status === "sonuclandi")
+    .map((attempt) => ({
+      exam_id: attempt.exam_id,
+      completed_at: attempt.completed_at,
+    }));
+  if (completedAttempts.length === 0) return [];
 
   const completedExamIds = completedAttempts.map((attempt) => attempt.exam_id);
   const ownSubmissions = await getOwnSubmissions(supabase);

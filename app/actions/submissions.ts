@@ -112,6 +112,50 @@ export async function submitAnswer(
 
   const supabase = await createServerSupabaseClient();
 
+  /*
+   * Oturumu once tek RPC ile dogrula/olustur. Bu fonksiyon atamayi, yayin
+   * durumunu ve sinav zamanini sunucu tarafinda denetler. Ardindan birbirine
+   * bagimli olmayan okumalar ayni anda baslatilir. Eski akista bu sorgular
+   * sirayla beklendigi icin tek bir cevap kaydi uzak Supabase'e bes ayri
+   * gidis-donus yapiyordu.
+   */
+  const { error: attemptError } = await supabase.rpc("start_exam_attempt", {
+    target_exam: input.examId,
+  });
+  if (attemptError && !isStudentFlowUnavailable(attemptError)) {
+    return { ok: false, error: attemptError.message };
+  }
+
+  const [
+    examResult,
+    assignmentResult,
+    examQuestionResult,
+    safeQuestionResult,
+    ownSubmissions,
+  ] = await Promise.all([
+    supabase
+      .from("exams")
+      .select("is_published, starts_at, ends_at")
+      .eq("id", input.examId)
+      .maybeSingle(),
+    supabase
+      .from("exam_assignments")
+      .select("due_at")
+      .eq("exam_id", input.examId)
+      .eq("student_id", current.user.id)
+      .maybeSingle(),
+    supabase
+      .from("exam_questions")
+      .select("question_id")
+      .eq("exam_id", input.examId)
+      .eq("question_id", input.questionId)
+      .maybeSingle(),
+    supabase.rpc("get_student_exam_questions", {
+      target_exam: input.examId,
+    }),
+    getOwnExamSubmissions(supabase, input.examId),
+  ]);
+
   /**
    * Sinav gercekten girilebilir mi?
    *
@@ -119,22 +163,13 @@ export async function submitAnswer(
    * gosterdigi icin bu okuma ayni zamanda yetki kontrolu islevi gorur:
    * yayinlanmamis bir sinavin id'si tahmin edilse bile satir donmez.
    */
-  const { data: exam } = await supabase
-    .from("exams")
-    .select("is_published, starts_at, ends_at")
-    .eq("id", input.examId)
-    .maybeSingle();
+  const { data: exam } = examResult;
 
   if (!exam || !exam.is_published) {
     return { ok: false, error: "Bu sinav su an cevaplamaya acik degil." };
   }
 
-  const { data: assignment, error: assignmentError } = await supabase
-    .from("exam_assignments")
-    .select("due_at")
-    .eq("exam_id", input.examId)
-    .eq("student_id", current.user.id)
-    .maybeSingle();
+  const { data: assignment, error: assignmentError } = assignmentResult;
   const effectiveEndsAt = assignmentError
     ? exam.ends_at
     : assignment?.due_at ?? exam.ends_at;
@@ -150,27 +185,12 @@ export async function submitAnswer(
   // Istemciden gelen questionId'nin bu sinava ait oldugunu dogrula. Yalnizca
   // sorunun varligini kontrol etmek, baska bir sinavdaki soruya cevap kaydi
   // yazilabilmesine izin verirdi.
-  const { data: examQuestion } = await supabase
-    .from("exam_questions")
-    .select("question_id")
-    .eq("exam_id", input.examId)
-    .eq("question_id", input.questionId)
-    .maybeSingle();
+  const { data: examQuestion } = examQuestionResult;
 
   if (!examQuestion) {
     return { ok: false, error: "Bu soru sinava ait degil." };
   }
 
-  const { error: attemptError } = await supabase.rpc("start_exam_attempt", {
-    target_exam: input.examId,
-  });
-  if (attemptError && !isStudentFlowUnavailable(attemptError)) {
-    return { ok: false, error: attemptError.message };
-  }
-
-  const safeQuestionResult = await supabase.rpc("get_student_exam_questions", {
-    target_exam: input.examId,
-  });
   const question = safeQuestionResult.data?.find(
     (item) => item.id === input.questionId,
   );
@@ -193,7 +213,7 @@ export async function submitAnswer(
     return { ok: false, error: "Gecerli bir secenek secin." };
   }
 
-  const existing = (await getOwnExamSubmissions(supabase, input.examId)).find(
+  const existing = ownSubmissions.find(
     (submission) => submission.question_id === input.questionId,
   );
 
@@ -267,7 +287,6 @@ export async function markExamResultViewed(
 
   revalidatePath("/dashboard/ogrenci");
   revalidatePath("/dashboard/ogrenci/sonuclar");
-  revalidatePath(`/dashboard/ogrenci/sinav/${examId}`);
   return { ok: true, data: undefined };
 }
 

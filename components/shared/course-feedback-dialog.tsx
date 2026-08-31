@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import { LockKeyhole, MessageSquareText, Star } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { submitCourseExperienceFeedback } from "@/app/actions/course-feedback";
@@ -66,8 +65,8 @@ export function CourseFeedbackDialog({
   subject,
   initialFeedback,
 }: CourseFeedbackDialogProps) {
-  const router = useRouter();
   const [open, setOpen] = React.useState(false);
+  const [submitted, setSubmitted] = React.useState(Boolean(initialFeedback));
   const [pending, startTransition] = React.useTransition();
   const [ratings, setRatings] = React.useState<Ratings>({
     clarity: initialFeedback?.clarity_rating ?? 0,
@@ -108,21 +107,21 @@ export function CourseFeedbackDialog({
       }
 
       toast.success(
-        initialFeedback
+        submitted
           ? "Anonim değerlendirmeniz güncellendi"
           : "Anonim değerlendirmeniz gönderildi",
       );
+      setSubmitted(true);
       setOpen(false);
-      router.refresh();
     });
   }
 
   return (
     <Dialog open={open} onOpenChange={(value) => !pending && setOpen(value)}>
       <DialogTrigger asChild>
-        <Button variant={initialFeedback ? "outline" : "default"} size="sm">
+        <Button variant={submitted ? "outline" : "default"} size="sm">
           <MessageSquareText className="h-4 w-4" />
-          {initialFeedback
+          {submitted
             ? "Değerlendirmeni düzenle"
             : "Ders deneyimini değerlendir"}
         </Button>
@@ -240,7 +239,7 @@ export function CourseFeedbackDialog({
             <Button type="submit" disabled={pending || !complete}>
               {pending
                 ? "Gönderiliyor..."
-                : initialFeedback
+                : submitted
                   ? "Değerlendirmeyi güncelle"
                   : "Anonim gönder"}
             </Button>

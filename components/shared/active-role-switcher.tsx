@@ -53,7 +53,6 @@ export function ActiveRoleSwitcher({ activeRole, roles }: ActiveRoleSwitcherProp
 
       toast.success(`${ROLE_DEFINITIONS[role].label} paneline geçildi`);
       router.push(ROLE_DEFINITIONS[role].path);
-      router.refresh();
     } catch (caught) {
       toast.error("Rol değiştirilemedi", {
         description:

@@ -166,7 +166,7 @@ export function QuestionReviseDialog({
         return;
       }
       if (!draft.correct_answer) {
-        setError("Doğru şıkkı seçin.");
+        setError("Doğru şıkkı seçiniz.");
         return;
       }
       onSave({ ...draft, options: filled, rubric: null });

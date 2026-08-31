@@ -79,7 +79,6 @@ export function RoleOnboarding({
         router.replace("/onay-bekleniyor");
       }
 
-      router.refresh();
     } catch (caught) {
       toast.error("Talep kaydedilemedi", {
         description:
