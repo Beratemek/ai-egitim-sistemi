@@ -1,3 +1,4 @@
+import type { QuestionSolution } from "./solution.ts";
 import type {
   ExamAttemptStatus,
   QuestionOption,
@@ -68,6 +69,16 @@ export interface StudentMistakeSource {
   questions: readonly SafeStudentMistakeQuestionInput[];
   submissions: readonly StudentMistakeSubmissionInput[];
   outcomes?: readonly StudentMistakeOutcomeInput[];
+  /**
+   * Soru kimligi -> cozum. Ayri bir RPC'den geliyor
+   * (`get_my_solutions`), soru sorgusundan DEGIL.
+   *
+   * Neden ayri: soru sorgusu (`get_student_exam_questions`) sinav
+   * SURERKEN de calisiyor; cozumu oraya koymak cevap anahtarini sinav
+   * sirasinda acmak olurdu. Cozum kapisi yalnizca 'sonuclandi' denemeleri
+   * geciriyor.
+   */
+  solutions?: ReadonlyMap<string, QuestionSolution>;
 }
 
 export interface StudentMistakeRecord {
@@ -94,11 +105,23 @@ export interface StudentMistakeRecord {
   earnedPoints: number;
   aiFeedback: string | null;
   instructorNote: string | null;
+  /**
+   * Sorunun adim adim cozumu. Henuz uretilmemis sorularda null - uretim
+   * toplu betikle yapiliyor, yani null normal bir durum.
+   */
+  solution: QuestionSolution | null;
 }
 
 export interface StudentMistakeFilterOption {
   value: string;
   label: string;
+}
+
+export interface StudentMistakeFilterOptions {
+  subjects: StudentMistakeFilterOption[];
+  exams: StudentMistakeFilterOption[];
+  outcomes: StudentMistakeFilterOption[];
+  statuses: StudentMistakeFilterOption[];
 }
 
 export interface StudentMistakeNotebook {
@@ -110,11 +133,11 @@ export interface StudentMistakeNotebook {
     blank: number;
     outcomeCount: number;
   };
-  filterOptions: {
-    subjects: StudentMistakeFilterOption[];
-    exams: StudentMistakeFilterOption[];
-    outcomes: StudentMistakeFilterOption[];
-  };
+  /**
+   * Hicbir suzgec secili degilken gecerli secenekler. Kullanici bir secim
+   * yaptiginda arayuz `availableFilterOptions` ile yeniden hesapliyor.
+   */
+  filterOptions: StudentMistakeFilterOptions;
 }
 
 export interface StudentMistakeFilters {
@@ -228,6 +251,7 @@ export function buildStudentMistakeNotebook(
           approvedScore,
           questionPoints,
           earnedPoints: round((questionPoints * approvedScore) / 100),
+          solution: source.solutions?.get(question.id) ?? null,
           aiFeedback: sanitizeStudentFeedback(submission?.ai_feedback ?? null),
           instructorNote: normalizedText(submission?.instructor_note ?? null),
         },
@@ -244,17 +268,64 @@ export function buildStudentMistakeNotebook(
       blank: records.filter((record) => record.status === "bos").length,
       outcomeCount: new Set(records.map((record) => record.outcomeKey)).size,
     },
-    filterOptions: {
-      subjects: uniqueOptions(records, (record) => record.subject, (record) => record.subject),
-      exams: uniqueOptions(records, (record) => record.examId, (record) => record.examTitle),
-      outcomes: uniqueOptions(
-        records,
-        (record) => record.outcomeKey,
-        (record) => record.outcomeLabel,
-      ),
-    },
+    filterOptions: availableFilterOptions(records, {}),
   };
 }
+
+/**
+ * Suzgeclerin BIRBIRINE GORE hesaplanmis secenekleri.
+ *
+ * SORUN: dort acilir liste birbirinden habersizdi. Her biri defterin
+ * TAMAMINDAKI degerleri gosterdigi icin ogrenci "Robotik ve Kodlama" dersi
+ * ile "Haberlesme Protokolleri" kazanimini birlikte secebiliyordu - oysa o
+ * kazanim "Elektronik ve IoT" dersine ait. Sonuc her zaman bos, ekranda da
+ * yalnizca "eslesen kayit yok" yaziyordu: kullanici filtrenin bozuk
+ * oldugunu sanmisti, oysa kombinasyon imkansizdi.
+ *
+ * COZUM: her boyutun secenekleri, DIGER boyutlarin suzgeclerinden gecmis
+ * kayitlardan uretiliyor. Kendi suzgeci hesaba katilmiyor - katilsaydi liste
+ * yalnizca secili degeri gosterir, kullanici baska bir sey secemezdi.
+ *
+ * Sonucu: acilir listelerden imkansiz bir birlesim KURULAMIYOR.
+ */
+export function availableFilterOptions(
+  records: readonly StudentMistakeRecord[],
+  filters: StudentMistakeFilters,
+): StudentMistakeFilterOptions {
+  const digerlerineGore = (
+    haric: keyof StudentMistakeFilters,
+  ): StudentMistakeRecord[] =>
+    filterStudentMistakes(records, { ...filters, [haric]: null });
+
+  return {
+    subjects: uniqueOptions(
+      digerlerineGore("subject"),
+      (record) => record.subject,
+      (record) => record.subject,
+    ),
+    exams: uniqueOptions(
+      digerlerineGore("examId"),
+      (record) => record.examId,
+      (record) => record.examTitle,
+    ),
+    outcomes: uniqueOptions(
+      digerlerineGore("outcomeKey"),
+      (record) => record.outcomeKey,
+      (record) => record.outcomeLabel,
+    ),
+    statuses: uniqueOptions(
+      digerlerineGore("status"),
+      (record) => record.status,
+      (record) => STATUS_LABELS[record.status],
+    ),
+  };
+}
+
+const STATUS_LABELS: Record<StudentMistakeStatus, string> = {
+  yanlis: "Yanlış",
+  kismi: "Eksik öğrenme",
+  bos: "Boş bırakıldı",
+};
 
 export function filterStudentMistakes(
   records: readonly StudentMistakeRecord[],

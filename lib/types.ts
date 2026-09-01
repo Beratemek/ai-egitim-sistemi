@@ -4,6 +4,7 @@
  */
 
 import type { AiProvider } from "@/lib/ai-providers";
+import type { QuestionSolution } from "@/lib/solution";
 import type { QuestionVisual } from "@/lib/visual";
 
 /* -------------------------------------------------------------------------- */
@@ -177,6 +178,18 @@ export type Question = {
    * sorularda null.
    */
   visual_json: QuestionVisual | null;
+  /**
+   * Adim adim cozum: kavram, adimlar, sik degerlendirmesi, sonuc.
+   *
+   * SORUYA ait, ogrenciye degil - ayni sorunun cozumu her ogrenci icin
+   * aynidir, bu yuzden soru basina BIR KEZ uretilip saklaniyor. Kocun
+   * ciktisi ogrenciye ozel oldugu icin saklanamiyordu; cozum oyle degil.
+   *
+   * Bicim: `lib/solution.ts` icindeki `QuestionSolution`. Henuz uretilmemis
+   * sorularda null - sutun sonradan eklendi ve uretim toplu betikle
+   * yapiliyor, yani "null" normal bir durum, hata degil.
+   */
+  solution_json: QuestionSolution | null;
   /**
    * Zorluk derecesi. AI uretirken tahmin eder; icerik uzmani duzeltebilir.
    *
@@ -721,6 +734,9 @@ export interface Database {
           | "correct_answer"
           | "rubric"
           | "visual_json"
+          // Cozum EKLEME sirasinda verilmez: soru once havuza girer, cozumu
+          // sonra toplu betikle uretilir (bkz. lib/solution.ts).
+          | "solution_json"
         >
       >;
       exams: TableDefinition<
@@ -1025,6 +1041,15 @@ export interface Database {
       get_my_submissions: {
         Args: { target_exam?: string | null };
         Returns: Submission[];
+      };
+      /*
+        Cozum okuma kapisi. Yalnizca 'sonuclandi' denemelerdeki sorularin
+        cozumunu dondurur - soru metni, siklar, dogru cevap ve rubrik
+        BURADAN GECMEZ. Bkz. BEKLEYEN-cozum-okuma.sql
+      */
+      get_my_solutions: {
+        Args: { target_exam?: string | null };
+        Returns: Array<{ question_id: string; solution_json: unknown }>;
       };
       set_student_guardian: {
         Args: { target_student: string; target_guardian: string | null };

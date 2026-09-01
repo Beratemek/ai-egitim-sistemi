@@ -46,6 +46,7 @@ function question(id = "q1"): Question {
     correct_answer: "A",
     rubric: null,
     visual_json: null,
+    solution_json: null,
     difficulty: "orta",
     status: "onayli",
     outcome_id: "o1",

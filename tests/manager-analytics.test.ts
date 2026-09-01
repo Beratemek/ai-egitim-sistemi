@@ -105,6 +105,7 @@ function question(): Question {
     correct_answer: null,
     rubric: "Doğru kavramları kullanır.",
     visual_json: null,
+    solution_json: null,
     status: "onayli",
     outcome_id: "o1",
     created_by: "expert",

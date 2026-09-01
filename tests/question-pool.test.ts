@@ -30,6 +30,7 @@ function soru(
     correct_answer: type === "test" ? "A" : null,
     rubric: type === "test" ? null : "rubrik",
     visual_json: null,
+    solution_json: null,
     status: "onayli",
     outcome_id: null,
     created_by: null,

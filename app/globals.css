@@ -268,6 +268,201 @@
     background-position: 0 0, 10px 15px;
   }
 
+  /* =======================================================================
+   * YANLISLARIM DEFTERI - kitap goruntuleyici
+   * =======================================================================
+   * Sayfa cevirme efekti StPageFlip ile ciziliyor (bkz. MistakeBook).
+   *
+   * KUTUPHANENIN BICIMLERI BURAYA KOPYALANDI, import EDILMEDI: bu dosya
+   * paketin `dist` klasorunde degil `src` icinde duruyor ve package.json'da
+   * disa aktarilmis bir yol degil. `page-flip/src/Style/...` seklinde
+   * import etmek, paketin ic klasor duzenine bel baglamak olurdu - bir
+   * surum yukseltmesi sessizce kirardi. Yirmi satir icin bu risk gereksiz.
+   * (Kaynak: page-flip 2.0.7, MIT lisansli.)
+   * ==================================================================== */
+  .stf__parent {
+    position: relative;
+    display: block;
+    box-sizing: border-box;
+    transform: translateZ(0);
+    touch-action: pan-y;
+  }
+
+  .stf__parent canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  .stf__block {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    perspective: 2000px;
+  }
+
+  .stf__item {
+    display: none;
+    position: absolute;
+    transform-style: preserve-3d;
+  }
+
+  .stf__outerShadow,
+  .stf__innerShadow,
+  .stf__hardShadow,
+  .stf__hardInnerShadow {
+    position: absolute;
+    left: 0;
+    top: 0;
+  }
+
+  /*
+   * Tezgah: kitabin uzerinde durdugu yuzey. Spiral tel de buraya, kitabin
+   * USTUNE konumlanıyor.
+   *
+   * GENISLIK SINIRI BURADA, kitabin kendisinde DEGIL: StPageFlip "stretch"
+   * modunda olcuyu KAPSAYICISININ genisliginden hesapliyor ve sonucu
+   * kitabin uzerine satir ici stil olarak yaziyor. Sinir kitaba konunca
+   * kutuphane sinirsiz genisligi olcup 1188px'lik bir kitap kuruyordu.
+   * Sinir kapsayiciya konunca hesap dogru genislikle basliyor.
+   *
+   * Neden sinir gerekiyor: sayfa genisledikce satirlar uzar ve okunurluk
+   * duser - basili kitaplarin sayfa genisligi de bu yuzden sinirlidir.
+   */
+  .defter-tezgah {
+    position: relative;
+    margin-inline: auto;
+    max-width: 56rem;
+  }
+
+  /*
+   * Tek yaprak.
+   *
+   * KENDI ZEMINI OLMALI: cevrilirken yaprak havada duruyor; saydam olsaydi
+   * arkasindaki sayfa gorunur ve kagit hissi kaybolurdu. Renk `.exam-paper`
+   * ile ayni krem, cunku sayfa icerigi de o paleti kullaniyor.
+   */
+  .defter-yaprak {
+    background-color: hsl(40 28% 99%);
+    overflow: hidden;
+  }
+
+  /*
+   * Defter yapragi: KARELI ve neredeyse BEYAZ kagit.
+   *
+   * `.exam-paper` krem bir SINAV KAGIDI paleti veriyor - defter icin fazla
+   * sariydi. Burada yalnizca zemin degiskenleri tazeleniyor; metin, vurgu
+   * ve durum renkleri `.exam-paper`dan gelmeye devam ediyor, yani koyu
+   * temada sayfa yine acik kaliyor.
+   *
+   * NOKTA DESENI YERINE KARE: `bg-paper` (noktali doku) uygulamanin
+   * TAMAMINDA kullaniliyor - gövde zemininde bile. Onu degistirmek her
+   * ekrani etkilerdi; bu yuzden deftere ozel ayri bir desen tanimlandi.
+   *
+   * Cizgiler soluk mavi-gri ve 24px araliklı: gercek kareli defterlerin
+   * 5mm karesine yakin. Opaklik dusuk tutuldu - kagit kareli GORUNMELI ama
+   * uzerindeki metni okumayi zorlastirmamali.
+   */
+  .defter-kagit {
+    --background: 40 28% 99%;
+    --card: 0 0% 100%;
+    --muted: 40 14% 95%;
+    --border: 40 12% 89%;
+
+    background-color: hsl(var(--background));
+    background-image:
+      linear-gradient(to right, hsl(206 42% 50% / 0.1) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(206 42% 50% / 0.1) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+
+  /*
+   * DEFTER EYLEM DUGMELERI - saydam kirmizi ve saydam mavi.
+   *
+   * `variant="outline"` ile geliyorlardi: saydam zemin + soluk kenarlik.
+   * Kagit uzerinde bu, dugme gibi degil metin gibi duruyordu.
+   *
+   * Renkler BURADA, paylasilan bilesenlerde DEGIL: ayni iki bilesen baska
+   * ekranlarda da kullaniliyor ve oralarda mevcut gorunum dogru. Deftere
+   * ozel bir istek, deftere ozel kalmali.
+   *
+   * KONTRAST HESAPLANDI, goze bakilmadi. Kagit ~rgb(253,253,252):
+   *   kirmizi yazi rgb(163,35,31) -> 6.6:1
+   *   mavi yazi    rgb(23,82,151) -> 6.9:1
+   * Ikisi de WCAG AA normal metin esigini (4.5:1) rahat geciyor. Zemin
+   * saydam oldugu icin yazi renginin KOYU olmasi sart - acik bir ton
+   * saydam zeminde okunmazdi.
+   *
+   * h-7 (28px): iki tur kisaltma istendi; `size="sm"` 36px, once 32px'e
+   * indi, burada 28px. Sabit yukseklikli sayfada eylem seridi ne kadar
+   * ince olursa icerige o kadar yer kaliyor.
+   */
+  .defter-eylem > div {
+    padding-top: 0;
+  }
+
+  .defter-eylem button {
+    height: 1.75rem;
+    width: 100%;
+    font-size: 0.7rem;
+    border-width: 1px;
+    box-shadow: 0 1px 2px hsl(220 20% 20% / 0.06);
+  }
+
+  .defter-eylem-kirmizi button {
+    background-color: hsl(2 74% 52% / 0.12);
+    border-color: hsl(2 68% 46% / 0.5);
+    color: hsl(2 68% 38%);
+  }
+
+  .defter-eylem-kirmizi button:hover {
+    background-color: hsl(2 74% 52% / 0.2);
+  }
+
+  .defter-eylem-mavi button {
+    background-color: hsl(212 80% 48% / 0.12);
+    border-color: hsl(212 72% 42% / 0.5);
+    color: hsl(212 74% 34%);
+  }
+
+  .defter-eylem-mavi button:hover {
+    background-color: hsl(212 80% 48% / 0.2);
+  }
+
+  /*
+   * Telli defterin spiral halkasi.
+   *
+   * Metal tek renkle olmuyor: ustte isik, ortada parlama, altta golge
+   * gerekiyor - gradyan bu uc bandi veriyor. Renkler bilincli olarak tema
+   * degiskeni DEGIL: metal her iki temada da ayni metal, ustelik sayfa
+   * `.exam-paper` sayesinde her zaman krem.
+   */
+  .defter-tel {
+    background-image: linear-gradient(
+      to bottom,
+      hsl(210 14% 88%),
+      hsl(210 10% 96%) 22%,
+      hsl(210 12% 66%) 58%,
+      hsl(210 14% 48%)
+    );
+    box-shadow:
+      0 1px 2px hsl(220 30% 15% / 0.3),
+      inset 0 1px 0 hsl(0 0% 100% / 0.65);
+  }
+
+  /*
+   * Tel yalnizca IKI SAYFALI duzende gorunur. Dar ekranda StPageFlip tek
+   * sayfaya dusuyor; ortada bir dikis olmadigi icin tel de anlamsiz olurdu.
+   * Esik, kitabin iki sayfaya gectigi genislige denk geliyor.
+   */
+  @media (min-width: 1024px) {
+    .defter-tel-serit {
+      display: flex;
+    }
+  }
+
   /*
    * Panel zemini.
    *

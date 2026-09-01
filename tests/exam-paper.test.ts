@@ -25,6 +25,7 @@ function soru(id: string, points: number): Question & { points: number } {
     correct_answer: null,
     rubric: "rubrik",
     visual_json: null,
+    solution_json: null,
     status: "onayli",
     outcome_id: null,
     created_by: null,

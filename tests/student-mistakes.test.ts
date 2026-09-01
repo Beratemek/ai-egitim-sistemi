@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  availableFilterOptions,
   buildStudentMistakeNotebook,
   filterStudentMistakes,
   sanitizeStudentFeedback,
@@ -212,4 +213,176 @@ test("eşik değiştirildiğinde yeterli sayılan kanıt defterden çıkar", () 
     notebook.records.some((record) => record.questionId === "partial-open"),
     false,
   );
+});
+
+
+/* ===========================================================================
+ * Suzgec seceneklerinin birbirine gore daralmasi
+ * ---------------------------------------------------------------------------
+ * Gercek bir kullanici sikayetinden dogdu: "Robotik ve Kodlama" dersi ile
+ * "Haberlesme Protokolleri" kazanimi birlikte secilebiliyordu, ama o kazanim
+ * "Elektronik ve IoT" dersine ait. Sonuc her zaman bostu ve ekranda yalnizca
+ * "eslesen kayit yok" yaziyordu - filtre bozuk saniliyordu.
+ * ======================================================================== */
+
+const ikiDersliKaynak: StudentMistakeSource = {
+  exams: [
+    {
+      id: "sinav-robotik",
+      title: "Robotik Denemesi",
+      subject: "Robotik ve Kodlama",
+      created_at: "2026-08-20T08:00:00.000Z",
+    },
+    {
+      id: "sinav-iot",
+      title: "IoT Denemesi",
+      subject: "Elektronik ve IoT",
+      created_at: "2026-08-21T08:00:00.000Z",
+    },
+  ],
+  attempts: [
+    {
+      exam_id: "sinav-robotik",
+      status: "sonuclandi",
+      completed_at: "2026-08-22T10:00:00.000Z",
+    },
+    {
+      exam_id: "sinav-iot",
+      status: "sonuclandi",
+      completed_at: "2026-08-23T10:00:00.000Z",
+    },
+  ],
+  questions: [
+    {
+      examId: "sinav-robotik",
+      id: "soru-sensor",
+      subject: "Robotik ve Kodlama",
+      topic: "Sensör Temelleri",
+      text: "Sensör nedir?",
+      type: "test",
+      options_json: null,
+      outcome_id: "kazanim-sensor",
+      position: 0,
+      points: 10,
+    },
+    {
+      examId: "sinav-iot",
+      id: "soru-protokol",
+      subject: "Elektronik ve IoT",
+      topic: "Haberleşme Protokolleri",
+      text: "I2C nedir?",
+      type: "test",
+      options_json: null,
+      outcome_id: "kazanim-protokol",
+      position: 0,
+      points: 10,
+    },
+  ],
+  submissions: [
+    {
+      exam_id: "sinav-robotik",
+      question_id: "soru-sensor",
+      answer_text: "B",
+      ai_feedback: null,
+      instructor_approved_score: 0,
+      instructor_note: null,
+      status: "egitmen_onayli",
+    },
+    {
+      /* Bos birakilmis: durum suzgecinin de daraldigini gostermek icin. */
+      exam_id: "sinav-iot",
+      question_id: "soru-protokol",
+      answer_text: "",
+      ai_feedback: null,
+      instructor_approved_score: 0,
+      instructor_note: null,
+      status: "egitmen_onayli",
+    },
+  ],
+  outcomes: [
+    { id: "kazanim-sensor", outcome_text: "Sensör temellerini açıklar." },
+    { id: "kazanim-protokol", outcome_text: "Haberleşme protokollerini açıklar." },
+  ],
+};
+
+test("suzgec secilmemisken tum secenekler listelenir", () => {
+  const { records } = buildStudentMistakeNotebook(ikiDersliKaynak);
+  const secenekler = availableFilterOptions(records, {});
+
+  assert.deepEqual(
+    secenekler.subjects.map((o) => o.label),
+    ["Elektronik ve IoT", "Robotik ve Kodlama"],
+  );
+  assert.equal(secenekler.outcomes.length, 2);
+  assert.deepEqual(
+    secenekler.statuses.map((o) => o.value).sort(),
+    ["bos", "yanlis"],
+  );
+});
+
+test("ders secilince kazanim listesi yalnizca o dersin kazanimlarina daralir", () => {
+  const { records } = buildStudentMistakeNotebook(ikiDersliKaynak);
+  const secenekler = availableFilterOptions(records, {
+    subject: "Robotik ve Kodlama",
+  });
+
+  assert.deepEqual(
+    secenekler.outcomes.map((o) => o.label),
+    ["Sensör temellerini açıklar."],
+  );
+  /* Baska dersin kazanimi ARTIK SECILEMIYOR - sikayetin kaynagi buydu. */
+  assert.ok(
+    !secenekler.outcomes.some((o) => o.label.includes("Haberleşme")),
+    "baska derse ait kazanim listede kalmamali",
+  );
+});
+
+test("bir boyutun kendi suzgeci kendi seceneklerini daraltmaz", () => {
+  const { records } = buildStudentMistakeNotebook(ikiDersliKaynak);
+  const secenekler = availableFilterOptions(records, {
+    subject: "Robotik ve Kodlama",
+  });
+
+  /*
+    Ders secili olsa bile ders listesi iki dersi de gostermeli; aksi halde
+    kullanici fikrini degistirip baska bir ders secemezdi.
+  */
+  assert.equal(secenekler.subjects.length, 2);
+});
+
+test("durum secenekleri de diger suzgeclere gore daralir", () => {
+  const { records } = buildStudentMistakeNotebook(ikiDersliKaynak);
+
+  const robotik = availableFilterOptions(records, {
+    subject: "Robotik ve Kodlama",
+  });
+  assert.deepEqual(robotik.statuses.map((o) => o.value), ["yanlis"]);
+
+  const iot = availableFilterOptions(records, { subject: "Elektronik ve IoT" });
+  assert.deepEqual(iot.statuses.map((o) => o.value), ["bos"]);
+});
+
+test("daralan listelerden kurulabilen her birlesim en az bir kayit dondurur", () => {
+  const { records } = buildStudentMistakeNotebook(ikiDersliKaynak);
+
+  /*
+    Ozelligin asil vaadi bu: arayuzun sundugu her ders+kazanim birlesimi
+    gercekten sonuc vermeli. Bos sonuc ureten bir secim sunulamaz.
+  */
+  for (const ders of availableFilterOptions(records, {}).subjects) {
+    const kazanimlar = availableFilterOptions(records, {
+      subject: ders.value,
+    }).outcomes;
+
+    for (const kazanim of kazanimlar) {
+      const sonuc = filterStudentMistakes(records, {
+        subject: ders.value,
+        outcomeKey: kazanim.value,
+      });
+      assert.ok(
+        sonuc.length > 0,
+        `${ders.label} + ${kazanim.label} bos sonuc verdi`,
+      );
+    }
+  }
 });

@@ -22,6 +22,7 @@ import { z } from "zod";
 import { createAiModel } from "@/lib/ai-model";
 import type { AiProvider } from "@/lib/ai-providers";
 import { resolveAiConfig, resolveAiConfigFor } from "@/lib/ai-settings";
+import { parseSolution, type QuestionSolution } from "@/lib/solution";
 import { parseVisual, type QuestionVisual } from "@/lib/visual";
 import { searchWikimediaImages } from "@/lib/visual-search";
 import type {
@@ -255,6 +256,70 @@ export interface MistakeCoachInput {
 }
 
 export type MistakeCoachResult = z.infer<typeof mistakeCoachSchema>;
+
+/**
+ * Soru cozumu semasi.
+ *
+ * ADIMLAR ve SIKLAR ISTEGE BAGLI (`.max()` var ama `.min()` yok) - ders
+ * basina ayri sema yazmamak icin bilincli. Matematikte `steps` dolar,
+ * tarihte bos kalir, dil bilgisinde `options` agirlik tasir. Modele hangi
+ * alani doldurmasi gerektigi istemde anlatiliyor; sema onu ZORLAMIYOR.
+ *
+ * `concept` ve `conclusion` ise ZORUNLU: ikisi olmadan geriye yalnizca
+ * "su sik yanlis" listesi kalir ve o ogretmez.
+ */
+const questionSolutionSchema = z.object({
+  concept: z
+    .string()
+    .describe(
+      "Sorunun dayandigi kural, kavram ya da formul. Cozumun geri kalani bunun " +
+        "uygulanmasidir. Dil bilgisinde kuralin tanimi, matematikte formul, " +
+        "tarihte olayin baglami.",
+    ),
+  steps: z
+    .array(z.string())
+    .max(10)
+    .describe(
+      "Cozume giden sirali adimlar. Islem/akil yurutme gerektiren sorularda " +
+        "doldur; dogrudan bilgi sorularinda BOS BIRAK.",
+    ),
+  options: z
+    .array(
+      z.object({
+        key: z.string().describe("Sik anahtari: A, B, C, D."),
+        correct: z.boolean().describe("Bu sik dogru mu?"),
+        reason: z
+          .string()
+          .describe(
+            "Neden dogru ya da neden yanlis. Yanlis siklarda ogrencinin hangi " +
+              "yanilgiya dustugunu gosteren somut bir aciklama yaz.",
+          ),
+      }),
+    )
+    .max(6)
+    .describe(
+      "Her sik icin degerlendirme - DOGRU SIK DA DAHIL. Yalnizca coktan " +
+        "secmeli sorularda doldur; acik uclu soruda BOS BIRAK.",
+    ),
+  conclusion: z
+    .string()
+    .describe("Dogru cevabin kisa ve acik gerekcesi."),
+});
+
+export interface SolutionInput {
+  subject: string;
+  topic: string;
+  outcomeText?: string | null;
+  questionText: string;
+  questionType: QuestionType;
+  /** Coktan secmelide siklarin TAM METNI; acik ucluda bos dizi. */
+  options: { key: string; text: string }[];
+  /** Coktan secmelide dogru sikkin anahtari; acik ucluda null. */
+  correctAnswer: string | null;
+  /** Acik uclu sorularda puanlama olcutu; varsa cozume yon verir. */
+  rubric?: string | null;
+}
+
 
 const examAiReviewSchema = z.object({
   summary: z
@@ -1367,4 +1432,131 @@ function likedMockDifficulties(
     );
 
   return valid.length > 0 ? valid : null;
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Soru cozumu                                                               */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Bir sorunun adim adim cozumunu uretir.
+ *
+ * KOCTAN FARKI: bu fonksiyon SIKLARI ve DOGRU CEVABI goruyor. Kocta bunlar
+ * bilerek gonderilmiyordu cunku ciktisi sinav sirasinda da erisilebilecek
+ * bir yuzeye baglanabilirdi. Cozum ise yalnizca SONUCLANMIS sinavlarda
+ * gosteriliyor; orada cevabi saklamanin anlami yok, tersine cevabi
+ * aciklamak isin ta kendisi.
+ *
+ * Siklarin METNI gonderiliyor, yalnizca harfi degil. Koctaki eksik tam
+ * buydu: modele "ogrenci A'yi secti" deniyor ama A'nin ne oldugu
+ * soylenmiyordu, bu yuzden yanilgi analizi genel bir tahmine donuyordu.
+ * Burada sik metinleri elde oldugu icin celdirici analizi gercek oluyor.
+ *
+ * ONAY KAPISI YOK: cikti toplu betikle uretilip dogrudan saklaniyor. Bu
+ * yuzden istemde iki sey zorlaniyor - kaynaktan sapmamak ve emin olunmayan
+ * yerde kesin konusmamak. Ogrenciye gosterilirken de yapay zeka urunu
+ * oldugu yaziliyor.
+ */
+export async function generateSolution(
+  input: SolutionInput,
+  /**
+   * Bu cagri icin kullanilacak model. Bos birakilirsa yapilandirmadaki
+   * uretim modeli kullanilir.
+   *
+   * NEDEN VAR: Gemini'nin ucretsiz katmaninda kota MODEL BASINA ayri.
+   * Uretim modeli tukendiginde is tamamen duruyordu; oysa ayni anahtarla
+   * baska bir model hala cevap veriyor olabiliyor. Bu parametre, kotayi
+   * `.env` dosyasini kurcalamadan ve baska ozellikleri etkilemeden
+   * yonlendirmeyi sagliyor - degisiklik yalnizca bu cagri icin gecerli.
+   */
+  modelAdi?: string | null,
+): Promise<QuestionSolution> {
+  const normalized: SolutionInput = {
+    ...input,
+    subject: input.subject.trim().slice(0, 120),
+    topic: input.topic.trim().slice(0, 160),
+    outcomeText: input.outcomeText?.trim().slice(0, 500) || null,
+    questionText: input.questionText.trim().slice(0, 2_000),
+    options: input.options.slice(0, 6).map((option) => ({
+      key: String(option.key).trim().slice(0, 4),
+      text: String(option.text).trim().slice(0, 500),
+    })),
+    rubric: input.rubric?.trim().slice(0, 1_500) || null,
+  };
+
+  if (!normalized.questionText) {
+    throw new Error("[ai] generateSolution: soru metni bos olamaz.");
+  }
+
+  const ai = await resolveAiConfig();
+  if (ai.mockMode) return mockGenerateSolution(normalized);
+
+  const test = normalized.questionType === "test";
+
+  const { object } = await generateObject({
+    maxRetries: 0,
+    model: createAiModel(ai, modelAdi?.trim() || ai.modelGeneration),
+    schema: questionSolutionSchema,
+    system: [
+      "Sen deneyimli bir ogretmensin ve sinavi TAMAMLAMIS bir ogrenciye sorunun cozumunu anlatiyorsun.",
+      "Sinav bitti; cevabi aciklamak senin isin, saklamak degil.",
+      "Once kurali ya da kavrami kur, sonra uygula. Ezberletme, nedenini goster.",
+      "Yalnizca sorunun kendisinden ve verilen bilgiden yararlan; disaridan bilgi uydurma.",
+      "Emin olmadigin bir yerde kesin konusma.",
+      "Turkce, sade ve yasa uygun bir dil kullan. Ogrenciyi yargilama.",
+      test
+        ? "Her sik icin ayri bir degerlendirme yaz - DOGRU SIK DA DAHIL. Yanlis siklarda 'bunu secen ogrenci muhtemelen sunu sununla karistirmistir' seklinde SOMUT yanilgi goster; 'yanlis' demekle yetinme."
+        : "Acik uclu soru: sik degerlendirmesi YAZMA, `options` alanini bos birak. Iyi bir cevabin hangi ogeleri tasimasi gerektigini anlat.",
+      "Islem ya da akil yurutme gerektiren sorularda `steps` alanini sirali doldur; dogrudan bilgi sorularinda bos birak.",
+    ].join(" "),
+    prompt: [
+      `DERS: ${normalized.subject || "Belirtilmedi"}`,
+      `KONU: ${normalized.topic || "Belirtilmedi"}`,
+      normalized.outcomeText ? `KAZANIM: ${normalized.outcomeText}` : "",
+      `SORU TURU: ${test ? "Coktan secmeli" : "Acik uclu"}`,
+      `SORU: ${normalized.questionText}`,
+      test && normalized.options.length > 0
+        ? "SIKLAR:\n" +
+          normalized.options.map((o) => `${o.key}) ${o.text}`).join("\n")
+        : "",
+      test && normalized.correctAnswer
+        ? `DOGRU SIK: ${normalized.correctAnswer}`
+        : "",
+      normalized.rubric ? `PUANLAMA OLCUTU: ${normalized.rubric}` : "",
+      "GOREV: Bu sorunun cozumunu uret. Once devredeki kural/kavram, sonra " +
+        (test
+          ? "sik sik degerlendirme ve dogru cevabin gerekcesi."
+          : "iyi bir cevabin tasimasi gereken ogeler ve sonuc."),
+    ]
+      .filter(Boolean)
+      .join("\n\n"),
+  });
+
+  const parsed = parseSolution(object);
+  if (!parsed) {
+    throw new Error("[ai] generateSolution: model gecerli bir cozum uretmedi.");
+  }
+  return parsed;
+}
+
+/** Kota harcamadan arayuz denemek icin sahte cozum. */
+function mockGenerateSolution(input: SolutionInput): QuestionSolution {
+  const test = input.questionType === "test";
+  return {
+    concept: `[MOCK] ${input.topic || "Konu"} konusundaki temel kural burada aciklanir.`,
+    steps: test ? [] : [{ text: "[MOCK] Cozume giden ilk adim." }],
+    options: test
+      ? input.options.map((option) => ({
+          key: option.key,
+          correct: option.key === input.correctAnswer,
+          reason:
+            option.key === input.correctAnswer
+              ? "[MOCK] Kurala uyan tek sik bu."
+              : "[MOCK] Bu sik kuralin farkli bir durumuyla karistiriliyor.",
+        }))
+      : [],
+    conclusion: test
+      ? `[MOCK] Dogru cevap ${input.correctAnswer ?? "-"}.`
+      : "[MOCK] Iyi bir cevap yukaridaki ogeleri tasimalidir.",
+  };
 }

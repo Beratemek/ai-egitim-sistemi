@@ -1,5 +1,6 @@
 import { isSupabaseConfigured, serverEnv } from "@/lib/env";
 import { grantedRoles } from "@/lib/roles";
+import { parseSolution, type QuestionSolution } from "@/lib/solution";
 import {
   buildStudentMistakeNotebook,
   type SafeStudentMistakeQuestionInput,
@@ -47,20 +48,44 @@ export async function getStudentMistakeNotebook(): Promise<StudentMistakeNoteboo
   const examIds = [...new Set(attempts.map((attempt) => attempt.exam_id))];
   if (examIds.length === 0) return EMPTY_NOTEBOOK;
 
-  const [examsResult, submissionsResult, ...questionResults] = await Promise.all([
-    supabase
-      .from("exams")
-      .select("id, title, subject, created_at")
-      .in("id", examIds),
-    supabase.rpc("get_my_submissions", { target_exam: null }),
-    ...examIds.map((examId) =>
-      supabase.rpc("get_student_exam_questions", { target_exam: examId }),
-    ),
-  ]);
+  /*
+    Cozumler AYRI bir RPC'den geliyor: `get_my_solutions`.
+
+    `get_student_exam_questions` icine konulamazdi - o sorgu sinav SURERKEN
+    de calisiyor ve cozum orada cevap anahtarini acardi. Cozum kapisi
+    yalnizca 'sonuclandi' denemeleri geciriyor (BEKLEYEN-cozum-okuma.sql).
+  */
+  const [examsResult, submissionsResult, solutionsResult, ...questionResults] =
+    await Promise.all([
+      supabase
+        .from("exams")
+        .select("id, title, subject, created_at")
+        .in("id", examIds),
+      supabase.rpc("get_my_submissions", { target_exam: null }),
+      supabase.rpc("get_my_solutions", { target_exam: null }),
+      ...examIds.map((examId) =>
+        supabase.rpc("get_student_exam_questions", { target_exam: examId }),
+      ),
+    ]);
 
   assertQuerySucceeded(examsResult.error);
   assertQuerySucceeded(submissionsResult.error);
   for (const result of questionResults) assertQuerySucceeded(result.error);
+
+  /*
+    Cozum hatasi defteri DUSURMEZ.
+
+    Migration henuz calistirilmadiysa ya da RPC bir sebeple hata verirse
+    ogrenci yine yanlislarini gorebilmeli; yalnizca cozum bolumu gorunmez.
+    Bu yuzden burada `assertQuerySucceeded` KULLANILMIYOR.
+  */
+  const solutions = new Map<string, QuestionSolution>();
+  if (!solutionsResult.error) {
+    for (const row of solutionsResult.data ?? []) {
+      const parsed = parseSolution(row.solution_json);
+      if (parsed) solutions.set(row.question_id, parsed);
+    }
+  }
 
   const questions: SafeStudentMistakeQuestionInput[] = questionResults.flatMap(
     (result, index) =>
@@ -92,6 +117,7 @@ export async function getStudentMistakeNotebook(): Promise<StudentMistakeNoteboo
     exams: examsResult.data ?? [],
     attempts,
     questions,
+    solutions,
     submissions: (submissionsResult.data ?? []).filter(
       (submission) =>
         submission.student_id === current.user.id &&
