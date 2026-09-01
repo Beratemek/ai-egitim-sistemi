@@ -18,6 +18,12 @@ import { ALL_SUBJECTS, subjectKey } from "@/lib/subjects";
 import { selectStyleScope, type StyleScopeInput } from "@/lib/style-scope";
 import { analyzeOutcomes, type OutcomeAnalysisRow } from "@/lib/outcome-analysis";
 import {
+  computeActualResults,
+  summarizeCalibration,
+  type CalibrationEntry,
+  type CalibrationSummary,
+} from "@/lib/exam-calibration";
+import {
   MOCK_EXAMS,
   MOCK_OUTCOMES,
   MOCK_QUESTIONS,
@@ -1069,6 +1075,122 @@ export async function getExamStatistics(): Promise<ExamStatistics[]> {
   const supabase = await createServerSupabaseClient();
   const { data } = await supabase.from("exam_statistics").select("*");
   return data ?? [];
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Kestirim kalibrasyonu                                                     */
+/* -------------------------------------------------------------------------- */
+
+export interface ExamCalibrationData {
+  /** Bu sinav icin en son kestirim ve -varsa- gerceklesen sonuc. */
+  latest: CalibrationEntry | null;
+  /** Egitmenin olculmus butun kestirimlerinden ozet; hic yoksa null. */
+  summary: CalibrationSummary | null;
+  /**
+   * Kayit tablosu erisilebilir mi.
+   *
+   * `false` ise migration henuz uygulanmamis demektir (bkz.
+   * supabase/migrations/BEKLEYEN-1-sinav-kestirimi.sql). Arayuz bunu
+   * "kalibrasyon kapali" diye gosterir; hata olarak degil, cunku kestirimin
+   * kendisi bu tablo olmadan da calisir.
+   */
+  available: boolean;
+}
+
+const BOS_KALIBRASYON: ExamCalibrationData = {
+  latest: null,
+  summary: null,
+  available: false,
+};
+
+/** Kalibrasyon hesabina alinacak en fazla sinav sayisi. */
+const CALIBRATION_EXAM_LIMIT = 20;
+
+/**
+ * Kestirim tahminlerini gerceklesen sonuclarla karsilastirir.
+ *
+ * HER SINAVDAN YALNIZCA EN SON KESTIRIM sayilir. Ayni sinav uzerinde bes kez
+ * kestirim calistirilirsa ve sinav bir kez yapilirsa, bes kaydin hepsini
+ * ozete katmak o tek sinavi bes kat agirlikli yapardi; ozet de en cok
+ * denenen sinava dogru kayardi.
+ */
+export async function getExamCalibration(
+  examId: string,
+): Promise<ExamCalibrationData> {
+  if (!isSupabaseConfigured) return BOS_KALIBRASYON;
+
+  const supabase = await createServerSupabaseClient();
+
+  const simulationsResult = await supabase
+    .from("exam_simulations")
+    .select("id, exam_id, cohort_kind, cohort_label, predicted_average, student_count, created_at")
+    .order("created_at", { ascending: false })
+    .limit(120);
+
+  // Tablo yoksa ya da okunamiyorsa kestirim calismaya devam eder.
+  if (simulationsResult.error || !simulationsResult.data) return BOS_KALIBRASYON;
+
+  const sonKestirimler = new Map<string, (typeof simulationsResult.data)[number]>();
+  for (const row of simulationsResult.data) {
+    if (!sonKestirimler.has(row.exam_id)) sonKestirimler.set(row.exam_id, row);
+  }
+
+  const secilen = [...sonKestirimler.values()].slice(0, CALIBRATION_EXAM_LIMIT);
+  if (secilen.length === 0) return { latest: null, summary: null, available: true };
+
+  const examIds = secilen.map((row) => row.exam_id);
+
+  const [examsResult, linksResult, submissionsResult] = await Promise.all([
+    supabase.from("exams").select("id, title").in("id", examIds),
+    supabase.from("exam_questions").select("exam_id, question_id, points").in("exam_id", examIds),
+    supabase
+      .from("submissions")
+      .select("exam_id, student_id, question_id, instructor_approved_score, status")
+      .in("exam_id", examIds)
+      .limit(8_000),
+  ]);
+
+  const titleById = new Map(
+    (examsResult.data ?? []).map((exam) => [exam.id, exam.title]),
+  );
+
+  const actualByExam = new Map(
+    computeActualResults(
+      (submissionsResult.data ?? []).map((submission) => ({
+        examId: submission.exam_id,
+        studentId: submission.student_id,
+        questionId: submission.question_id,
+        approvedScore: submission.instructor_approved_score,
+        status: submission.status,
+      })),
+      (linksResult.data ?? []).map((link) => ({
+        examId: link.exam_id,
+        questionId: link.question_id,
+        points: link.points,
+      })),
+    ).map((result) => [result.examId, result]),
+  );
+
+  const entries: CalibrationEntry[] = secilen.map((row) => {
+    const actual = actualByExam.get(row.exam_id) ?? null;
+    return {
+      simulationId: row.id,
+      examId: row.exam_id,
+      examTitle: titleById.get(row.exam_id) ?? "Sınav",
+      cohortKind: row.cohort_kind,
+      cohortLabel: row.cohort_label,
+      predicted: Number(row.predicted_average),
+      actual: actual?.average ?? null,
+      studentCount: actual?.studentCount ?? 0,
+      createdAt: row.created_at,
+    };
+  });
+
+  return {
+    latest: entries.find((entry) => entry.examId === examId) ?? null,
+    summary: summarizeCalibration(entries),
+    available: true,
+  };
 }
 
 /**

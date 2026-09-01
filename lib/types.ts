@@ -5,6 +5,7 @@
 
 import type { AiProvider } from "@/lib/ai-providers";
 import type { QuestionSolution } from "@/lib/solution";
+import type { ExamSimulationReport } from "@/lib/exam-simulation";
 import type { QuestionVisual } from "@/lib/visual";
 
 /* -------------------------------------------------------------------------- */
@@ -513,6 +514,34 @@ export interface StyleGuide {
 }
 
 /* -------------------------------------------------------------------------- */
+/*  Sinav kestirimi kaydi                                                     */
+/* -------------------------------------------------------------------------- */
+
+export const SIMULATION_COHORT_KINDS = ["hazir", "elle", "ikiz"] as const;
+export type SimulationCohortKind = (typeof SIMULATION_COHORT_KINDS)[number];
+
+/**
+ * Yayindan once yapilmis bir kestirimin kaydi.
+ *
+ * Kayit DEGISTIRILEMEZ (tabloda update politikasi yok): kalibrasyonun anlami
+ * tahminin sonradan duzeltilememesinde.
+ */
+export type ExamSimulationRow = {
+  id: string;
+  exam_id: string;
+  created_by: string;
+  cohort_kind: SimulationCohortKind;
+  cohort_label: string;
+  /** Kadronun temsil ettigi ogrenci sayisi. */
+  student_count: number;
+  /** Kalibrasyonun karsilastirdigi sayi, 0-100. */
+  predicted_average: number;
+  /** Raporun tamami; sekli `lib/exam-simulation.ts` icinde. */
+  report: ExamSimulationReport;
+  created_at: string;
+};
+
+/* -------------------------------------------------------------------------- */
 /*  Yapay zeka cikti tipleri                                                  */
 /* -------------------------------------------------------------------------- */
 
@@ -621,6 +650,59 @@ export interface ReviseQuestionRequest {
   kazanim?: string;
   /** Kaynak metin - model bilgi uydurmasin. */
   context?: string;
+}
+
+/**
+ * Sanal sinif pilot uygulamasi istegi.
+ *
+ * Soru GOVDEDE tasiniyor cunku pilot, taslak henuz veritabanina yazilmadan
+ * uretim ekraninda calisiyor.
+ */
+export interface VirtualClassRequest {
+  /** Pilot uygulamaya sokulacak taslak. */
+  question: GeneratedQuestion;
+  /** Sorunun olctugu kazanim - simule ogrencilerin "derste ogrendigi" sey. */
+  kazanim?: string;
+  /** Ders adi. */
+  subject?: string;
+  /** Bu pilot icin kullanilacak model; verilmezse varsayilan model. */
+  model?: string;
+  /** Modelin saglayicisi. */
+  provider?: string;
+}
+
+/**
+ * Egitmenin elle kurdugu tek bir ogrenci profili.
+ *
+ * Yetkinlik ve dikkat 0-1 arasi oran; `count` bu profilden kac ogrenci
+ * oldugunu soyler ve kestirimde agirlik olarak kullanilir.
+ */
+export interface ManualProfileInput {
+  label: string;
+  /** Genel yetkinlik, 0-1. */
+  ability: number;
+  /** Dikkat, 0-1: 1 titiz, 0 aceleci. */
+  diligence: number;
+  /** Bu profilden kac ogrenci var. */
+  count: number;
+  /** Ders bazinda yetkinlik ezmesi (ders adi -> 0-1). */
+  subjectAbility?: Record<string, number>;
+  /** Tasidigi kavram yanilgisi. */
+  misconception?: string | null;
+}
+
+/** Sinav kestiriminde kullanilacak kadro. */
+export type SimulationCohortInput =
+  | { kind: "hazir" }
+  | { kind: "elle"; profiles: ManualProfileInput[] }
+  | { kind: "ikiz"; classroom: string };
+
+export interface SimulateExamRequest {
+  examId: string;
+  cohort: SimulationCohortInput;
+  /** Bu kestirimde kullanilacak model; verilmezse varsayilan model. */
+  model?: string;
+  provider?: string;
 }
 
 export interface GradeAnswerRequest {
@@ -840,6 +922,10 @@ export interface Database {
           | "updated_at"
           | "updated_by"
         >
+      >;
+      exam_simulations: TableDefinition<
+        ExamSimulationRow,
+        Insertable<ExamSimulationRow, "id" | "created_at" | "student_count">
       >;
       question_preferences: TableDefinition<
         QuestionPreference,
