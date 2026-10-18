@@ -16,7 +16,7 @@ import { createServerClient } from "@supabase/ssr";
 import { createClient as createSupabaseJsClient } from "@supabase/supabase-js";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 
-import { requireSupabaseEnv, serverEnv } from "@/lib/env";
+import { isSupabaseConfigured, requireSupabaseEnv, serverEnv } from "@/lib/env";
 import type { Database, UserProfile, UserRole } from "@/lib/types";
 
 export type TypedServerClient = SupabaseClient<Database>;
@@ -130,6 +130,10 @@ export interface AuthenticatedUser {
  * politikalari her zaman gercek kullaniciya gore calisir.
  */
 export const getCurrentUser = cache(async (): Promise<AuthenticatedUser | null> => {
+  // Demo modunda (Supabase yapilandirilmamis) oturum yoktur; hata firlatmak
+  // yerine "kullanici yok" doner ki sayfalar derlemede de calissin.
+  if (!isSupabaseConfigured) return null;
+
   const client = await createServerSupabaseClient();
 
   const {

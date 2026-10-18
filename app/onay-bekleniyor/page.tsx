@@ -7,6 +7,7 @@ import { BrandMark } from "@/components/shared/brand-mark";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { roleLabel } from "@/lib/roles";
+import { isSupabaseConfigured } from "@/lib/env";
 import { getCurrentUser } from "@/lib/supabase-server";
 import { cn, formatDateTime } from "@/lib/utils";
 
@@ -19,6 +20,9 @@ export const metadata: Metadata = { title: "Onay Bekleniyor" };
  * yetkili alanlara zaten erisemez. Ekran yalnızca durumu anlatir.
  */
 export default async function OnayBekleniyorPage() {
+  // Demo modunda oturum yok: ziyaretçiyi doğrudan panele gönder.
+  if (!isSupabaseConfigured) redirect("/dashboard");
+
   const current = await getCurrentUser();
   if (!current) redirect("/login");
 

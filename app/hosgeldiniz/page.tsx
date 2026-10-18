@@ -6,6 +6,7 @@ import { BrandMark } from "@/components/shared/brand-mark";
 import { RoleOnboarding } from "@/components/shared/role-onboarding";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { dashboardPathFor } from "@/lib/roles";
+import { isSupabaseConfigured } from "@/lib/env";
 import { getCurrentUser } from "@/lib/supabase-server";
 
 export const metadata: Metadata = { title: "Hoş Geldiniz" };
@@ -18,6 +19,9 @@ export const metadata: Metadata = { title: "Hoş Geldiniz" };
  * doğrudan acilirsa da korunmali.
  */
 export default async function HosGeldinizPage() {
+  // Demo modunda oturum yok: ziyaretçiyi doğrudan panele gönder.
+  if (!isSupabaseConfigured) redirect("/dashboard");
+
   const current = await getCurrentUser();
   if (!current) redirect("/login");
   if (current.profile.role_status === "onayli") {
